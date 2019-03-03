@@ -110,7 +110,7 @@ class SamplesLoss(Module):
 
     """
     def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, 
-                       scaling=.5, truncate=None, cost=None, kernel=None, backend="auto"):
+                       scaling=.5, truncate=5, cost=None, kernel=None, backend="auto"):
 
         super(SamplesLoss, self).__init__()
         self.loss = loss

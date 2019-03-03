@@ -102,3 +102,13 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+
+# Build junk
+*build*
+*output*
+!*input_output.py
+/build/*
+!/build/.gitkeep
+*_auto_examples*
+*_auto_tutorials*
