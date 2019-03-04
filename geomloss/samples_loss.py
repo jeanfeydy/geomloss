@@ -6,7 +6,7 @@ import warnings
 from .kernel_samples import kernel_tensorized, kernel_online, kernel_multiscale
 
 from .sinkhorn_samples import sinkhorn_tensorized
-from .kernel_samples import kernel_online     as sinkhorn_online
+from .sinkhorn_samples import sinkhorn_online
 from .kernel_samples import kernel_multiscale as sinkhorn_multiscale
 
 from .kernel_samples import kernel_tensorized as hausdorff_tensorized
