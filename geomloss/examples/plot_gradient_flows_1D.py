@@ -16,6 +16,7 @@ the registration of an interval onto another.
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.neighbors import KernelDensity  # display as density curves
+import time
 
 import torch
 from geomloss import SamplesLoss
@@ -89,6 +90,7 @@ def gradient_flow(loss, lr=.05) :
     # wrt. the positions x_i of the diracs masses that make up α:
     x_i.requires_grad = True  
     
+    t_0 = time.time()
     plt.figure(figsize=(12,8)) ; k = 1
     for i in range(Nsteps): # Euler scheme ===============
         # Compute cost and gradient
@@ -108,6 +110,7 @@ def gradient_flow(loss, lr=.05) :
         
         # in-place modification of the tensor's values
         x_i.data -= lr * len(x_i) * g 
+    plt.title("t = {:1.2f}, elapsed time: {:.2f}s".format(lr*i, time.time() - t_0))
 
 
 
@@ -160,3 +163,26 @@ gradient_flow( SamplesLoss("laplacian", blur=.1) )
 
 # sphinx_gallery_thumbnail_number = 4
 gradient_flow( SamplesLoss("energy") )
+
+
+
+###############################################
+# Sinkhorn divergence
+# ~~~~~~~~~~~~~~~~~~~~~~
+# 
+# Blabla.
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=1.) )
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
+
+
+###############################################
+# Sinkhorn divergence
+# ~~~~~~~~~~~~~~~~~~~~~~
+# 
+# Blabla.
+
+gradient_flow( SamplesLoss("sinkhorn", p=1, blur=1.) )
+
+gradient_flow( SamplesLoss("sinkhorn", p=1, blur=.01), lr=.01 )

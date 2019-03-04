@@ -1,7 +1,11 @@
 import torch
 
-def scal(α, f) :
-    return torch.dot( α.view(-1), f.view(-1) )
+def scal(α, f, batch=False) :
+    if batch:
+        B = α.shape[0]
+        return ( α.view(B,-1) * f.view(B,-1) ).sum(1)
+    else:
+        return torch.dot( α.view(-1), f.view(-1) )
 
 
 class Sqrt0(torch.autograd.Function):

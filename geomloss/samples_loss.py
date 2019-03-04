@@ -5,7 +5,7 @@ import warnings
 
 from .kernel_samples import kernel_tensorized, kernel_online, kernel_multiscale
 
-from .kernel_samples import kernel_tensorized as sinkhorn_tensorized
+from .sinkhorn_samples import sinkhorn_tensorized
 from .kernel_samples import kernel_online     as sinkhorn_online
 from .kernel_samples import kernel_multiscale as sinkhorn_multiscale
 
@@ -120,7 +120,7 @@ class SamplesLoss(Module):
                 reductions provided by the `pykeops <https://www.kernel-operations.io>`_ library.
 
     """
-    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, scaling=.5, truncate=5, cost=None, kernel=None, backend="auto"):
+    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, diameter=None, scaling=.5, truncate=5, cost=None, kernel=None, backend="auto"):
 
         super(SamplesLoss, self).__init__()
         self.loss = loss
@@ -129,6 +129,7 @@ class SamplesLoss(Module):
         self.blur = blur
         self.reach = reach
         self.truncate = truncate
+        self.diameter = diameter
         self.scaling = scaling
         self.cost = cost
         self.kernel = kernel
@@ -161,8 +162,9 @@ class SamplesLoss(Module):
 
         # Run --------------------------------------------------------------------------------
         values = routines[self.loss][backend]( α, x, β, y, 
-                    p = self.p, blur = self.blur, reach = self.reach, scaling = self.scaling, 
-                    truncate = self.truncate, cost = self.cost, kernel = self.kernel )
+                    p = self.p, blur = self.blur, reach = self.reach, 
+                    diameter=self.diameter, scaling = self.scaling, truncate = self.truncate, 
+                    cost = self.cost, kernel = self.kernel )
 
 
         # Make sure that the output has the correct shape ------------------------------------
