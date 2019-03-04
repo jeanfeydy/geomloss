@@ -21,7 +21,9 @@ The **GeomLoss** library provides efficient GPU implementations for:
 
 These loss functions, defined between positive measures, 
 are available through the custom `PyTorch <https://pytorch.org/>`_ layers 
-``SamplesLoss``, ``ImagesLoss`` and ``VolumesLoss``
+:class:`SamplesLoss <geomloss.SamplesLoss>`, 
+:class:`ImagesLoss <geomloss.ImagesLoss>` and 
+:class:`VolumesLoss <geomloss.VolumesLoss>`
 which allow you to work with weighted **point clouds** (of any dimension),
 **density maps** and **volumetric segmentation masks**.
 Geometric losses come with three backends each:
@@ -46,6 +48,7 @@ A typical sample of code looks like:
     # Apply it to large point clouds in 3D
     x = torch.randn(100000, 3, requires_grad=True).cuda()
     y = torch.randn(200000, 3).cuda()
+    
     L = loss(x, y)  # By default, use constant weights = 1/number of samples
     g_x, = torch.autograd.grad(L, [x])  # GeomLoss fully supports autograd
 
@@ -63,7 +66,7 @@ algorithms. It provides:
 * Efficient computation of the **gradients**, which bypasses the naive
   backpropagation algorithm.
 * Support for `unbalanced  <https://link.springer.com/article/10.1007/s00222-017-0759-8>`_ 
-  `Optimal Transport <https://arxiv.org/pdf/1506.06430.pdf>`_,
+  Optimal `Transport <https://arxiv.org/pdf/1506.06430.pdf>`_,
   with a softening of the marginal constraints
   through a maximum **reach** parameter.
 * Support for the `ε-scaling heuristic <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.228.9750&rep=rep1&type=pdf>`_ 
@@ -73,7 +76,7 @@ algorithms. It provides:
   the standard `SoftAssign/Sinkhorn algorithm <https://arxiv.org/abs/1306.0895>`_.
 
 
-Note, however, that ``SamplesLoss`` does *not* implement the 
+Note, however, that :class:`SamplesLoss <geomloss.SamplesLoss>` does *not* implement the 
 `Fast Multipole <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.129.7826&rep=rep1&type=pdf>`_ 
 or `Fast Gauss <http://users.umiacs.umd.edu/~morariu/figtree/>`_ transforms.
 If you are aware of a well-packaged implementation
@@ -97,8 +100,8 @@ to **machine learning** (kernel methods, GANs...)
 and **image processing**.
 Details and examples are provided below:
 
-* :doc:`Documentation <api/geomloss>`.
-* :doc:`API <api/api>`.
+* :doc:`Maths and algorithms <api/geomloss>`
+* :doc:`PyTorch API <api/pytorch-api>`
 * `Source code <https://github.com/jeanfeydy/geomloss>`_
 * :doc:`Simple examples <_auto_examples/index>`
 * :doc:`Advanced tutorials <_auto_tutorials/index>`
@@ -119,9 +122,9 @@ Table of contents
 .. toctree::
    :maxdepth: 2
 
-   api/installation
+   api/install
    api/geomloss
-   api/api
+   api/pytorch-api
    _auto_examples/index
    _auto_tutorials/index
 

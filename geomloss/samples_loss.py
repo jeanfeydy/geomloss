@@ -3,6 +3,17 @@ from torch.nn import Module
 from functools import partial
 import warnings
 
+from .kernel_samples import kernel_tensorized, kernel_online, kernel_multiscale
+
+from .kernel_samples import kernel_tensorized as sinkhorn_tensorized
+from .kernel_samples import kernel_online     as sinkhorn_online
+from .kernel_samples import kernel_multiscale as sinkhorn_multiscale
+
+from .kernel_samples import kernel_tensorized as hausdorff_tensorized
+from .kernel_samples import kernel_online     as hausdorff_online
+from .kernel_samples import kernel_multiscale as hausdorff_multiscale
+
+
 routines = {
     "sinkhorn" : {
         "tensorized" : sinkhorn_tensorized,
@@ -45,7 +56,7 @@ class SamplesLoss(Module):
             The supported values are:
 
               - ``"sinkhorn"``: (Un-biased) Sinkhorn divergence, which interpolates
-                between Wasserstein (blur=0) and kernel (blur=:math:`+\infty`).
+                between Wasserstein (blur=0) and kernel (blur= :math:`+\infty` ).
               - ``"hausdorff"``: Weighted Hausdorff distance, which interpolates
                 between
               - ``"energy"``: Energy Distance MMD, computed using the kernel
@@ -60,32 +71,31 @@ class SamplesLoss(Module):
         p (int, default=2): If **loss** is ``"sinkhorn"`` or ``"hausdorff"``,
             specifies the ground cost function between points.
             The supported values are:
-              - 1: :math:`C(x,y) ~=~ \|x-y\|_2`.
-              - 2: :math:`C(x,y) ~=~ \\tfrac{1}{2}\|x-y\|_2^2`.
+
+              - **p** = 1: :math:`~~C(x,y) ~=~ \|x-y\|_2`.
+              - **p** = 2: :math:`~~C(x,y) ~=~ \\tfrac{1}{2}\|x-y\|_2^2`.
         
         blur (float, default=.05): The finest level of detail that
             should be handled by the loss function - in
             order to prevent overfitting on the samples' locations.
-            It is typically set to a fraction of the diameter
-            of the input configuration.
             
             - If **loss** is ``"gaussian"`` or ``"laplacian"``,
               it is the standard deviation :math:`\sigma` of the convolution kernel.
             - If **loss** is ``"sinkhorn"`` or ``"haudorff"``,
               it is the typical scale :math:`\sigma` associated
-              to the temperature :math:`\epsilon = \sigma^p`.
+              to the temperature :math:`\\varepsilon = \sigma^p`.
               The default value of .05 is sensible for input
               measures that lie in the unit square/cube.
 
             Note that the *Energy Distance* is scale-equivariant, and won't 
             be affected by this parameter.
 
-        reach (float, default=None=:math:`+\infty`): If 
+        reach (float, default=None= :math:`+\infty` ): If 
 
         scaling (float, default=.5): If **loss** is ``"sinkhorn"``,
             specifies the ratio between successive values
-            of :math:`\sigma=\epsilon^{1/p}` in the
-            :math:`\epsilon`-scaling descent.
+            of :math:`\sigma=\\varepsilon^{1/p}` in the
+            :math:`\\varepsilon`-scaling descent.
 
         truncate (float, default=None=:math:`+\infty`):
 
@@ -96,21 +106,21 @@ class SamplesLoss(Module):
             will be used in the background; this choice has a major impact
             on performance. The supported values are:
 
-              - ``"auto"``: Choose automatically, depending on the inputs' shapes.
+              - ``"auto"``: Choose automatically, using a simple
+                heuristic based on the inputs' shapes.
               - ``"tensorized"``: Relies on a full cost/kernel matrix, computed
                 once and for all and stored on the device memory. 
                 This method is fast, but has a quadratic
                 memory footprint and does not scale beyond ~5,000 samples per measure.
               - ``"online"``: Computes cost/kernel values on-the-fly, leveraging
                 online map-reduce CUDA routines provided by 
-                the `pykeops <www.kernel-operations.io>`_ library.
+                the `pykeops <https://www.kernel-operations.io>`_ library.
               - ``"multiscale"``: Fast implementation that scales to millions
                 of samples in dimension 1-2-3, relying on the block-sparse
-                reductions provided by the `pykeops <www.kernel-operations.io>`_ library.
+                reductions provided by the `pykeops <https://www.kernel-operations.io>`_ library.
 
     """
-    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, 
-                       scaling=.5, truncate=5, cost=None, kernel=None, backend="auto"):
+    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, scaling=.5, truncate=5, cost=None, kernel=None, backend="auto"):
 
         super(SamplesLoss, self).__init__()
         self.loss = loss
@@ -125,7 +135,8 @@ class SamplesLoss(Module):
 
 
     def forward(self, *args):
-
+        """Computes the loss between sampled measures."""
+        
         α, x, β, y = self.process_args(*args)
         B, N, M, D = self.check_shapes(α, x, β, y)
 

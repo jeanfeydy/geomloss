@@ -1,13 +1,13 @@
 """Implements kernel ("gaussian", "laplacian", "energy") norms between sampled measures.
 
 .. math::
-    \\text{Loss}(\\al,\\be) 
-        ~&=~ \\text{Loss}\\big( \sum_{i=1}^N \\al_i \,\delta_{x_i} \,,\, \sum_{j=1}^M \\be_j \,\delta_{y_j} \\big) 
-        ~=~ \\tfrac{1}{2} \|\\al-\\be\|_k^2 \\\\
-        &=~ \\tfrac{1}{2} \langle \\al-\\be \,,\, k\star (\\al - \\be) \\rangle \\\\
-        &=~ \\tfrac{1}{2} \sum_{i=1}^N \sum_{j=1}^N  \\al_i \\al_j \cdot k(x_i,x_j) 
-          + \\tfrac{1}{2} \sum_{i=1}^M \sum_{j=1}^M  \\be_i \\be_j \cdot k(y_i,y_j) \\\\
-        &-~\sum_{i=1}^N \sum_{j=1}^M  \\al_i \\be_j \cdot k(x_i,y_j)
+    \\text{Loss}(\\alpha,\\beta) 
+        ~&=~ \\text{Loss}\\big( \sum_{i=1}^N \\alpha_i \,\delta_{x_i} \,,\, \sum_{j=1}^M \\beta_j \,\delta_{y_j} \\big) 
+        ~=~ \\tfrac{1}{2} \|\\alpha-\\beta\|_k^2 \\\\
+        &=~ \\tfrac{1}{2} \langle \\alpha-\\beta \,,\, k\star (\\alpha - \\beta) \\rangle \\\\
+        &=~ \\tfrac{1}{2} \sum_{i=1}^N \sum_{j=1}^N  \\alpha_i \\alpha_j \cdot k(x_i,x_j) 
+          + \\tfrac{1}{2} \sum_{i=1}^M \sum_{j=1}^M  \\beta_i \\beta_j \cdot k(y_i,y_j) \\\\
+        &-~\sum_{i=1}^N \sum_{j=1}^M  \\alpha_i \\beta_j \cdot k(x_i,y_j)
 
 where:
 
@@ -29,9 +29,7 @@ try:  # Import the keops library, www.kernel-operations.io
 except:
     keops_available = False
 
-def scal(α, f) :
-    return torch.dot( α.view(-1), f.view(-1) )
-
+from .utils import scal, squared_distances, distances
 
 class DoubleGrad(torch.autograd.Function):
     @staticmethod
@@ -45,39 +43,10 @@ class DoubleGrad(torch.autograd.Function):
 def double_grad(x):
     return DoubleGrad.apply(x)
 
-class Sqrt0(torch.autograd.Function):
-
-    @staticmethod
-    def forward(ctx, input):
-        result = input.sqrt()
-        ctx.save_for_backward(result)
-        return result
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        result, = ctx.saved_tensors
-        grad_input = grad_output / (2*result)
-        grad_input[result == 0] = 0
-        return grad_input
-
-def sqrt_0(x):
-    return Sqrt0.apply(x)
-
 
 # ==============================================================================
 #                          backend == "tensorized"
 # ==============================================================================
-
-def squared_distances(x, y):
-    D_xx = (x*x).sum(-1).unsqueeze(2)  # (B,N,1)
-    D_xy = torch.matmul( x, y.permute(0,2,1) )  # (B,N,D) @ (B,D,M) = (B,N,M)
-    D_yy = (y*y).sum(-1).unsqueeze(1)  # (B,1,M)
-    return D_xx - 2*D_xy + D_yy
-
-
-def distances(x, y):
-    return sqrt_0( squared_distances(x,y) )
-
 
 def gaussian_kernel(x, y, blur=.05):
     C2 = squared_distances(x / blur, y / blur)
@@ -125,23 +94,23 @@ def kernel_tensorized(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
 
 kernel_formulas = {
     "gaussian" : ("Exp(-SqDist(X,Y) / IntCst(2))", True ),
-    "laplacian": ("Exp(-Dist(X,Y))",   True ),
-    "energy"   : ("(-Dist(X,Y))",      False),
+    "laplacian": ("Exp(-Norm2(X-Y))",   True ),
+    "energy"   : ("(-Norm2(X-Y))",      False),
 }
 
 
 def kernel_keops(kernel, α, x, β, y, ranges_xx = None, ranges_yy = None, ranges_xy = None):
 
     D = x.shape[1]
-    kernel_conv = generic_sum( "(" kernel +  " * B)",    # Formula
+    kernel_conv = generic_sum( "(" + kernel + " * B)",   # Formula
                                "A = Vx(1)",              # Output:    a_i
                                "X = Vx({})".format(D),   # 1st input: x_i
                                "Y = Vy({})".format(D),   # 2nd input: y_j
                                "B = Vy(1)" )             # 3rd input: b_j
     
-    a_i = generic_sum(double_grad(x), x.detach(), α.detach().view(-1,1), ranges=ranges_xx)
-    b_j = generic_sum(double_grad(y), y.detach(), β.detach().view(-1,1), ranges=ranges_yy)
-    b_i = generic_sum(x, y, β.view(-1,1), ranges=ranges_xy)
+    a_i = kernel_conv(double_grad(x), x.detach(), α.detach().view(-1,1), ranges=ranges_xx)
+    b_j = kernel_conv(double_grad(y), y.detach(), β.detach().view(-1,1), ranges=ranges_yy)
+    b_i = kernel_conv(x, y, β.view(-1,1), ranges=ranges_xy)
 
     # N.B.: we assume that 'kernel' is symmetric:
     return .5 * scal( double_grad(α), a_i ) \
