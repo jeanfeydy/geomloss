@@ -172,12 +172,13 @@ gradient_flow( SamplesLoss("energy") )
 # 
 # Blabla.
 
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=1.) )
+#gradient_flow( SamplesLoss("sinkhorn", p=2, blur=1.) )
 
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
+#gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
 
+#gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="online") )
 
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="online") )
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="multiscale") )
 
 
 ###############################################

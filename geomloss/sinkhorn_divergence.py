@@ -71,7 +71,7 @@ def scaling_parameters( x, y, p, blur, reach, diameter, scaling):
     ε   = blur**p
     ε_s = epsilon_schedule( p, diameter, blur, scaling )
     ρ   = None if reach is None else reach**p
-    return ε, ε_s, ρ  
+    return diameter, ε, ε_s, ρ  
 
 
 # ==============================================================================
@@ -94,7 +94,7 @@ def sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=False):
 
 
 def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, ρ, 
-                   jumps=[], kernel_truncation=None, truncate=5,
+                   jumps=[], kernel_truncation=None, truncate=5, cost=None,
                    extrapolate=None, last_extrapolation=True ):
     
     Nits = len(ε_s)
@@ -150,11 +150,11 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
                 # Kernel truncation trick (described in Bernhard Schmitzer's 2016 paper),
                 # that typically relies on KeOps' block-sparse routines:
                 C_xx_, _     = kernel_truncation( C_xx, C_xx, C_xxs[k+1], C_xxs[k+1],
-                                                    a_x, a_x, ε, truncate=truncate)
+                                                    a_x, a_x, ε, truncate=truncate,cost=cost)
                 C_yy_, _     = kernel_truncation( C_yy, C_yy, C_yys[k+1], C_yys[k+1],
-                                                    b_y, b_y, ε, truncate=truncate)
+                                                    b_y, b_y, ε, truncate=truncate,cost=cost)
                 C_xy_, C_yx_ = kernel_truncation( C_xy, C_yx, C_xys[k+1], C_yxs[k+1],
-                                                    b_x, a_y, ε, truncate=truncate)
+                                                    b_x, a_y, ε, truncate=truncate,cost=cost)
 
 
             # Extrapolation for the symmetric problems:
