@@ -69,7 +69,7 @@ X_i, Y_j = 0.2 * t_i,  0.4 * t_j + 0.6
 # and as a "model-free" machine learning program, where
 # we optimize directly on the samples' locations.
  
-def gradient_flow(loss, lr=.05) :
+def gradient_flow(loss, lr=.025) :
     """Flows along the gradient of the cost function, using a simple Euler scheme.
     
     Parameters:
@@ -110,7 +110,7 @@ def gradient_flow(loss, lr=.05) :
         
         # in-place modification of the tensor's values
         x_i.data -= lr * len(x_i) * g 
-    plt.title("t = {:1.2f}, elapsed time: {:.2f}s".format(lr*i, time.time() - t_0))
+    plt.title("t = {:1.2f}, elapsed time: {:.2f}s/it".format(lr*i, (time.time() - t_0)/Nsteps ))
 
 
 
@@ -168,25 +168,80 @@ gradient_flow( SamplesLoss("energy") )
 
 ###############################################
 # Sinkhorn divergence
-# ~~~~~~~~~~~~~~~~~~~~~~
+# ----------------------
 # 
-# Blabla.
-
-#gradient_flow( SamplesLoss("sinkhorn", p=2, blur=1.) )
-
-#gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
-
-#gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="online") )
-
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="multiscale") )
-
-
-###############################################
-# Sinkhorn divergence
-# ~~~~~~~~~~~~~~~~~~~~~~
-# 
-# Blabla.
+# (Unbiased) Sinkhorn divergences have recently been
+# introduced in the machine learning litterature,
+# and can be understood as modern iterations
+# of the classic `SoftAssign <https://en.wikipedia.org/wiki/Point_set_registration#Robust_point_matching>`_ algorithm
+# from `economics <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.228.9750&rep=rep1&type=pdf>`_ and 
+# `computer vision <http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.86.9769&rep=rep1&type=pdf>`_.
+#
+#
+# Wasserstein-1 distance
+# ~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# When ``p = 1``, the Sinkhorn divergence :math:`\text{S}_\varepsilon`
+# interpolates between the Energy Distance (when :math:`\varepsilon` is large):
 
 gradient_flow( SamplesLoss("sinkhorn", p=1, blur=1.) )
 
+###############################################
+# And the Earth-Mover's (Wassertein-1) distance:
+#
+
 gradient_flow( SamplesLoss("sinkhorn", p=1, blur=.01), lr=.01 )
+
+
+###############################################
+# Wasserstein-2 distance
+# ~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# When ``p = 2``, :math:`\text{S}_\varepsilon`
+# interpolates between the degenerate kernel norm
+#
+# .. math::
+#   \tfrac{1}{2}\| \alpha-\beta\|^2_{-\tfrac{1}{2}\|\cdot\|^2}
+#   ~=~ \tfrac{1}{2}\| \int x \text{d}\alpha(x)~-~\int y \text{d}\beta(y)\|^2,
+#
+# which only registers the means of both measures with each other 
+# (when :math:`\varepsilon` is large):
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=1.) )
+
+###############################################
+# And the quadratic, Wasserstein-2 Optimal Transport
+# distance which has been studied so well by mathematicians
+# from the 80's onwards (when :math:`\varepsilon` is small):
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
+
+###############################################
+# Introduced in 2016-2018, the *unbalanced*
+# setting (Gaussian-Hellinger, Wasserstein-Fisher-Rao, etc.)
+# provides a principled way of introducing a **threshold**
+# in Optimal Transport computations:
+# it allows you to introduce **laziness** in the transportation problem
+# by replacing distance fields :math:`\|x-y\|`
+# with a robustified analogous :math:`\rho\cdot( 1 - e^{-\|x-y\|/\rho} )`,
+# whose gradient saturates beyond a given **reach**, :math:`\rho`
+# - at least, that's the idea.
+#
+# In real-life applications, this tunable parameter could allow
+# you to be a little bit more **robust to outliers**!
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, reach=.3) )
+
+
+###############################################
+# Blabla
+#
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="online") )
+
+###############################################
+# Blabla
+#
+
+gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="multiscale") )
+

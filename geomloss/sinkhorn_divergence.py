@@ -88,9 +88,24 @@ def log_weights(α):
     return α_log
 
 
+class UnbalancedWeight(torch.nn.Module):
+    def __init__(self, ε, ρ):
+        super(UnbalancedWeight, self).__init__()
+        self.ε, self.ρ = ε, ρ
+
+    def forward(self, x):
+        return (self.ρ + self.ε/2) * x
+
+    def backward(self, g):
+        return (self.ρ + self.ε)   * g
+
+
 def sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=False):
     if ρ is None:
         return scal( α, b_x - a_x, batch=batch ) + scal( β, a_y - b_y, batch=batch )
+    else:
+        return scal( α, UnbalancedWeight(ε, ρ)( (-a_x/ρ).exp() - (-b_x/ρ).exp() ), batch=batch ) \
+             + scal( β, UnbalancedWeight(ε, ρ)( (-b_y/ρ).exp() - (-a_y/ρ).exp() ), batch=batch )
 
 
 def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, ρ, 

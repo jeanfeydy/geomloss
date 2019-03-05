@@ -148,8 +148,8 @@ def kernel_online(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
 def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, truncate=5, name=None, **kwargs):
 
     if truncate is None or name == "energy":
-        return kernel_online( α, x, β, y, blur=.05, kernel=None, 
-                              truncate=None, name=None, **kwargs )
+        return kernel_online( α, x, β, y, blur=blur, kernel=kernel, 
+                              truncate=truncate, name=name, **kwargs )
 
     # Renormalize our point cloud so that blur = 1:
     kernel, x, y = kernel_preprocess(kernel, name, x, y, blur)
