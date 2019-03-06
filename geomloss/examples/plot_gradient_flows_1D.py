@@ -2,7 +2,7 @@
 Gradient flows in 1D
 ====================
 
-This example showcases the properties of **kernel MMDs**, **Hausdorff**
+Let's showcase the properties of **kernel MMDs**, **Hausdorff**
 and **Sinkhorn** divergences on a simple toy problem:
 the registration of an interval onto another.
 """

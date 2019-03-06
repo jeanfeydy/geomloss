@@ -145,8 +145,11 @@ class SamplesLoss(Module):
         backend = self.backend  # Choose the backend -----------------------------------------
         if backend == "auto":
             if M*N <= 5000**2 : backend = "tensorized"  # Fast backend, with a quadratic memory footprint
-            elif D <= 3:        backend = "multiscale"  # Super scalable algorithm in low dimension
-            else :              backend = "online"      # Worst case scenario
+            else:
+                if D <= 3 and self.loss == "sinkhorn" and M*N > 10000**2 and self.p==2:
+                    backend = "multiscale"  # Super scalable algorithm in low dimension     
+                else:
+                    backend = "online"      # Play it safe, without kernel truncation
 
         # Check compatibility between the batchsize and the backend --------------------------
         if backend in ["online", "multiscale"]:  # KeOps routines work on single measures
