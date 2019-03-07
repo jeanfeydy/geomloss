@@ -145,7 +145,8 @@ def kernel_online(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
 #                          backend == "multiscale"
 # ==============================================================================
 
-def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, truncate=5, name=None, **kwargs):
+def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None, 
+                      truncate=5, cluster_scale=None,**kwargs):
 
     if truncate is None or name == "energy":
         return kernel_online( α, x, β, y, blur=blur, kernel=kernel, 
@@ -154,11 +155,13 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, truncate=5, name=None
     # Renormalize our point cloud so that blur = 1:
     kernel, x, y = kernel_preprocess(kernel, name, x, y, blur)
 
-    # Put our points in cubic clusters of diameter 1/2:
-    diameter = .5
-    edge = diameter / np.sqrt( x.shape[1] )
-    x_lab = grid_cluster(x, edge) 
-    y_lab = grid_cluster(y, edge) 
+    # Don't forget to normalize the clustering scale too
+    if cluster_scale is None: cluster_scale = blur
+
+    # Put our points in cubic clusters:
+    diameter = cluster_scale * np.sqrt( x.shape[1] )
+    x_lab = grid_cluster(x, cluster_scale) 
+    y_lab = grid_cluster(y, cluster_scale) 
 
     # Compute the ranges and centroids of each cluster:
     ranges_x, x_c, α_c = cluster_ranges_centroids(x, x_lab, weights=α)
@@ -175,9 +178,9 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, truncate=5, name=None
         C_xy = squared_distances( x_c, y_c)
 
         # Compute the boolean masks:
-        keep_xx = ( C_xx <= (truncate + 2 * diameter)**2 )
-        keep_yy = ( C_yy <= (truncate + 2 * diameter)**2 )
-        keep_xy = ( C_xy <= (truncate + 2 * diameter)**2 )
+        keep_xx = ( C_xx <= (truncate + diameter)**2 )
+        keep_yy = ( C_yy <= (truncate + diameter)**2 )
+        keep_xy = ( C_xy <= (truncate + diameter)**2 )
 
         # Compute the KeOps reduction ranges:
         ranges_xx = from_matrix(ranges_x, ranges_x, keep_xx)

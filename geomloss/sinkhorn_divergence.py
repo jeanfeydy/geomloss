@@ -122,7 +122,7 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
     torch.autograd.set_grad_enabled(False)
 
     k = 0  # Scale index; we start at the coarsest resolution available
-    ε = ε_s[k] ; λ = dampening(ε_s[-1], ρ)
+    ε = ε_s[k] ; λ = dampening(ε, ρ)
 
     # Load the measures and cost matrices at the current scale:
     α_log, β_log = α_logs[k], β_logs[k]
@@ -137,7 +137,7 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
 
     for i, ε in enumerate(ε_s):  # ε-scaling descent -----------------------
 
-        # λ = dampening(ε, ρ)  # I don't know yet which one is better
+        λ = dampening(ε, ρ)  # ε has changed, so we should update λ too!
 
         # "Coordinate ascent" on the dual problems:
         at_x = λ * softmin(ε, C_xx, α_log + a_x/ε )  # OT(α,α)
