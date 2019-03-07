@@ -22,8 +22,8 @@ use_cuda = torch.cuda.is_available()
 
 from geomloss import SamplesLoss
 
-MAXTIME = 10  # Max number of seconds before we break the loop
-REDTIME = 2   # Decrease the number of runs if computations take longer than 2s...
+MAXTIME = 10 if use_cuda else 1   # Max number of seconds before we break the loop
+REDTIME = 2  if use_cuda else .2  # Decrease the number of runs if computations take longer than 2s...
 D  = 3        # Let's do this in 3D
 
 # Number of samples that we'll loop upon
@@ -37,18 +37,17 @@ NS = [100, 200, 500,
 ##############################################
 # Synthetic dataset. Feel free to use
 # a Stanford Bunny, or whatever!
-#
 
 def generate_samples(N, device):
-    """Create point clouds sampled non-uniformly on the unit sphere."""
+    """Create point clouds sampled non-uniformly on a sphere of diameter 1."""
 
     x  = torch.randn(N, D, device=device)
     x[:,0] += 1
-    x  = x / (x.norm(dim=1,keepdim=True))
+    x  = x / (2*x.norm(dim=1,keepdim=True))
 
     y  = torch.randn(N, D, device=device)
     y[:,1] += 2
-    y  = y / (y.norm(dim=1,keepdim=True))
+    y  = y / (2*y.norm(dim=1,keepdim=True))
 
     x.requires_grad = True
 
@@ -64,7 +63,6 @@ def generate_samples(N, device):
 
 ##############################################
 # Benchmarking loops.
-#
 
 def benchmark(Loss, dev, N, loops = 10) :
     """Times a loss computation+gradient on an N-by-N problem."""
@@ -140,7 +138,7 @@ def full_bench(Loss) :
     plt.legend(loc='upper left')
     plt.grid(True, which="major", linestyle="-")
     plt.grid(True, which="minor", linestyle="dotted")
-    plt.axis([ NS[0], NS[-1], 5e-4, MAXTIME ])
+    plt.axis([ NS[0], NS[-1], 1e-3, MAXTIME ])
     plt.tight_layout()
 
     # Save as a .csv to put a nice Tikz figure in the papers:
@@ -156,6 +154,7 @@ def full_bench(Loss) :
 
 full_bench( SamplesLoss("gaussian", blur=.1, truncate=3) )
 
+
 ##############################################
 # Energy Distance MMD
 # ~~~~~~~~~~~~~~~~~~~~~~
@@ -167,6 +166,17 @@ full_bench( SamplesLoss("energy") )
 ##############################################
 # Sinkhorn divergence
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
+# 
+# With a medium blurring scale, at one twentieth of the
+# configuration's diameter:
+
+full_bench( SamplesLoss("sinkhorn", p=2, blur=.05) )
+
+
+##############################################
+# With a small blurring scale, at one hundredth of the
+# configuration's diameter:
 
 full_bench( SamplesLoss("sinkhorn", p=2, blur=.01) )
+
+plt.show()

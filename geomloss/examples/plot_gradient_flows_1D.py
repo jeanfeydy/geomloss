@@ -49,7 +49,7 @@ def display_samples(ax, x, color):
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
 #   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
 
-N, M = (250, 250) if not use_cuda else (10000, 10000)
+N, M = (100, 100) if not use_cuda else (10000, 10000)
  
 t_i = torch.linspace(0, 1, N).type(dtype).view(-1,1)
 t_j = torch.linspace(0, 1, M).type(dtype).view(-1,1)
@@ -75,7 +75,7 @@ def gradient_flow(loss, lr=.025) :
     Parameters:
         loss ((x_i,y_j) -> torch float number): 
             Real-valued loss function.
-        lr (float, default = .05):
+        lr (float, default = .025):
             Learning rate, i.e. time step.
     """
     
@@ -232,16 +232,4 @@ gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
 
 gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, reach=.3) )
 
-
-###############################################
-# Blabla
-#
-
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="online") )
-
-###############################################
-# Blabla
-#
-
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="multiscale") )
-
+plt.show()

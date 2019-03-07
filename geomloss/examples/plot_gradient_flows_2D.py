@@ -67,7 +67,7 @@ def display_samples(ax, x, color, x_grad=None, scale=None, width=0.0025) :
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
 #   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
 
-N, M = (250, 250) if not use_cuda else (10000, 10000)
+N, M = (100, 100) if not use_cuda else (10000, 10000)
  
 X_i = draw_samples("data/density_a.png", N, dtype)
 Y_j = draw_samples("data/density_b.png", M, dtype)
@@ -256,17 +256,4 @@ gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01) )
 # you to be a little bit more **robust to outliers**!
 
 gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, reach=.3) )
-
-
-###############################################
-# Blabla
-#
-
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="online") )
-
-###############################################
-# Blabla
-#
-
-gradient_flow( SamplesLoss("sinkhorn", p=2, blur=.01, backend="multiscale") )
 

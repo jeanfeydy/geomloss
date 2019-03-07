@@ -24,24 +24,25 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 # Sample points on the unit sphere:
 # 
 
-N, M = (250, 250) if not use_cuda else (5000, 5000) 
+N, M = (100, 100) if not use_cuda else (10000, 10000) 
 x, y = torch.randn(N,3).type(dtype), torch.randn(M,3).type(dtype)
-x, y = x / x.norm(dim=1,keepdim=True), y / y.norm(dim=1,keepdim=True)
+x, y = x / (2 * x.norm(dim=1,keepdim=True)), y / (2 * y.norm(dim=1,keepdim=True))
 x.requires_grad = True
 
 ##########################################################
 # Use the PyTorch profiler to output Chrome trace files:
 
-for backend in ["tensorized", "online", "multiscale"]:
-    with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
-        loss = SamplesLoss("gaussian", blur=.1, backend=backend, truncate=3)
-        t_0 = time()
-        L_xy = loss(x, y)
-        L_xy.backward()
-        t_1 = time()
-        print("{:.2f}s, cost = {:.6f}".format( t_1-t_0, L_xy.item()) )
+for loss in ["gaussian", "sinkhorn"]:
+    for backend in ["tensorized", "online", "multiscale"]:
+        with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
+            Loss = SamplesLoss(loss, blur=.1, backend=backend, truncate=3)
+            t_0 = time()
+            L_xy = Loss(x, y)
+            L_xy.backward()
+            t_1 = time()
+            print("{:.2f}s, cost = {:.6f}".format( t_1-t_0, L_xy.item()) )
 
-    prof.export_chrome_trace("output/profile_"+backend+".json")
+        prof.export_chrome_trace("output/profile_"+loss+"_"+backend+".json")
 
 
 ######################################################################

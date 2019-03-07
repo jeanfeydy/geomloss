@@ -66,7 +66,7 @@ def display_samples(ax, x, color, x_grad=None, scale=None, width=0.0025) :
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
 #   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
 
-N, M = (1000, 1000) if not use_cuda else (10000, 10000)
+N, M = (100, 100) if not use_cuda else (10000, 10000)
  
 X_i = draw_samples("data/density_a.png", N, dtype)
 Y_j = draw_samples("data/density_b.png", M, dtype)
@@ -181,7 +181,14 @@ gradient_descent( SamplesLoss("sinkhorn", p=2, blur=.01, reach=.1) )
 # Optimal Transport is *not* the panacea
 # -----------------------------------------------
 # 
-# 
+# Optimal Transport theory is all about 
+# **discarding the topological structure** of the data
+# to get a simple, convex registration algorithm:
+# the Monge map transports **bags of sands** from one location
+# to another, and may tear shapes apart as needed.
+#
+# In generative modelling, this versatility allows us
+# to fit "Gaussian blobs" to any kind of empirical distribution:
 
 X_i = draw_samples("data/crescent_a.png", N, dtype)
 Y_j = draw_samples("data/crescent_b.png", M, dtype)
@@ -189,8 +196,8 @@ gradient_descent( SamplesLoss("sinkhorn", p=2, blur=.01) )
 
 
 ################################################
-# Blabla
-#
+# Going further, in simple situations, Optimal Transport 
+# may even be used as a "cheap and easy" registration routine...
 
 X_i = draw_samples("data/worm_a.png", N, dtype)
 Y_j = draw_samples("data/worm_b.png", M, dtype)
@@ -198,9 +205,11 @@ gradient_descent( SamplesLoss("sinkhorn", p=2, blur=.01) )
 
 
 ################################################
-# Blabla
+# But beware! 
 #
 
 X_i = draw_samples("data/moon_a.png", N, dtype)
 Y_j = draw_samples("data/moon_b.png", M, dtype)
 gradient_descent( SamplesLoss("sinkhorn", p=2, blur=.01) )
+
+plt.show()
