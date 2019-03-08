@@ -162,12 +162,13 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
     # Renormalize our point cloud so that blur = 1:
     kernel, x, y = kernel_preprocess(kernel, name, x, y, blur)
 
-    # Don't forget to normalize the clustering scale too
-
+    # Don't forget to normalize the diameter too!
     if cluster_scale is None: 
         D = x.shape[-1]
         if diameter is None:
             diameter = max_diameter(x.view(-1,D), y.view(-1,D))
+        else:
+            diameter = diameter / blur
         cluster_scale = diameter / (np.sqrt(D) * 2000**(1/D))
 
     # Put our points in cubic clusters:

@@ -23,7 +23,7 @@ use_cuda = torch.cuda.is_available()
 dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 ###############################################
-# Display routine
+# Display routines
 # ~~~~~~~~~~~~~~~~~
 
 import numpy as np
@@ -49,7 +49,7 @@ def draw_samples(fname, n, dtype=torch.FloatTensor) :
 
     return torch.from_numpy(dots).type(dtype)
 
-def display_samples(ax, x, color, x_grad=None, scale=None, width=0.0025) :
+def display_samples(ax, x, color) :
     x_ = x.detach().cpu().numpy()
     ax.scatter( x_[:,0], x_[:,1], 25*500 / len(x_), color, edgecolors='none' )
 
@@ -115,7 +115,7 @@ def gradient_descent(loss, lr=1) :
             plt.scatter( [10], [10] ) # shameless hack to prevent a slight change of axis...
 
             display_samples(ax, y_j, [(.55,.55,.95)])
-            display_samples(ax, x_i, colors, width=.25/len(x_i), scale=5)
+            display_samples(ax, x_i, colors)
             
             ax.set_title("it = {}".format(i))
 
