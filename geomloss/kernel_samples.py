@@ -145,8 +145,15 @@ def kernel_online(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
 #                          backend == "multiscale"
 # ==============================================================================
 
+def max_diameter(x, y):
+    mins = torch.stack((x.min(dim=0)[0], y.min(dim=0)[0])).min(dim=0)[0]
+    maxs = torch.stack((x.max(dim=0)[0], y.max(dim=0)[0])).max(dim=0)[0]
+    diameter = (maxs-mins).norm().item()
+    return diameter
+
+
 def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None, 
-                      truncate=5, cluster_scale=None,**kwargs):
+                      truncate=5, diameter=None, cluster_scale=None,**kwargs):
 
     if truncate is None or name == "energy":
         return kernel_online( α, x, β, y, blur=blur, kernel=kernel, 
@@ -156,10 +163,15 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
     kernel, x, y = kernel_preprocess(kernel, name, x, y, blur)
 
     # Don't forget to normalize the clustering scale too
-    if cluster_scale is None: cluster_scale = blur
+
+    if cluster_scale is None: 
+        if diameter is None:
+            D = x.shape[-1]
+            diameter = max_diameter(x.view(-1,D), y.view(-1,D))
+        cluster_scale = diameter / (np.sqrt(D) * 2000**(1/D))
 
     # Put our points in cubic clusters:
-    diameter = cluster_scale * np.sqrt( x.shape[1] )
+    cell_diameter = cluster_scale * np.sqrt( x.shape[1] )
     x_lab = grid_cluster(x, cluster_scale) 
     y_lab = grid_cluster(y, cluster_scale) 
 
@@ -167,6 +179,7 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
     ranges_x, x_c, α_c = cluster_ranges_centroids(x, x_lab, weights=α)
     ranges_y, y_c, β_c = cluster_ranges_centroids(y, y_lab, weights=β)
 
+    print(x_c.shape, y_c.shape)
     # Sort the clusters, making them contiguous in memory:
     (α, x), x_lab = sort_clusters( (α, x), x_lab)
     (β, y), y_lab = sort_clusters( (β, y), y_lab)
@@ -178,9 +191,9 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
         C_xy = squared_distances( x_c, y_c)
 
         # Compute the boolean masks:
-        keep_xx = ( C_xx <= (truncate + diameter)**2 )
-        keep_yy = ( C_yy <= (truncate + diameter)**2 )
-        keep_xy = ( C_xy <= (truncate + diameter)**2 )
+        keep_xx = ( C_xx <= (truncate + cell_diameter)**2 )
+        keep_yy = ( C_yy <= (truncate + cell_diameter)**2 )
+        keep_xy = ( C_xy <= (truncate + cell_diameter)**2 )
 
         # Compute the KeOps reduction ranges:
         ranges_xx = from_matrix(ranges_x, ranges_x, keep_xx)

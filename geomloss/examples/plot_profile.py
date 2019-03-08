@@ -24,7 +24,7 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 # Sample points on the unit sphere:
 # 
 
-N, M = (100, 100) if not use_cuda else (10000, 10000) 
+N, M = (100, 100) if not use_cuda else (100000, 100000) 
 x, y = torch.randn(N,3).type(dtype), torch.randn(M,3).type(dtype)
 x, y = x / (2 * x.norm(dim=1,keepdim=True)), y / (2 * y.norm(dim=1,keepdim=True))
 x.requires_grad = True
@@ -35,7 +35,7 @@ x.requires_grad = True
 for loss in ["gaussian", "sinkhorn"]:
     for backend in ["tensorized", "online", "multiscale"]:
         with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
-            Loss = SamplesLoss(loss, blur=.1, backend=backend, truncate=3)
+            Loss = SamplesLoss(loss, blur=.05, backend=backend, truncate=3)
             t_0 = time()
             L_xy = Loss(x, y)
             L_xy.backward()

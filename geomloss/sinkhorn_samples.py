@@ -163,7 +163,7 @@ def kernel_truncation( C_xy, C_yx, C_xy_, C_yx_,
             C      = cost(x, y)
             keep   = b_x.view(-1,1) + a_y.view(1,-1) > C - truncate*ε
             ranges_xy_ = from_matrix(ranges_x, ranges_y, keep)
-            # print(C.shape, keep.sum())
+            print("Keep fraction:", (keep.sum().float() / (C.shape[0]*C.shape[1])).item() )
     
 
         return (x_, yd_, ranges_x_, ranges_y_, ranges_xy_), \
@@ -204,6 +204,11 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
             jumps = [i+1]
             break
     
+
+    print(x_c.shape, y_c.shape)
+    print([ x**(1/2) for x in ε_s])
+    print(jumps)
+
     # The input measures are stored at two levels: coarse and fine
     α_logs = [ log_weights(α_c), log_weights(α) ]
     β_logs = [ log_weights(β_c), log_weights(β) ]
