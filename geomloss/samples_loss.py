@@ -120,7 +120,7 @@ class SamplesLoss(Module):
                 reductions provided by the `pykeops <https://www.kernel-operations.io>`_ library.
 
     """
-    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, diameter=None, scaling=.5, truncate=5, cost=None, kernel=None, cluster_scale=None, backend="auto"):
+    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, diameter=None, scaling=.5, truncate=5, cost=None, kernel=None, cluster_scale=None, verbose=False, backend="auto"):
 
         super(SamplesLoss, self).__init__()
         self.loss = loss
@@ -134,6 +134,7 @@ class SamplesLoss(Module):
         self.cost = cost
         self.kernel = kernel
         self.cluster_scale = cluster_scale
+        self.verbose = verbose
 
 
     def forward(self, *args):
@@ -168,7 +169,8 @@ class SamplesLoss(Module):
         values = routines[self.loss][backend]( α, x, β, y, 
                     p = self.p, blur = self.blur, reach = self.reach, 
                     diameter=self.diameter, scaling = self.scaling, truncate = self.truncate, 
-                    cost = self.cost, kernel = self.kernel, cluster_scale=self.cluster_scale )
+                    cost = self.cost, kernel = self.kernel, cluster_scale=self.cluster_scale,
+                    verbose = self.verbose )
 
 
         # Make sure that the output has the correct shape ------------------------------------

@@ -33,9 +33,9 @@ x.requires_grad = True
 # Use the PyTorch profiler to output Chrome trace files:
 
 for loss in ["gaussian", "sinkhorn"]:
-    for backend in ["tensorized", "online", "multiscale"]:
+    for backend in ["online", "multiscale"]:
         with torch.autograd.profiler.profile(use_cuda=use_cuda) as prof:
-            Loss = SamplesLoss(loss, blur=.05, backend=backend, truncate=3)
+            Loss = SamplesLoss(loss, blur=.05, backend=backend, truncate=3, verbose=True)
             t_0 = time()
             L_xy = Loss(x, y)
             L_xy.backward()

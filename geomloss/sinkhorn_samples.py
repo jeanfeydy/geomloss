@@ -142,7 +142,7 @@ def clusterize(α, x, scale=None) :
         return [α_c, α], [x_c, x], [ranges_x]
 
 def kernel_truncation( C_xy, C_yx, C_xy_, C_yx_, 
-                       b_x, a_y, ε, truncate=None, cost=None):
+                       b_x, a_y, ε, truncate=None, cost=None, verbose=False):
     """Prunes out useless parts of the (block-sparse) cost matrices for finer scales.
 
     This is where our approximation takes place.
@@ -163,7 +163,10 @@ def kernel_truncation( C_xy, C_yx, C_xy_, C_yx_,
             C      = cost(x, y)
             keep   = b_x.view(-1,1) + a_y.view(1,-1) > C - truncate*ε
             ranges_xy_ = from_matrix(ranges_x, ranges_y, keep)
-            print("Keep fraction:", (keep.sum().float() / (C.shape[0]*C.shape[1])).item() )
+            if verbose:
+                ks, Cs = keep.sum(), C.shape[0]*C.shape[1]
+                print("Keep {}/{} = {:2.1f}% of the coarse cost matrix.".format(
+                    ks, Cs, 100*float(ks) / Cs ) )
     
 
         return (x_, yd_, ranges_x_, ranges_y_, ranges_xy_), \
@@ -179,7 +182,8 @@ def extrapolate_samples( b_x, a_y, ε, λ, C_xy, β_log, C_xy_, softmin=None ):
 
 
 def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, 
-                        scaling=.5, truncate=5, cost=None, cluster_scale=None, **kwargs):
+                        scaling=.5, truncate=5, cost=None, cluster_scale=None, 
+                        verbose=False, **kwargs):
     
     N, D = x.shape
     M, _ = y.shape
@@ -205,9 +209,12 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
             break
     
 
-    print(x_c.shape, y_c.shape)
-    print([ x**(1/2) for x in ε_s])
-    print(jumps)
+    if verbose: 
+        print("{}x{} clusters, computed at scale = {:2.3f}".format(
+              len(x_c), len(y_c), cluster_scale))
+        print("Successive scales : ", ', '.join(["{:.3f}".format(x**(1/p)) for x in ε_s]))
+        print("Jump from coarse to fine between indices {} and {}.".format(jumps[0], jumps[0]+1))
+
 
     # The input measures are stored at two levels: coarse and fine
     α_logs = [ log_weights(α_c), log_weights(α) ]
@@ -230,7 +237,7 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
                                         C_xxs, C_yys, C_xys, C_yxs, ε_s, ρ,
                                         jumps=jumps,
                                         cost=cost_routine,
-                                        kernel_truncation=kernel_truncation,
+                                        kernel_truncation=partial(kernel_truncation, verbose=verbose),
                                         truncate=truncate,
                                         extrapolate=extrapolate, )
 

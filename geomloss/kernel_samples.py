@@ -153,7 +153,7 @@ def max_diameter(x, y):
 
 
 def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None, 
-                      truncate=5, diameter=None, cluster_scale=None,**kwargs):
+                      truncate=5, diameter=None, cluster_scale=None, verbose=False, **kwargs):
 
     if truncate is None or name == "energy":
         return kernel_online( α, x, β, y, blur=blur, kernel=kernel, 
@@ -165,8 +165,8 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
     # Don't forget to normalize the clustering scale too
 
     if cluster_scale is None: 
+        D = x.shape[-1]
         if diameter is None:
-            D = x.shape[-1]
             diameter = max_diameter(x.view(-1,D), y.view(-1,D))
         cluster_scale = diameter / (np.sqrt(D) * 2000**(1/D))
 
@@ -179,7 +179,11 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
     ranges_x, x_c, α_c = cluster_ranges_centroids(x, x_lab, weights=α)
     ranges_y, y_c, β_c = cluster_ranges_centroids(y, y_lab, weights=β)
 
-    print(x_c.shape, y_c.shape)
+
+    if verbose: 
+        print("{}x{} clusters, computed at scale = {:2.3f}".format(
+              len(x_c), len(y_c), cluster_scale))
+
     # Sort the clusters, making them contiguous in memory:
     (α, x), x_lab = sort_clusters( (α, x), x_lab)
     (β, y), y_lab = sort_clusters( (β, y), y_lab)
