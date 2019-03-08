@@ -206,7 +206,13 @@ gradient_descent( SamplesLoss("sinkhorn", p=2, blur=.01) )
 
 ################################################
 # But beware! 
-#
+# Out-of-the-box, Optimal Transport will **not** match
+# the salient features of both shapes (e.g. ends or corners) with each other.
+# In real-life applications, Sinkhorn divergences should thus
+# always be used in a relevant **feature space** (e.g. of SIFT descriptors),
+# in conjunction with a prior-enforcing
+# **generative model** (e.g. a convolutional neural network or
+# a thin plate spline deformation).
 
 X_i = draw_samples("data/moon_a.png", N, dtype)
 Y_j = draw_samples("data/moon_b.png", M, dtype)

@@ -31,14 +31,13 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 import numpy as np
 import torch
 from random import choices
-from scipy import misc
+import imageio
 from matplotlib import pyplot as plt
 
 
 def load_image(fname) :
-    img = misc.imread(fname) # RGB
-    img = img / 255.
-    return img
+    img = imageio.imread(fname)  # RGB
+    return img / 255.         # Normalized to [0,1]
 
 def RGB_cloud(fname, sampling, dtype=torch.FloatTensor) :
     A = load_image(fname)
@@ -60,9 +59,10 @@ def display_image(ax, x) :
 # Dataset
 # ~~~~~~~~~~~~~~~~~~
 #
-# Our source and target samples are drawn from measures whose densities
-# are stored in simple PNG files. They allow us to define a pair of discrete 
-# probability measures:
+# Our source and target samples are clouds of 3D points,
+# each of whom encodes the RGB color of a pixel
+# in a standard test image. We can then define a pair of discrete 
+# probability measures on our color space :math:`[0,1]^3`:
 #
 # .. math::
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
@@ -82,9 +82,13 @@ ax = fig.add_subplot(2, 2, 4, projection='3d') ; display_cloud(ax, Y_j) ; ax.set
 plt.tight_layout()
 
 ###############################################
-# Lagrangian gradient descent
-# -------------------------------
+# Color transfer through gradient descent
+# -------------------------------------------
 # 
+# To showcase the properties of the Sinkhorn divergence
+# :math:`\text{S}_{\varepsilon,\rho}`, we now follow the steps
+# of the :doc:`Optimal Transport example <plot_optimal_transport_2D>`
+# with custom parameters.
  
 def color_transfer(loss, lr=1) :
     """Flows along the gradient of the loss function.
@@ -112,7 +116,9 @@ def color_transfer(loss, lr=1) :
 
     plt.figure(figsize=(12,12)) ; k = 3
     ax = plt.subplot(2,2,1) ; display_image(ax, X_i) ; ax.set_title("Source image")
+    plt.xticks([], []); plt.yticks([], [])
     ax = plt.subplot(2,2,2) ; display_image(ax, Y_j) ; ax.set_title("Target image")
+    plt.xticks([], []); plt.yticks([], [])
 
     for i in range(Nsteps): # Euler scheme ===============
         # Compute cost and gradient
@@ -127,29 +133,50 @@ def color_transfer(loss, lr=1) :
         x_i.data -= lr * len(x_i) * g 
 
     plt.title("it = {}, elapsed time: {:.2f}s/it".format(i, (time.time() - t_0)/Nsteps ))
+    plt.tight_layout()
 
 
 ###############################################
 # Wasserstein-2 Optimal Transport
 # ----------------------------------
 # 
+# When **p = 2**, the (normalized) Lagrangian gradient of the Sinkhorn divergence
+# :math:`v_i = \tfrac{1}{\alpha_i}\nabla_{x_i}\text{S}_{\varepsilon,\rho}(\alpha,\beta)`
+# defines a "Brenier map" whose **smoothness** and maximum reach
+# can be tuned with the :math:`\text{blur} = \sqrt{\varepsilon}~`
+# and :math:`\text{reach} = \sqrt{\rho}~` parameters.
+#
+# Crucially, when :math:`(\varepsilon,\rho)\,\neq\,(0,+\infty)`,
+# the overlap between the transported and target measures is **not perfect**.
+# As we iterate our gradient descent on the colors :math:`x_i\in\mathbb{R}^3`,
+# we will thus transition from a **smooth** deformation of the source histogram
+# to a precise deformation that **overfits** on the target color distribution.
 
-color_transfer( SamplesLoss("sinkhorn", p=2, blur=.1) )
+color_transfer( SamplesLoss("sinkhorn", blur=.3) )
 
 
 ###############################################
-# Wasserstein-2 Optimal Transport
-# ----------------------------------
-# 
+# In most applications, the color transfer obtained after one, smooth
+# update is more appropriate than the "perfect" matching,
+# solution of the Monge problem. Fortunately,
+# this smooth color transfer is also easier to compute!
+#
+# Feel free to play around with the **input features**
+# (i.e. the coordinates system on the color space)
+# and the **blur** parameter, which allows you
+# to be more or less precise in the first few iterations:
 
-color_transfer( SamplesLoss("sinkhorn", p=2, blur=.01) )
+color_transfer( SamplesLoss("sinkhorn", blur=.1) )
 
 
 ###############################################
-# Wasserstein-2 Optimal Transport
-# ----------------------------------
-# 
+# Going further, the **reach** parameter allows you to define
+# a maximum transportation distance in the color space.
+# In real-life applications, you may want to apply this simple algorithm
+# on a higher-dimensional feature space (e.g. position + color),
+# and thus get quasi-smooth matchings at a low computational cost.
+#
 
-color_transfer( SamplesLoss("sinkhorn", p=2, blur=.01, reach=.1) )
+color_transfer( SamplesLoss("sinkhorn", blur=.1, reach=.4) )
 
 plt.show()

@@ -52,11 +52,14 @@ extensions = [
     'sphinx.ext.napoleon',
 ]
 
+from sphinx_gallery.sorting import FileNameSortKey
+
 sphinx_gallery_conf = {
      # path to your examples scripts
-     'examples_dirs': ['../geomloss/examples', '../geomloss/tutorials'],
+     'examples_dirs': ['../geomloss/examples'],
      # path where to save gallery generated examples
-     'gallery_dirs': ['./_auto_examples', '_auto_tutorials'],
+     'gallery_dirs': ['./_auto_examples'],
+     'within_subsection_order': FileNameSortKey,
 }
 
 # Generate the API documentation when building

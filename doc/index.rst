@@ -103,8 +103,7 @@ Details and examples are provided below:
 * :doc:`Maths and algorithms <api/geomloss>`
 * :doc:`PyTorch API <api/pytorch-api>`
 * `Source code <https://github.com/jeanfeydy/geomloss>`_
-* :doc:`Simple examples <_auto_examples/index>`
-* :doc:`Advanced tutorials <_auto_tutorials/index>`
+* :doc:`Examples <_auto_examples/index>`
 
 **GeomLoss is licensed** under the `MIT license <https://github.com/jeanfeydy/geomloss/blob/master/LICENSE>`_.
 
@@ -126,6 +125,5 @@ Table of contents
    api/geomloss
    api/pytorch-api
    _auto_examples/index
-   _auto_tutorials/index
 
 

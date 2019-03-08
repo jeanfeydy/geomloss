@@ -213,7 +213,11 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
         print("{}x{} clusters, computed at scale = {:2.3f}".format(
               len(x_c), len(y_c), cluster_scale))
         print("Successive scales : ", ', '.join(["{:.3f}".format(x**(1/p)) for x in ε_s]))
-        print("Jump from coarse to fine between indices {} and {}.".format(jumps[0], jumps[0]+1))
+        if jumps[0] >= len(ε_s)-1:
+            print("Extrapolate from coarse to fine after the last iteration.")
+        else:
+            print("Jump from coarse to fine between indices {} (σ={:2.3f}) and {} (σ={:2.3f}).".format(
+                jumps[0], ε_s[jumps[0]]**(1/p), jumps[0]+1, ε_s[jumps[0]+1]**(1/p)))
 
 
     # The input measures are stored at two levels: coarse and fine

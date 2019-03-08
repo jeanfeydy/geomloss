@@ -2,7 +2,7 @@
 Benchmark SamplesLoss in 3D
 =====================================
 
-Let's compare the different losses and backends
+Let's compare the performances of our losses and backends
 as the number of samples grows from 100 to 1,000,000.
 """
 
@@ -52,14 +52,14 @@ def generate_samples(N, device):
     x.requires_grad = True
 
     # Draw random weights:
-    α  = torch.randn(N, device=device)
-    β  = torch.randn(N, device=device)
+    a  = torch.randn(N, device=device)
+    b  = torch.randn(N, device=device)
 
     # And normalize them:
-    α = α.abs()     ; β = β.abs()
-    α = α / α.sum() ; β = β / β.sum()
+    a = a.abs()     ; b = b.abs()
+    a = a / a.sum() ; b = b / b.sum()
 
-    return α, x, β, y
+    return a, x, b, y
 
 ##############################################
 # Benchmarking loops.
@@ -69,11 +69,13 @@ def benchmark(Loss, dev, N, loops = 10) :
 
     importlib.reload(torch)  # In case we had a memory overflow just before...
     device = torch.device(dev)
-    α, x, β, y = generate_samples(N, device)
+    a, x, b, y = generate_samples(N, device)
 
     # We simply benchmark a Loss + gradien wrt. x
-    code = "L = Loss( α, x, β, y ) ; L.backward()"
+    code = "L = Loss( a, x, b, y ) ; L.backward()"
+    Loss.verbose = True
     exec( code, locals() ) # Warmup run, to compile and load everything
+    Loss.verbose = False
 
     t_0 = time.perf_counter()  # Actual benchmark --------------------
     if use_cuda: torch.cuda.synchronize()
@@ -170,13 +172,13 @@ full_bench( SamplesLoss("energy") )
 # With a medium blurring scale, at one twentieth of the
 # configuration's diameter:
 
-full_bench( SamplesLoss("sinkhorn", p=2, blur=.05) )
+full_bench( SamplesLoss("sinkhorn", p=2, blur=.05, diameter=1) )
 
 
 ##############################################
 # With a small blurring scale, at one hundredth of the
 # configuration's diameter:
 
-full_bench( SamplesLoss("sinkhorn", p=2, blur=.01) )
+full_bench( SamplesLoss("sinkhorn", p=2, blur=.01, diameter=1) )
 
 plt.show()
