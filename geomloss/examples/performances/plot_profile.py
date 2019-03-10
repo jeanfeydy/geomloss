@@ -1,5 +1,5 @@
 """
-Profiling the GeomLoss routines
+Profile the GeomLoss routines
 ===================================
 
 This example explains how to **profile** the geometric losses

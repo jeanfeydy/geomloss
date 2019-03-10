@@ -62,7 +62,7 @@ def display_samples(ax, x, color, blur=.01):
 ###############################################
 #
 
-from geomloss.examples.model_fitting import fit_model  # Wrapper around scipy.optimize
+from geomloss.examples.optimal_transport.model_fitting import fit_model  # Wrapper around scipy.optimize
 from torch.nn import Module, Parameter  # PyTorch syntax for optimization problems
 
 class LagrangianBarycenter(Module):

@@ -1,5 +1,5 @@
 """
-Wrapper around the scipy.optimize module
+Optimization routines
 ============================================
 """
 

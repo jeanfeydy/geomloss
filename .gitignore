@@ -106,8 +106,8 @@ venv.bak/
 
 # Build junk
 *build*
-geomloss/examples/output/*
-!geomloss/examples/output/.gitkeep
+geomloss/examples/performances/output/*
+!geomloss/examples/performances/output/.gitkeep
 !*input_output.py
 /build/*
 !/build/.gitkeep
