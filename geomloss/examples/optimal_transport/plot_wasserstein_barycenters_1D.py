@@ -119,7 +119,7 @@ class Barycenter(Module):
         # We copy the reference starting points, to prevent in-place modification:
         self.x_i, self.y_j, self.z_k = X_i.clone(), Y_j.clone(), Z_k.clone()
 
-    def optimize(self, display=False, tol=1e-10):
+    def fit(self, display=False, tol=1e-10):
         """Uses a custom wrapper around the scipy.optimize module."""
         fit_model(self, method = "L-BFGS", lr = 1., display = display, tol=tol, gtol=tol)
 
@@ -155,7 +155,7 @@ class Barycenter(Module):
                 ax.set_title(title)
 
             ax.axis([-.1,1.1,-.1,20.5])
-            ax.set_xticks([], []); ax.set_xticks([], [])
+            ax.set_xticks([], []); ax.set_yticks([], [])
             plt.tight_layout()
 
 
@@ -189,7 +189,7 @@ class EulerianBarycenter(Barycenter) :
 # with a large **scaling** coefficient - i.e. a large number of iterations
 # in the Sinkhorn loop:
 
-EulerianBarycenter( SamplesLoss("sinkhorn", blur=.001, scaling=.99) ).optimize(display=True)
+EulerianBarycenter( SamplesLoss("sinkhorn", blur=.001, scaling=.99) ).fit(display=True)
 
 #############################################
 # As evidenced here, the **Eulerian** descent fits **one by one** 
@@ -228,7 +228,7 @@ class LagrangianBarycenter(Barycenter) :
 # As evidenced below, this algorithm converges quickly towards
 # a decent interpolator, even for small-ish values of the scaling coefficient:
 
-LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.9) ).optimize(display=True)
+LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.9) ).fit(display=True)
 
 
 ###############################################
@@ -239,5 +239,5 @@ LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.9) ).optimize(d
 # The trade-off between speed and accuracy (especially with respect to oscillating artifacts)
 # can be tuned with the **tol** and **scaling** parameters:
 
-LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.5) ).optimize(display=True, tol=1e-5)
+LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.5) ).fit(display=True, tol=1e-5)
 plt.show()
