@@ -49,7 +49,7 @@ def display_samples(ax, x, color):
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
 #   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
 
-N, M = (100, 100) if not use_cuda else (10000, 10000)
+N, M = (50, 50) if not use_cuda else (10000, 10000)
  
 t_i = torch.linspace(0, 1, N).type(dtype).view(-1,1)
 t_j = torch.linspace(0, 1, M).type(dtype).view(-1,1)
@@ -69,7 +69,7 @@ X_i, Y_j = 0.2 * t_i,  0.4 * t_j + 0.6
 # and as a "model-free" machine learning program, where
 # we optimize directly on the samples' locations.
  
-def gradient_flow(loss, lr=.025) :
+def gradient_flow(loss, lr=.01) :
     """Flows along the gradient of the cost function, using a simple Euler scheme.
     
     Parameters:
@@ -190,7 +190,7 @@ gradient_flow( SamplesLoss("sinkhorn", p=1, blur=1.) )
 # And the Earth-Mover's (Wassertein-1) distance:
 #
 
-gradient_flow( SamplesLoss("sinkhorn", p=1, blur=.01), lr=.01 )
+gradient_flow( SamplesLoss("sinkhorn", p=1, blur=.01) )
 
 
 ###############################################

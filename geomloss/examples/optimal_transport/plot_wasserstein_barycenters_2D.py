@@ -2,8 +2,9 @@
 Wasserstein barycenters in 2D
 ==================================
 
-Let's compute Wasserstein barycenters between 2D densities,
-using a simple descent scheme to minimize a weighted Sinkhorn divergence.
+Let's compute pseudo-Wasserstein barycenters between 2D densities,
+using the gradient of the Sinkhorn divergence as a cheap approximation
+of the Monge map.
 """
 
 ##############################################
@@ -26,6 +27,8 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 # Dataset
 # ~~~~~~~~~~~~~~~~~~
 #
+# In this tutorial, we work with square images
+# understood as densities on the unit square.
 
 def grid(W):
     y, x = torch.meshgrid( [ torch.arange(0.,W).type(dtype) / W ] * 2 )
@@ -35,7 +38,7 @@ def grid(W):
 def load_image(fname) :
     img = misc.imread(fname, flatten = True) # Grayscale
     img = (img[:, :])  / 255.
-    return 1 - img
+    return 1 - img                           # black = 1, white = 0
 
 
 def as_measure(fname, size):
@@ -46,127 +49,115 @@ def as_measure(fname, size):
 
     samples = grid( size )
     return weights.view(-1), samples
-    
-import matplotlib
-matplotlib.rc('image', cmap='gray')
+ 
+###############################################
+# To perform Lagrangian computations,
+# we turn these **png** bitmaps into **weighted point clouds**,
+# regularly spaced on a grid:
 
 N, M = (8, 8) if not use_cuda else (128, 64)
 
-A = as_measure("data/A.png", M)
-B = as_measure("data/B.png", M)
-C = as_measure("data/C.png", M)
-D = as_measure("data/D.png", M)
+A, B = as_measure("data/A.png", M), as_measure("data/B.png", M)
+C, D = as_measure("data/C.png", M), as_measure("data/D.png", M)
 
 
 ###############################################
-#
+# The starting point of our algorithm is 
+# a finely grained uniform sample on the unit square:
 
-Z_k = grid(N)
+x_i = grid(N).view(-1,2)
+a_i = (torch.ones(N*N) / (N*N)).type_as(x_i)
 
+x_i.requires_grad = True
 
 ###############################################
 # Display routine
 # ~~~~~~~~~~~~~~~~~
 #
-# We display our samples using (smoothed) density
-# curves, computed with a straightforward Gaussian convolution:
- 
+# To display our interpolating point clouds, we put points
+# into square bins and display the resulting density,
+# using an appropriate threshold to mitigate quantization artifacts:
+    
+import matplotlib
+matplotlib.rc('image', cmap='gray')
+
 grid_plot = grid(M).view(-1,2).cpu().numpy()
 
 def display_samples(ax, x, weights=None):
-    """Displays samples on the unit square using a density estimator."""
+    """Displays samples on the unit square using a simple binning algorithm."""
     x = x.clamp(0, 1 - .1/M)
     bins = (x[:,0] * M).floor() + M * (x[:,1] * M).floor()
     count = bins.int().bincount(weights=weights, minlength=M*M)
-    ax.imshow( count.detach().float().view(M,M).cpu().numpy(), vmin=0 )
+    ax.imshow( count.detach().float().view(M,M).cpu().numpy(), vmin=0, vmax=.5*count.max().item() )
 
 
 
 ###############################################
+# In the :doc:`notebook on Wasserstein barycenters <plot_wasserstein_barycenters_1D>`,
+# we've seen how to solve generic optimization problems
+# of the form
 #
+# .. math::
+#       \alpha^\star~=~\arg\min_\alpha 
+#             w_a \cdot \text{S}_{\varepsilon,\rho}(\,\alpha,\,A\,)
+#        ~&+~  w_b \cdot \text{S}_{\varepsilon,\rho}(\,\alpha,\,B\,) \\
+#        ~+~  w_c \cdot \text{S}_{\varepsilon,\rho}(\,\alpha,\,C\,)
+#         ~&+~  w_d \cdot \text{S}_{\varepsilon,\rho}(\,\alpha,\,D\,)
+# 
+# using Eulerian and Lagrangian schemes.
+# 
+# Focusing on the Lagrangian descent, a **single** (weighted) 
+# **gradient step** on the points :math:`x_i`
+# that make up the variable distribution 
+# :math:`\alpha = \sum_{i=1}^N \alpha_i \delta_{x_i}`
+# results in an update
+#
+# .. math::
+#       x_i ~\gets~ x_i + w_a\cdot v_i^A + w_b\cdot v_i^B + w_c\cdot v_i^C  + w_d\cdot v_i^D,  
+#
+# where the :math:`\,v_i^A\,=\,-\tfrac{1}{\alpha_i}\nabla_{x_i}\text{S}_{\varepsilon,\rho}(\,\alpha,\,A\,)\,`, etc.
+# are the displacement vectors that map the starting (uniform) sample :math:`\alpha` 
+# to the target measures
+# :math:`A`, :math:`B`, :math:`C` and :math:`D`.
 
-from geomloss.examples.optimal_transport.model_fitting import fit_model  # Wrapper around scipy.optimize
-from torch.nn import Module, Parameter  # PyTorch syntax for optimization problems
-
-class Barycenter(Module):
+Loss = SamplesLoss("sinkhorn", blur=.01, scaling=.9)
+models = []
+for (b_j, y_j) in [A,B,C,D]:
+    L_ab = Loss( a_i, x_i, b_j, y_j)
+    [g_i] = torch.autograd.grad(L_ab, [x_i])
+    models.append( x_i - g_i / a_i.view(-1,1) )
     
-    def __init__(self, loss, targets):
-        super(Barycenter, self).__init__()
-        self.loss = loss        # Sinkhorn divergence to optimize
-        self.targets = targets
+a, b, c, d = models
 
-        # Our parameter to optimize: sample locations and log-weights
-        self.z_k = Parameter( Z_k.clone() )
-        self.l_k = Parameter( torch.zeros(len(self.z_k)).type_as(self.z_k) )
- 
+###############################################
+# If the weights :math:`w_k` sum up to 1, this update is a barycentric
+# combination of the **target points** :math:`x_i + v_i^A`, :math:`~\dots\,`, :math:`x_i + v_i^D`,
+# images of the source sample :math:`x_i`
+# under the action of the :doc:`generalized Monge maps <plot_interpolation>` that transport
+# our uniform sample onto the four target measures.
+# 
+# Using the resulting sample as an **ersatz for the true Wasserstein barycenter**
+# is thus an approximation that holds in dimension 1, and is reasonable
+# for most applications. As evidenced below, it allows us to interpolate
+# between arbitrary densities at a low numerical cost:
 
-    def weights(self):
-        """Turns the l_k's into the weights of a positive probabilty measure."""
-        return torch.nn.functional.softmax(self.l_k, dim=0)
+plt.figure(figsize=(14,14))
 
+# Display the target measures in the corners of our Figure
+ax = plt.subplot(7,7,1)  ; ax.imshow( A[0].reshape(M,M).cpu() ) ; ax.set_xticks([], []); ax.set_yticks([], [])
+ax = plt.subplot(7,7,7)  ; ax.imshow( B[0].reshape(M,M).cpu() ) ; ax.set_xticks([], []); ax.set_yticks([], [])
+ax = plt.subplot(7,7,43) ; ax.imshow( C[0].reshape(M,M).cpu() ) ; ax.set_xticks([], []); ax.set_yticks([], [])
+ax = plt.subplot(7,7,49) ; ax.imshow( D[0].reshape(M,M).cpu() ) ; ax.set_xticks([], []); ax.set_yticks([], [])
 
-    def fit(self, display=False, tol=1e-10):
-        """Uses a custom wrapper around the scipy.optimize module."""
-        fit_model(self, method = "L-BFGS", lr = 1., display = display, tol=tol, gtol=tol)
-
-
-    def forward(self) :
-        """Returns the cost to minimize."""
-        cost = 0
-        for (w, (weights, samples) ) in self.targets:
-            cost = cost + w * self.loss(self.weights(), self.z_k, weights, samples)
-        return cost
-
-
-    def plot(self, nit=0, cost=0, ax=None, title=None):
-        """Displays the descent using a custom 'waffle' layout."""
-        if ax is None:
-            if nit == 0 or nit % 16 == 4: 
-                plt.pause(.01)
-                plt.figure(figsize=(16,4))
-
-            if nit <= 4 or nit % 4 == 0:
-                if nit < 4: index = nit + 1
-                else:       index = (nit//4 - 1) % 4 + 1
-                ax = plt.subplot(1,4, index)
-                
-        if ax is not None:
-            display_samples(ax, self.z_k, weights = self.weights())
-
-            if title is None:
-                ax.set_title("nit = {}, cost = {:3.4f}".format(nit, cost))
-            else:
-                ax.set_title(title)
-
-            ax.set_xticks([], []); ax.set_yticks([], [])
-            if nit != 2 and nit % 16 != 12: plt.tight_layout()
-
-
-
-Barycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.5),
-            [ (0., A), (1., B) ] 
-            ).fit(display=True, tol=1e-5)
-
- 
-
-plt.figure(figsize=(9.7,14))
-
-ax = plt.subplot(7,7,1)  ; ax.imshow( A[0].reshape(M,M) ) ; ax.set_xticks([], []); ax.set_yticks([], [])
-ax = plt.subplot(7,7,7)  ; ax.imshow( B[0].reshape(M,M) ) ; ax.set_xticks([], []); ax.set_yticks([], [])
-ax = plt.subplot(7,7,43) ; ax.imshow( C[0].reshape(M,M) ) ; ax.set_xticks([], []); ax.set_yticks([], [])
-ax = plt.subplot(7,7,49) ; ax.imshow( D[0].reshape(M,M) ) ; ax.set_xticks([], []); ax.set_yticks([], [])
-
+# Display the interpolating densities as a 5x5 waffle plot
 for i in range(5):
     for j in range(5):
         x, y = j/4, i/4
-
-        bary = Barycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.5),
-                        [ ( (1-x)*(1-y), A ),  ( x*(1-y), B ), 
-                          ( (1-x)*  y,   C ),  ( x*  y,   D ),  ] )
-        bary.fit(tol=1e-5)
+        barycenter = (1-x)*(1-y)*a + x*(1-y)*b + (1-x)*y*c + x*y*d
 
         ax = plt.subplot(7,7, 7*(i+1) + j+2 )
-        bary.plot(ax=ax, title="")
+        display_samples(ax, barycenter )
+        ax.set_xticks([], []); ax.set_yticks([], [])
 
 plt.tight_layout()
 plt.show()

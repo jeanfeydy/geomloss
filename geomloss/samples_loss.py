@@ -46,19 +46,18 @@ routines = {
 class SamplesLoss(Module):
     """Creates a criterion that computes distances between sampled measures on a vector space.
 
-    Blabla measures.
-
     Warning:
-        If **loss** is ``"sinkhorn"`` and 
+        If **loss** is ``"sinkhorn"`` and **reach** is **None** (balanced Optimal Transport),
+        the resulting routine will expect measures whose total masses are equal with each other.
 
     Parameters:
         loss (string, default = ``"sinkhorn"``): The loss function to compute.
             The supported values are:
 
               - ``"sinkhorn"``: (Un-biased) Sinkhorn divergence, which interpolates
-                between Wasserstein (blur=0) and kernel (blur= :math:`+\infty` ).
+                between Wasserstein (blur=0) and kernel (blur= :math:`+\infty` ) distances.
               - ``"hausdorff"``: Weighted Hausdorff distance, which interpolates
-                between
+                between the ICP loss (blur=0) and a kernel distance (blur= :math:`+\infty` ).
               - ``"energy"``: Energy Distance MMD, computed using the kernel
                 :math:`k(x,y) = -\|x-y\|_2`.
               - ``"gaussian"``: Gaussian MMD, computed using the kernel
@@ -90,17 +89,57 @@ class SamplesLoss(Module):
             Note that the *Energy Distance* is scale-equivariant, and won't 
             be affected by this parameter.
 
-        reach (float, default=None= :math:`+\infty` ): If 
+        reach (float, default=None= :math:`+\infty` ): If **loss** is ``"sinkhorn"``
+            or ``"hausdorff"``,
+            specifies the typical scale :math:`\\tau` associated
+            to the constraint strength :math:`\\rho = \\tau^p`.
+
+        diameter (float, default=None): A rough indication of the maximum
+            distance between points, which is used to tune the :math:`\\varepsilon`-scaling
+            descent and provide a default heuristic for clustering **multiscale** schemes.
+            If **None**, a conservative estimate will be computed on-the-fly.
 
         scaling (float, default=.5): If **loss** is ``"sinkhorn"``,
             specifies the ratio between successive values
             of :math:`\sigma=\\varepsilon^{1/p}` in the
             :math:`\\varepsilon`-scaling descent.
+            This parameter allows you to specify the trade-off between
+            speed (**scaling** < .4) and accuracy (**scaling** > .9).
 
-        truncate (float, default=None=:math:`+\infty`):
+        truncate (float, default=None= :math:`+\infty`): If **backend**
+            is ``"multiscale"``, specifies the effective support of
+            a Gaussian/Laplacian kernel as a multiple of its standard deviation.
+            If **truncate** is not **None**, kernel truncation
+            steps will assume that 
+            :math:`\\exp(-x/\sigma)` or
+            :math:`\\exp(-x^2/2\sigma^2) are zero when 
+            :math:`\|x\| \,>\, \\text{truncate}\cdot \sigma`.
+            
 
-        cost (function, default=None):
+        cost (function or string, default=None): if **loss** is ``"sinkhorn"``
+            or ``"hausdorff"``, specifies the cost function that should
+            be used instead of :math:`\\tfrac{1}{p}\|x-y\|^p`:
+            
+            - If **backend** is ``"tensorized"``, **cost** should be a 
+              python function that takes as input a
+              (B,N,D) torch Tensor **x**, a (B,M,D) torch Tensor **y**
+              and returns a batched Cost matrix as a (B,N,M) Tensor.
+            - Otherwise, if **backend** is ``"online"`` or ``"multiscale"``,
+              **cost** should be a `KeOps formula <http://www.kernel-operations.io/api/math-operations.html>`_,
+              given as a string, with variables ``X`` and ``Y``.
+              The default values are ``"Norm2(X-Y)"`` (for **p** = 1) and
+              ``"(SqDist(X,Y) / IntCst(2))"`` (for **p** = 2).
 
+        cluster_scale (float, default=None): If **backend** is ``"multiscale"``,
+            specifies the coarse scale at which cluster centroids will be computed.
+            If **None**, a conservative estimate will be computed from
+            **diameter** and the ambient space's dimension, 
+            making sure that memory overflows won't take place.
+
+        verbose (bool, default=False): If **backend** is ``"multiscale"``,
+            specifies whether information on the clustering and
+            :math:`\\varepsilon`-scaling descent should be displayed
+            in the standard output.
 
         backend (string, default = ``"auto"``): The implementation that
             will be used in the background; this choice has a major impact
@@ -138,7 +177,10 @@ class SamplesLoss(Module):
 
 
     def forward(self, *args):
-        """Computes the loss between sampled measures."""
+        """Computes the loss between sampled measures.
+        
+        Documentation and examples: Soon!
+        Until then, please check the tutorials :-)"""
         
         α, x, β, y = self.process_args(*args)
         B, N, M, D = self.check_shapes(α, x, β, y)

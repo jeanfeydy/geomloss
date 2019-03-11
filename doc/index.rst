@@ -1,8 +1,9 @@
 Geometric Loss functions between sampled measures, images and volumes
 ---------------------------------------------------------------------
 
-**N.B.:** This is still an alpha release! 
-Please send me your feedback: I will polish the user interface
+**N.B.:** This is still an **alpha** release! 
+Please send me your feedback: I will polish the user interface,
+implement Hausdorff divergences, add support for images/volumes
 and clean the documentation before a first stable release in April 2019.
 
 The **GeomLoss** library provides efficient GPU implementations for:
@@ -42,15 +43,15 @@ A typical sample of code looks like:
     import torch
     from geomloss import SamplesLoss  # See also ImagesLoss, VolumesLoss
 
-    # Sinkhorn (~Wasserstein) loss between sampled measures
-    loss = SamplesLoss(loss="sinkhorn", p=2, blur=.05)
-
-    # Apply it to large point clouds in 3D
+    # Create some large point clouds in 3D
     x = torch.randn(100000, 3, requires_grad=True).cuda()
     y = torch.randn(200000, 3).cuda()
-    
+
+    # Define a Sinkhorn (~Wasserstein) loss between sampled measures
+    loss = SamplesLoss(loss="sinkhorn", p=2, blur=.05)
+
     L = loss(x, y)  # By default, use constant weights = 1/number of samples
-    g_x, = torch.autograd.grad(L, [x])  # GeomLoss fully supports autograd
+    g_x, = torch.autograd.grad(L, [x])  # GeomLoss fully supports autograd!
 
 
 GeomLoss is a simple interface for cutting-edge Optimal Transport
@@ -83,9 +84,9 @@ If you are aware of a well-packaged implementation
 of these algorithms on the GPU, please contact me!
 
 
-Most importantly, the divergences provided here are
-all suitable for measure-fitting applications:
-they are **symmetric** and **positive definite**.
+The divergences implemented here are
+all **symmetric**, **positive definite**
+and therefore suitable for measure-fitting applications.
 For positive input measures :math:`\alpha` and :math:`\beta`,
 our :math:`\text{Loss}` functions are such that
 
@@ -94,7 +95,7 @@ our :math:`\text{Loss}` functions are such that
     0~=~\text{Loss}(\alpha,\alpha) ~&\leqslant~ \text{Loss}(\alpha,\beta), \\
     0~=~\text{Loss}(\alpha,\beta)~&\Longleftrightarrow~ \alpha = \beta.
 
-GeomLoss can be used in a wide variety of settings, 
+**GeomLoss** can be used in a wide variety of settings, 
 from **shape analysis** (LDDMM, optimal transport...)
 to **machine learning** (kernel methods, GANs...)
 and **image processing**.
@@ -110,10 +111,23 @@ Details and examples are provided below:
 Author
 -------
 
-Feel free to contact me for any bug report or feature request:
+Feel free to contact me for any **bug report** or **feature request**:
 
 - `Jean Feydy <http://www.math.ens.fr/~feydy/>`_
 
+Related projects
+------------------
+
+You may be interested by:
+
+- The `KeOps library <http://www.kernel-operations.io/>`_, which provides 
+  **efficient CUDA routines**
+  for point cloud processing, with full `PyTorch <https://pytorch.org/>`_ support.
+- Rémi Flamary and Nicolas Courty's 
+  `Python Optimal Transport library <https://pot.readthedocs.io/en/stable/>`_,
+  which provides a reference implementation of **OT-related methods** for small problems.
+- Bernhard Schmitzer's `Optimal Transport toolbox <https://github.com/bernhard-schmitzer/optimal-transport/tree/master/v0.2.0>`_,
+  which provides a reference **multiscale solver** for the OT problem, on the CPU.
 
 Table of contents
 -----------------
