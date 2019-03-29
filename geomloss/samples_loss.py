@@ -219,21 +219,14 @@ class SamplesLoss(Module):
                     p = self.p, blur = self.blur, reach = self.reach, 
                     diameter=self.diameter, scaling = self.scaling, truncate = self.truncate, 
                     cost = self.cost, kernel = self.kernel, cluster_scale=self.cluster_scale,
-                    debias = self.debias, potentials = self.potentials
+                    debias = self.debias, potentials = self.potentials,
                     labels_x = l_x, labels_y = l_y,
                     verbose = self.verbose )
 
 
         # Make sure that the output has the correct shape ------------------------------------
-        if potentials:  # Return some dual potentials (= test functions) sampled on the input measures
-            if backend in ["online", "multiscale"]:  # KeOps backends return a single scalar value
-                if B == 0: return values           # The user expects a scalar value
-                else:      return values.view(-1)  # The user expects a "batch list" of distances
-
-            else:  # "tensorized" backend returns a "batch vector" of values
-                if B == 0: return values[0]  # The user expects a scalar value
-                else:      return values     # The user expects a "batch vector" of distances
-
+        if self.potentials:  # Return some dual potentials (= test functions) sampled on the input measures
+            return values
 
         else:  # Return a scalar cost value
             if backend in ["online", "multiscale"]:  # KeOps backends return a single scalar value
