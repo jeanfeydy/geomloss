@@ -103,10 +103,10 @@ def kernel_keops(kernel, α, x, β, y, ranges_xx = None, ranges_yy = None, range
 
     D = x.shape[1]
     kernel_conv = generic_sum( "(" + kernel + " * B)",   # Formula
-                               "A = Vx(1)",              # Output:    a_i
-                               "X = Vx({})".format(D),   # 1st input: x_i
-                               "Y = Vy({})".format(D),   # 2nd input: y_j
-                               "B = Vy(1)" )             # 3rd input: b_j
+                               "A = Vi(1)",              # Output:    a_i
+                               "X = Vi({})".format(D),   # 1st input: x_i
+                               "Y = Vj({})".format(D),   # 2nd input: y_j
+                               "B = Vj(1)" )             # 3rd input: b_j
     
     a_i = kernel_conv(double_grad(x), x.detach(), α.detach().view(-1,1), ranges=ranges_xx)
     b_j = kernel_conv(double_grad(y), y.detach(), β.detach().view(-1,1), ranges=ranges_yy)

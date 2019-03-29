@@ -70,10 +70,10 @@ def softmin_online(ε, C_xy, f_y, log_conv=None):
 
 def keops_lse(cost, D):
     log_conv = generic_logsumexp("( B - (P * " + cost + " ) )",
-                                 "A = Vx(1)",
-                                 "X = Vx({})".format(D),
-                                 "Y = Vy({})".format(D),
-                                 "B = Vy(1)",
+                                 "A = Vi(1)",
+                                 "X = Vi({})".format(D),
+                                 "Y = Vj({})".format(D),
+                                 "B = Vj(1)",
                                  "P = Pm(1)")
     return log_conv
 
@@ -113,7 +113,7 @@ def softmin_multiscale(ε, C_xy, f_y, log_conv=None):
     return - ε * log_conv( x, y, f_y.view(-1,1), torch.Tensor([1/ε]).type_as(x), ranges=ranges_xy ).view(-1)
 
 
-def clusterize(α, x, scale=None) :
+def clusterize(α, x, scale=None, labels=None) :
     """
     Performs a simple 'voxelgrid' clustering on the input measure,
     putting points into cubic bins of size 'scale' = σ_c.
@@ -128,12 +128,12 @@ def clusterize(α, x, scale=None) :
         α_c[k], x_c[k] correspond to
         α[x_ranges[k,0]:x_ranges[k,1]], x[x_ranges[k,0]:x_ranges[k,1],:]
     """
-    if scale is None : # No clustering, single-scale Sinkhorn on the way...
+    if labels is None and scale is None : # No clustering, single-scale Sinkhorn on the way...
         return [α], [x], []
 
     else : # As of today, only two-scale Sinkhorn is implemented:
         # Compute simple (voxel-like) class labels:
-        x_lab = grid_cluster(x, scale)  
+        x_lab = grid_cluster(x, scale) if labels is None else labels
         # Compute centroids and weights:
         ranges_x, x_c, α_c = cluster_ranges_centroids(x, x_lab, weights=α)
         # Make clusters contiguous in memory:
@@ -183,6 +183,7 @@ def extrapolate_samples( b_x, a_y, ε, λ, C_xy, β_log, C_xy_, softmin=None ):
 
 def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, 
                         scaling=.5, truncate=5, cost=None, cluster_scale=None, 
+                        labels_x = None, labels_y = None,
                         verbose=False, **kwargs):
     
     N, D = x.shape
@@ -199,8 +200,8 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
     # Clusterize and sort our point clouds:
     if cluster_scale is None:
         cluster_scale = diameter / (np.sqrt(D) * 2000**(1/D))
-    [α_c, α], [x_c, x], [ranges_x] = clusterize(α, x, scale=cluster_scale)
-    [β_c, β], [y_c, y], [ranges_y] = clusterize(β, y, scale=cluster_scale)
+    [α_c, α], [x_c, x], [ranges_x] = clusterize(α, x, scale=cluster_scale, labels=labels_x)
+    [β_c, β], [y_c, y], [ranges_y] = clusterize(β, y, scale=cluster_scale, labels=labels_y)
 
     jumps = [ len(ε_s)-1 ]
     for i, ε in enumerate(ε_s[2:]):

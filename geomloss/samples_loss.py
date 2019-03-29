@@ -182,11 +182,16 @@ class SamplesLoss(Module):
         Documentation and examples: Soon!
         Until then, please check the tutorials :-)"""
         
-        α, x, β, y = self.process_args(*args)
-        B, N, M, D = self.check_shapes(α, x, β, y)
+        l_x, α, x, l_y, β, y = self.process_args(*args)
+        B, N, M, D = self.check_shapes(l_x, α, x, l_y, β, y)
 
         backend = self.backend  # Choose the backend -----------------------------------------
-        if backend == "auto":
+        if l_x is not None or l_y is not None:
+            if backend in ["auto", "multiscale"]: backend = "multiscale"
+            else:
+                raise ValueError('Explicit cluster labels are only supported with the "auto" and "multiscale" backends.')
+
+        elif backend == "auto":
             if M*N <= 5000**2 : backend = "tensorized"  # Fast backend, with a quadratic memory footprint
             else:
                 if D <= 3 and self.loss == "sinkhorn" and M*N > 10000**2 and self.p==2:
@@ -212,6 +217,7 @@ class SamplesLoss(Module):
                     p = self.p, blur = self.blur, reach = self.reach, 
                     diameter=self.diameter, scaling = self.scaling, truncate = self.truncate, 
                     cost = self.cost, kernel = self.kernel, cluster_scale=self.cluster_scale,
+                    labels_x = l_x, labels_y = l_y,
                     verbose = self.verbose )
 
 
@@ -226,15 +232,18 @@ class SamplesLoss(Module):
                 
 
     def process_args(self, *args):
-        if len(args) == 4:
+        if len(args) == 6:
             return args
+        if len(args) == 4:
+            α, x, β, y = args
+            return None, α, x, None, β, y
         elif len(args) == 2:
             x, y = args
             α = self.generate_weights(x)
             β = self.generate_weights(y)
-            return α, x, β, y
+            return None, α, x, None, β, y
         else:
-            raise ValueError("A SamplesLoss accepts two (x, y) or four (α, x, β, y) arguments.")
+            raise ValueError("A SamplesLoss accepts two (x, y), four (α, x, β, y) or six (l_x, α, x, l_y, β, y)  arguments.")
 
 
     def generate_weights(self, x):
@@ -248,7 +257,7 @@ class SamplesLoss(Module):
             raise ValueError("Input samples 'x' and 'y' should be encoded as (N,D) or (B,N,D) (batch) tensors.")
 
 
-    def check_shapes(self, α, x, β, y):
+    def check_shapes(self, l_x, α, x, l_y, β, y):
 
         if α.dim() != β.dim(): raise ValueError("Input weights 'α' and 'β' should have the same number of dimensions.")
         if x.dim() != y.dim(): raise ValueError("Input samples 'x' and 'y' should have the same number of dimensions.")
@@ -265,6 +274,23 @@ class SamplesLoss(Module):
                 if α.shape[1] > 1: raise ValueError("Without batches, input weights 'α' should be encoded as (N,) or (N,1) tensors.")
                 if β.shape[1] > 1: raise ValueError("Without batches, input weights 'β' should be encoded as (M,) or (M,1) tensors.")
                 α, β = α.view(-1), β.view(-1)
+
+            if l_x is not None:
+                if l_x.dim() not in [1,2] :
+                    raise ValueError("Without batches, the vector of labels 'l_x' should be encoded as an (N,) or (N,1) tensor.")
+                elif l_x.dim() == 2:
+                    if l_x.shape[1] > 1: raise ValueError("Without batches, the vector of labels 'l_x' should be encoded as (N,) or (N,1) tensors.")
+                    l_x = l_x.view(-1)
+                if len(l_x) != N : raise ValueError("The vector of labels 'l_x' should have the same length as the point cloud 'x'.")
+            
+            if l_y is not None:
+                if l_y.dim() not in [1,2] :
+                    raise ValueError("Without batches, the vector of labels 'l_y' should be encoded as an (M,) or (M,1) tensor.")
+                elif l_y.dim() == 2:
+                    if l_y.shape[1] > 1: raise ValueError("Without batches, the vector of labels 'l_y' should be encoded as (M,) or (M,1) tensors.")
+                    l_y = l_y.view(-1)
+                if len(l_y) != M : raise ValueError("The vector of labels 'l_y' should have the same length as the point cloud 'y'.")
+
             N2, M2 = α.shape[0], β.shape[0]
 
         elif x.dim() == 3:  # batch computation ---------------------------------------------------------
@@ -279,6 +305,9 @@ class SamplesLoss(Module):
                 if β.shape[2] > 1: raise ValueError("With batches, input weights 'β' should be encoded as (B,M) or (B,M,1) tensors.")
                 α, β = α.squeeze(-1), β.squeeze(-1)
             
+            if l_x is not None: raise NotImplementedError('The "multiscale" backend has not been implemented with batches.')
+            if l_y is not None: raise NotImplementedError('The "multiscale" backend has not been implemented with batches.')
+
             B2, N2 = α.shape
             B3, M2 = β.shape
             if B != B2: raise ValueError("Samples 'x' and weights 'α' should have the same batchsize.")
