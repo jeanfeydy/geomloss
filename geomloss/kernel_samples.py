@@ -24,7 +24,7 @@ import torch
 
 try:  # Import the keops library, www.kernel-operations.io
     from pykeops.torch import generic_sum
-    from pykeops.torch.cluster import grid_cluster, cluster_ranges_centroids, sort_clusters, from_matrix
+    from pykeops.torch.cluster import grid_cluster, cluster_ranges_centroids, sort_clusters, from_matrix, swap_axes
     keops_available = True
 except:
     keops_available = False
@@ -65,7 +65,7 @@ kernel_routines = {
     "energy"   : energy_kernel,
 }
 
-def kernel_tensorized(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
+def kernel_tensorized(α, x, β, y, blur=.05, kernel=None, name=None, potentials=False,**kwargs):
     
     B, N, D = x.shape
     _, M, _ = y.shape
@@ -75,16 +75,21 @@ def kernel_tensorized(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
 
     K_xx = kernel( double_grad(x), x.detach(), blur=blur)  # (B,N,N) tensor
     K_yy = kernel( double_grad(y), y.detach(), blur=blur)  # (B,M,M) tensor
-    K_xy = kernel( x, y, blur=blur)                              # (B,N,M) tensor
+    K_xy = kernel( x, y, blur=blur)                        # (B,N,M) tensor
 
     a_i = torch.matmul( K_xx, α.detach().unsqueeze(-1) ).squeeze(-1)  # (B,N,N) @ (B,N) = (B,N) 
     b_j = torch.matmul( K_yy, β.detach().unsqueeze(-1) ).squeeze(-1)  # (B,M,M) @ (B,M) = (B,M)
     b_i = torch.matmul( K_xy, β.unsqueeze(-1)          ).squeeze(-1)  # (B,N,M) @ (B,M) = (B,N) 
 
-    # N.B.: we assume that 'kernel' is symmetric:
-    return .5 * (double_grad(α) * a_i).sum(1) \
-         + .5 * (double_grad(β) * b_j).sum(1) \
-         -  (α * b_i).sum(1)
+    
+    if potentials:
+        a_j = torch.matmul( K_xy.transpose(1,2), α.unsqueeze(-1)).squeeze(-1)  # (B,M,N) @ (B,N) = (B,M)
+        return a_i - b_i, b_j - a_j
+
+    else:  # Return the Kernel norm. N.B.: we assume that 'kernel' is symmetric:
+        return .5 * (double_grad(α) * a_i).sum(1) \
+             + .5 * (double_grad(β) * b_j).sum(1) \
+             -  (α * b_i).sum(1)
 
 
 
@@ -99,7 +104,7 @@ kernel_formulas = {
 }
 
 
-def kernel_keops(kernel, α, x, β, y, ranges_xx = None, ranges_yy = None, ranges_xy = None):
+def kernel_keops(kernel, α, x, β, y, potentials=False, ranges_xx = None, ranges_yy = None, ranges_xy = None):
 
     D = x.shape[1]
     kernel_conv = generic_sum( "(" + kernel + " * B)",   # Formula
@@ -112,9 +117,13 @@ def kernel_keops(kernel, α, x, β, y, ranges_xx = None, ranges_yy = None, range
     b_j = kernel_conv(double_grad(y), y.detach(), β.detach().view(-1,1), ranges=ranges_yy)
     b_i = kernel_conv(x, y, β.view(-1,1), ranges=ranges_xy)
 
-    # N.B.: we assume that 'kernel' is symmetric:
-    return .5 * scal( double_grad(α), a_i ) \
-         + .5 * scal( double_grad(β), b_j )  -  scal( α, b_i )
+    if potentials:
+        a_j = kernel_conv(y, x, α.view(-1,1), ranges=swap_axes(ranges_xy))
+        return a_i - b_i, b_j - a_j
+
+    else:  # Return the Kernel norm. N.B.: we assume that 'kernel' is symmetric:
+        return .5 * scal( double_grad(α), a_i ) \
+             + .5 * scal( double_grad(β), b_j )  -  scal( α, b_i )
               
 
 
@@ -135,10 +144,10 @@ def kernel_preprocess(kernel, name, x, y, blur):
     return kernel, x, y
 
 
-def kernel_online(α, x, β, y, blur=.05, kernel=None, name=None, **kwargs):
+def kernel_online(α, x, β, y, blur=.05, kernel=None, name=None, potentials=False, **kwargs):
 
     kernel, x, y = kernel_preprocess(kernel, name, x, y, blur)
-    return kernel_keops(kernel, α, x, β, y)
+    return kernel_keops(kernel, α, x, β, y, potentials=potentials)
 
 
 # ==============================================================================
@@ -153,11 +162,12 @@ def max_diameter(x, y):
 
 
 def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None, 
-                      truncate=5, diameter=None, cluster_scale=None, verbose=False, **kwargs):
+                      truncate=5, diameter=None, cluster_scale=None, 
+                      potentials=False, verbose=False, **kwargs):
 
     if truncate is None or name == "energy":
         return kernel_online( α, x, β, y, blur=blur, kernel=kernel, 
-                              truncate=truncate, name=name, **kwargs )
+                              truncate=truncate, name=name, potentials=potentials, **kwargs )
 
     # Renormalize our point cloud so that blur = 1:
     kernel, x, y = kernel_preprocess(kernel, name, x, y, blur)
@@ -205,6 +215,6 @@ def kernel_multiscale(α, x, β, y, blur=.05, kernel=None, name=None,
         ranges_yy = from_matrix(ranges_y, ranges_y, keep_yy)
         ranges_xy = from_matrix(ranges_x, ranges_y, keep_xy)
     
-    return kernel_keops(kernel, α, x, β, y, 
+    return kernel_keops(kernel, α, x, β, y, potentials=potentials,
                 ranges_xx=ranges_xx, ranges_yy=ranges_yy, ranges_xy=ranges_xy)
 

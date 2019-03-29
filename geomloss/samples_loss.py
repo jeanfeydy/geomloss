@@ -159,7 +159,7 @@ class SamplesLoss(Module):
                 reductions provided by the `pykeops <https://www.kernel-operations.io>`_ library.
 
     """
-    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, diameter=None, scaling=.5, truncate=5, cost=None, kernel=None, cluster_scale=None, verbose=False, backend="auto"):
+    def __init__(self, loss="sinkhorn", p=2, blur=.05, reach=None, diameter=None, scaling=.5, truncate=5, cost=None, kernel=None, cluster_scale=None, debias=True, potentials=False, verbose=False, backend="auto"):
 
         super(SamplesLoss, self).__init__()
         self.loss = loss
@@ -173,6 +173,8 @@ class SamplesLoss(Module):
         self.cost = cost
         self.kernel = kernel
         self.cluster_scale = cluster_scale
+        self.debias = debias
+        self.potentials = potentials
         self.verbose = verbose
 
 
@@ -217,18 +219,30 @@ class SamplesLoss(Module):
                     p = self.p, blur = self.blur, reach = self.reach, 
                     diameter=self.diameter, scaling = self.scaling, truncate = self.truncate, 
                     cost = self.cost, kernel = self.kernel, cluster_scale=self.cluster_scale,
+                    debias = self.debias, potentials = self.potentials
                     labels_x = l_x, labels_y = l_y,
                     verbose = self.verbose )
 
 
         # Make sure that the output has the correct shape ------------------------------------
-        if backend in ["online", "multiscale"]:  # KeOps backends return a single scalar value
-            if B == 0: return values           # The user expects a scalar value
-            else:      return values.view(-1)  # The user expects a "batch list" of distances
+        if potentials:  # Return some dual potentials (= test functions) sampled on the input measures
+            if backend in ["online", "multiscale"]:  # KeOps backends return a single scalar value
+                if B == 0: return values           # The user expects a scalar value
+                else:      return values.view(-1)  # The user expects a "batch list" of distances
 
-        else:  # "tensorized" backend returns a "batch vector" of values
-            if B == 0: return values[0]  # The user expects a scalar value
-            else:      return values     # The user expects a "batch vector" of distances
+            else:  # "tensorized" backend returns a "batch vector" of values
+                if B == 0: return values[0]  # The user expects a scalar value
+                else:      return values     # The user expects a "batch vector" of distances
+
+
+        else:  # Return a scalar cost value
+            if backend in ["online", "multiscale"]:  # KeOps backends return a single scalar value
+                if B == 0: return values           # The user expects a scalar value
+                else:      return values.view(-1)  # The user expects a "batch list" of distances
+
+            else:  # "tensorized" backend returns a "batch vector" of values
+                if B == 0: return values[0]  # The user expects a scalar value
+                else:      return values     # The user expects a "batch vector" of distances
                 
 
     def process_args(self, *args):

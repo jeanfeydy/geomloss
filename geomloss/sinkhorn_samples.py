@@ -32,7 +32,8 @@ def softmin_tensorized(ε, C, f):
     B = C.shape[0]
     return - ε * ( f.view(B,1,-1) - C/ε ).logsumexp(2)
 
-def sinkhorn_tensorized(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, **kwargs):
+def sinkhorn_tensorized(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, 
+                        debias = True, potentials = False, **kwargs):
     
     B, N, D = x.shape
     _, M, _ = y.shape
@@ -40,17 +41,17 @@ def sinkhorn_tensorized(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, 
     if cost is None:
         cost = cost_routines[p]
         
-    C_xx, C_yy = cost( x, x.detach()), cost( y, y.detach())  # (B,N,N), (B,M,M)
-    C_xy, C_yx = cost( x, y.detach()), cost( y, x.detach())  # (B,N,M), (B,M,N)
+    C_xx, C_yy = ( cost( x, x.detach()), cost( y, y.detach()) ) if debias else (None, None)  # (B,N,N), (B,M,M)
+    C_xy, C_yx = ( cost( x, y.detach()), cost( y, x.detach()) )  # (B,N,M), (B,M,N)
 
 
     diameter, ε, ε_s, ρ = scaling_parameters( x, y, p, blur, reach, diameter, scaling )
 
     a_x, b_y, a_y, b_x = sinkhorn_loop( softmin_tensorized, 
                                         log_weights(α), log_weights(β), 
-                                        C_xx, C_yy, C_xy, C_yx, ε_s, ρ )
+                                        C_xx, C_yy, C_xy, C_yx, ε_s, ρ, debias=debias )
 
-    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=True)
+    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=True, debias=debias, potentials=potentials)
 
 
 # ==============================================================================
@@ -78,7 +79,8 @@ def keops_lse(cost, D):
     return log_conv
 
 
-def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, **kwargs):
+def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, 
+                    debias = True, potentials = False, **kwargs):
     
     N, D = x.shape
     M, _ = y.shape
@@ -89,16 +91,16 @@ def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scal
 
     # The "cost matrices" are implicitely encoded in the point clouds,
     # and re-computed on-the-fly:
-    C_xx, C_yy = (x, x.detach()), (y, y.detach())
-    C_xy, C_yx = (x, y.detach()), (y, x.detach())
+    C_xx, C_yy = ( (x, x.detach()), (y, y.detach()) ) if debias else None, None
+    C_xy, C_yx = ( (x, y.detach()), (y, x.detach()) )
 
     diameter, ε, ε_s, ρ = scaling_parameters( x, y, p, blur, reach, diameter, scaling )
 
     a_x, b_y, a_y, b_x = sinkhorn_loop( softmin,
                                         log_weights(α), log_weights(β), 
-                                        C_xx, C_yy, C_xy, C_yx, ε_s, ρ )
+                                        C_xx, C_yy, C_xy, C_yx, ε_s, ρ, debias=debias )
 
-    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x)
+    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, debias=debias, potentials=potentials)
 
 
 
@@ -183,6 +185,7 @@ def extrapolate_samples( b_x, a_y, ε, λ, C_xy, β_log, C_xy_, softmin=None ):
 
 def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, 
                         scaling=.5, truncate=5, cost=None, cluster_scale=None, 
+                        debias = True, potentials = False,
                         labels_x = None, labels_y = None,
                         verbose=False, **kwargs):
     
@@ -229,9 +232,9 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
     # which are implicitely encoded as point clouds
     # + integer summation ranges, and re-computed on-the-fly:
     C_xxs = [ (x_c, x_c.detach(), ranges_x, ranges_x, None), 
-              (  x,   x.detach(),     None,     None, None) ] 
+              (  x,   x.detach(),     None,     None, None) ] if debias else None
     C_yys = [ (y_c, y_c.detach(), ranges_y, ranges_y, None), 
-              (  y,   y.detach(),     None,     None, None) ] 
+              (  y,   y.detach(),     None,     None, None) ] if debias else None
     C_xys = [ (x_c, y_c.detach(), ranges_x, ranges_y, None), 
               (  x,   y.detach(),     None,     None, None) ] 
     C_yxs = [ (y_c, x_c.detach(), ranges_y, ranges_x, None), 
@@ -244,6 +247,7 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
                                         cost=cost_routine,
                                         kernel_truncation=partial(kernel_truncation, verbose=verbose),
                                         truncate=truncate,
-                                        extrapolate=extrapolate, )
+                                        extrapolate=extrapolate, 
+                                        debias = debias)
 
-    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x)
+    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, debias=debias, potentials=potentials)

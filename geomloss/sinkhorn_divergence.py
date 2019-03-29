@@ -100,22 +100,38 @@ class UnbalancedWeight(torch.nn.Module):
         return (self.ρ + self.ε)   * g
 
 
-def sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=False):
-    if ρ is None:
-        return scal( α, b_x - a_x, batch=batch ) + scal( β, a_y - b_y, batch=batch )
-    else:
-        return scal( α, UnbalancedWeight(ε, ρ)( (-a_x/ρ).exp() - (-b_x/ρ).exp() ), batch=batch ) \
-             + scal( β, UnbalancedWeight(ε, ρ)( (-b_y/ρ).exp() - (-a_y/ρ).exp() ), batch=batch )
+def sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=False, debias=True, potentials=False):
+    if potentials:  # Just returns the dual potentials
+        if debias:
+            return a_y, b_x, a_x, b_y
+        else:
+            return a_y, b_x
+
+    else:  # Actually compute the Sinkhorn divergence
+        if debias:  # UNBIASED Sinkhorn divergence, S_ε(α,β) = OT_ε(α,β) - .5*OT_ε(α,α) - .5*OT_ε(β,β)
+            if ρ is None:
+                return scal( α, b_x - a_x, batch=batch ) + scal( β, a_y - b_y, batch=batch )
+            else:
+                return scal( α, UnbalancedWeight(ε, ρ)( (-a_x/ρ).exp() - (-b_x/ρ).exp() ), batch=batch ) \
+                     + scal( β, UnbalancedWeight(ε, ρ)( (-b_y/ρ).exp() - (-a_y/ρ).exp() ), batch=batch )
+
+        else:  # Classic, BIASED entropized Optimal Transport OT_ε(α,β)
+            if ρ is None:
+                return scal( α, b_x, batch=batch ) + scal( β, a_y, batch=batch )
+            else:
+                return scal( α, UnbalancedWeight(ε, ρ)( 1 - (-b_x/ρ).exp() ), batch=batch ) \
+                     + scal( β, UnbalancedWeight(ε, ρ)( 1 - (-a_y/ρ).exp() ), batch=batch )
 
 
 def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, ρ, 
                    jumps=[], kernel_truncation=None, truncate=5, cost=None,
-                   extrapolate=None, last_extrapolation=True ):
+                   extrapolate=None, debias=True, last_extrapolation=True ):
     
     Nits = len(ε_s)
     if type(α_logs) is not list:
         α_logs, β_logs = [α_logs], [β_logs]
-        C_xxs,  C_yys  = [C_xxs],  [C_yys]
+        if debias:
+            C_xxs,  C_yys  = [C_xxs],  [C_yys]
         C_xys,  C_yxs  = [C_xys],  [C_yxs]
 
 
@@ -126,12 +142,14 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
 
     # Load the measures and cost matrices at the current scale:
     α_log, β_log = α_logs[k], β_logs[k]
-    C_xx,  C_yy  = C_xxs[k],  C_yys[k]
+    if debias:
+        C_xx,  C_yy  = C_xxs[k],  C_yys[k]
     C_xy,  C_yx  = C_xys[k],  C_yxs[k]
 
     # Start with a decent initialization for the dual vectors:
-    a_x = λ * softmin(ε, C_xx, α_log )  # OT(α,α)
-    b_y = λ * softmin(ε, C_yy, β_log )  # OT(β,β)
+    if debias:
+        a_x = λ * softmin(ε, C_xx, α_log )  # OT(α,α)
+        b_y = λ * softmin(ε, C_yy, β_log )  # OT(β,β)
     a_y = λ * softmin(ε, C_yx, α_log )  # OT(α,β) wrt. a
     b_x = λ * softmin(ε, C_xy, β_log )  # OT(α,β) wrt. b
 
@@ -140,13 +158,15 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
         λ = dampening(ε, ρ)  # ε has changed, so we should update λ too!
 
         # "Coordinate ascent" on the dual problems:
-        at_x = λ * softmin(ε, C_xx, α_log + a_x/ε )  # OT(α,α)
-        bt_y = λ * softmin(ε, C_yy, β_log + b_y/ε )  # OT(β,β)
+        if debias:
+            at_x = λ * softmin(ε, C_xx, α_log + a_x/ε )  # OT(α,α)
+            bt_y = λ * softmin(ε, C_yy, β_log + b_y/ε )  # OT(β,β)
         at_y = λ * softmin(ε, C_yx, α_log + b_x/ε )  # OT(α,β) wrt. a
         bt_x = λ * softmin(ε, C_xy, β_log + a_y/ε )  # OT(α,β) wrt. b
 
         # Symmetrized updates:
-        a_x, b_y = .5 * ( a_x + at_x ), .5 * ( b_y + bt_y )  # OT(α,α), OT(β,β)
+        if debias:
+            a_x, b_y = .5 * ( a_x + at_x ), .5 * ( b_y + bt_y )  # OT(α,α), OT(β,β)
         a_y, b_x = .5 * ( a_y + at_y ), .5 * ( b_x + bt_x )  # OT(α,β) wrt. a, b
 
 
@@ -154,7 +174,8 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
 
             if i == len(ε_s) - 1:  # Last iteration: just extrapolate!
 
-                C_xx_, C_yy_ = C_xxs[k+1], C_yys[k+1]
+                if debias:
+                    C_xx_, C_yy_ = C_xxs[k+1], C_yys[k+1]
                 C_xy_, C_yx_ = C_xys[k+1], C_yxs[k+1]
 
                 last_extrapolation = False  # No need to re-extrapolate after the loop
@@ -164,17 +185,19 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
 
                 # Kernel truncation trick (described in Bernhard Schmitzer's 2016 paper),
                 # that typically relies on KeOps' block-sparse routines:
-                C_xx_, _     = kernel_truncation( C_xx, C_xx, C_xxs[k+1], C_xxs[k+1],
-                                                    a_x, a_x, ε, truncate=truncate,cost=cost)
-                C_yy_, _     = kernel_truncation( C_yy, C_yy, C_yys[k+1], C_yys[k+1],
-                                                    b_y, b_y, ε, truncate=truncate,cost=cost)
+                if debias:
+                    C_xx_, _     = kernel_truncation( C_xx, C_xx, C_xxs[k+1], C_xxs[k+1],
+                                                        a_x, a_x, ε, truncate=truncate,cost=cost)
+                    C_yy_, _     = kernel_truncation( C_yy, C_yy, C_yys[k+1], C_yys[k+1],
+                                                        b_y, b_y, ε, truncate=truncate,cost=cost)
                 C_xy_, C_yx_ = kernel_truncation( C_xy, C_yx, C_xys[k+1], C_yxs[k+1],
                                                     b_x, a_y, ε, truncate=truncate,cost=cost)
 
 
             # Extrapolation for the symmetric problems:
-            a_x = extrapolate( a_x, a_x, ε, λ, C_xx, α_log, C_xx_ )
-            b_y = extrapolate( b_y, b_y, ε, λ, C_yy, β_log, C_yy_ )
+            if debias:
+                a_x = extrapolate( a_x, a_x, ε, λ, C_xx, α_log, C_xx_ )
+                b_y = extrapolate( b_y, b_y, ε, λ, C_yy, β_log, C_yy_ )
 
             # The cross-updates should be done in parallel!
             a_y, b_x = extrapolate( a_y, b_x, ε, λ, C_yx, α_log, C_yx_ ), \
@@ -184,19 +207,24 @@ def sinkhorn_loop( softmin, α_logs, β_logs, C_xxs, C_yys, C_xys, C_yxs, ε_s, 
             # Update the measure weights and cost "matrices":
             k = k+1
             α_log, β_log = α_logs[k], β_logs[k]
-            C_xx,  C_yy  = C_xx_,  C_yy_
+            if debias:
+                C_xx,  C_yy  = C_xx_,  C_yy_
             C_xy,  C_yx  = C_xy_,  C_yx_
 
     torch.autograd.set_grad_enabled(True)
 
     if last_extrapolation:
         # Last extrapolation, to get the correct gradients:
-        a_x = λ * softmin(ε, C_xx, (α_log + a_x/ε).detach() )
-        b_y = λ * softmin(ε, C_yy, (β_log + b_y/ε).detach() )
+        if debias:
+            a_x = λ * softmin(ε, C_xx, (α_log + a_x/ε).detach() )
+            b_y = λ * softmin(ε, C_yy, (β_log + b_y/ε).detach() )
 
         # The cross-updates should be done in parallel!
         a_y, b_x = λ * softmin(ε, C_yx, (α_log + b_x/ε).detach() ), \
                    λ * softmin(ε, C_xy, (β_log + a_y/ε).detach() )
 
-    return a_x, b_y, a_y, b_x
+    if debias:
+        return a_x, b_y, a_y, b_x
+    else:
+        return None, None, a_y, b_x
 
