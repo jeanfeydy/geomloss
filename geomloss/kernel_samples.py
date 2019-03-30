@@ -77,19 +77,19 @@ def kernel_tensorized(α, x, β, y, blur=.05, kernel=None, name=None, potentials
     K_yy = kernel( double_grad(y), y.detach(), blur=blur)  # (B,M,M) tensor
     K_xy = kernel( x, y, blur=blur)                        # (B,N,M) tensor
 
-    a_i = torch.matmul( K_xx, α.detach().unsqueeze(-1) ).squeeze(-1)  # (B,N,N) @ (B,N) = (B,N) 
-    b_j = torch.matmul( K_yy, β.detach().unsqueeze(-1) ).squeeze(-1)  # (B,M,M) @ (B,M) = (B,M)
-    b_i = torch.matmul( K_xy, β.unsqueeze(-1)          ).squeeze(-1)  # (B,N,M) @ (B,M) = (B,N) 
+    a_x = torch.matmul( K_xx, α.detach().unsqueeze(-1) ).squeeze(-1)  # (B,N,N) @ (B,N) = (B,N) 
+    b_y = torch.matmul( K_yy, β.detach().unsqueeze(-1) ).squeeze(-1)  # (B,M,M) @ (B,M) = (B,M)
+    b_x = torch.matmul( K_xy, β.unsqueeze(-1)          ).squeeze(-1)  # (B,N,M) @ (B,M) = (B,N) 
 
     
     if potentials:
-        a_j = torch.matmul( K_xy.transpose(1,2), α.unsqueeze(-1)).squeeze(-1)  # (B,M,N) @ (B,N) = (B,M)
-        return a_i - b_i, b_j - a_j
+        a_y = torch.matmul( K_xy.transpose(1,2), α.unsqueeze(-1)).squeeze(-1)  # (B,M,N) @ (B,N) = (B,M)
+        return a_x - b_x, b_y - a_y
 
     else:  # Return the Kernel norm. N.B.: we assume that 'kernel' is symmetric:
-        return .5 * (double_grad(α) * a_i).sum(1) \
-             + .5 * (double_grad(β) * b_j).sum(1) \
-             -  (α * b_i).sum(1)
+        return .5 * (double_grad(α) * a_x).sum(1) \
+             + .5 * (double_grad(β) * b_y).sum(1) \
+             -  (α * b_x).sum(1)
 
 
 
@@ -113,13 +113,13 @@ def kernel_keops(kernel, α, x, β, y, potentials=False, ranges_xx = None, range
                                "Y = Vj({})".format(D),   # 2nd input: y_j
                                "B = Vj(1)" )             # 3rd input: b_j
     
-    a_i = kernel_conv(double_grad(x), x.detach(), α.detach().view(-1,1), ranges=ranges_xx)
-    b_j = kernel_conv(double_grad(y), y.detach(), β.detach().view(-1,1), ranges=ranges_yy)
-    b_i = kernel_conv(x, y, β.view(-1,1), ranges=ranges_xy)
+    a_x = kernel_conv(double_grad(x), x.detach(), α.detach().view(-1,1), ranges=ranges_xx)
+    b_y = kernel_conv(double_grad(y), y.detach(), β.detach().view(-1,1), ranges=ranges_yy)
+    b_x = kernel_conv(x, y, β.view(-1,1), ranges=ranges_xy)
 
     if potentials:
-        a_j = kernel_conv(y, x, α.view(-1,1), ranges=swap_axes(ranges_xy))
-        return a_i - b_i, b_j - a_j
+        a_y = kernel_conv(y, x, α.view(-1,1), ranges=swap_axes(ranges_xy))
+        return a_x - b_x, b_y - a_y
 
     else:  # Return the Kernel norm. N.B.: we assume that 'kernel' is symmetric:
         return .5 * scal( double_grad(α), a_i ) \

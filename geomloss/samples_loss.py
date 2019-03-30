@@ -226,7 +226,8 @@ class SamplesLoss(Module):
 
         # Make sure that the output has the correct shape ------------------------------------
         if self.potentials:  # Return some dual potentials (= test functions) sampled on the input measures
-            return values
+            F, G = values
+            return F.view_as(α), G.view_as(β)
 
         else:  # Return a scalar cost value
             if backend in ["online", "multiscale"]:  # KeOps backends return a single scalar value

@@ -101,11 +101,11 @@ class UnbalancedWeight(torch.nn.Module):
 
 
 def sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=False, debias=True, potentials=False):
-    if potentials:  # Just returns the dual potentials
+    if potentials:  # Just return the dual potentials
         if debias:
-            return a_y, b_x, a_x, b_y
+            return b_x - a_x, a_y - b_y
         else:
-            return a_y, b_x
+            return b_x, a_y
 
     else:  # Actually compute the Sinkhorn divergence
         if debias:  # UNBIASED Sinkhorn divergence, S_ε(α,β) = OT_ε(α,β) - .5*OT_ε(α,α) - .5*OT_ε(β,β)
