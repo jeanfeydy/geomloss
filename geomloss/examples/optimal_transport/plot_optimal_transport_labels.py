@@ -1,5 +1,5 @@
 """
-Transfer of labels with Optimal Transport
+Label transfer with Optimal Transport
 ============================================
 
 Let's use a regularized Optimal Transport plan
@@ -78,7 +78,10 @@ def draw_samples(fname, n, dtype=torch.FloatTensor, labels=False) :
 #
 # .. math::
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
-#   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
+#   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j},
+#
+# with uniform weights :math:`\alpha_i = \tfrac{1}{N}`
+# and :math:`\beta_j = \tfrac{1}{M}`.
 
 N, M = (500, 500) if not use_cuda else (10000, 10000)
  
@@ -87,7 +90,7 @@ Y_j, l_j = draw_samples("data/threeblobs_b.png", M, dtype, labels=True)
 
 
 ###############################################
-# In this tutorial, we endow the :math:`y_j`'s with **color labels**,
+# In this tutorial, the :math:`y_j`'s are endowed with **color labels**
 # encoded as one-hot vectors :math:`\ell_j` which are equal to:
 #
 # - :math:`(1,0,0)` for **red** points,
@@ -100,7 +103,7 @@ Y_j, l_j = draw_samples("data/threeblobs_b.png", M, dtype, labels=True)
 
 
 plt.figure(figsize=(8,8)) ; ax = plt.gca()
-ax.scatter( [10], [10] ) # shameless hack to prevent a slight change of axis...
+ax.scatter( [10], [10] )  # shameless hack to prevent a slight change of axis...
 
 # Fancy display:
 display_samples(ax, Y_j, l_j)  
@@ -108,7 +111,7 @@ display_samples(ax, X_i)
 ax.set_title("Source (Labeled) and Target  point clouds")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
-ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
+plt.tight_layout()
 
 
 ###############################################
@@ -130,7 +133,7 @@ ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
 # where :math:`\text{C}(x,y)=\tfrac{1}{p}\|x-y\|_2^p` is a **cost** function
 # on the feature space and :math:`\varepsilon` 
 # is a positive regularization strength (the *temperature*)
-# given through the **blur** parameter :math:`\sigma = \varepsilon^{1/p}`.
+# specified through the **blur** parameter :math:`\sigma = \varepsilon^{1/p}`.
 # By default, :mod:`SamplesLoss <geomloss.SamplesLoss>` computes the
 # **unbiased** (positive, definite) Sinkhorn divergence
 # 
@@ -141,7 +144,10 @@ ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
 # 
 # and returns a differentiable scalar value.
 # But if we set the optional parameters **debias** to **False**
-# and **potentials** to **True**, 
+# and **potentials** to **True**, we will instead get access
+# to the **optimal dual potentials** :math:`f` and :math:`g`,
+# solution of the :math:`\text{OT}_\varepsilon(\alpha,\beta)` problem and
+# respectively sampled on the :math:`x_i`'s and :math:`y_j`'s.
 #
 # .. note::
 #   By default, :mod:`SamplesLoss("sinkhorn") <geomloss.SamplesLoss>` uses
@@ -153,18 +159,67 @@ ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
 #   But in this tutorial, setting the trade-off between speed
 #   (**scaling** :math:`\rightarrow` 0) 
 #   and accuracy (**scaling** :math:`\rightarrow` 1) to a more **conservative**
-#   value makes more sense. We'll thus err on the side of caution,
-#   and set the **scaling** parameter to .9 for the remainder of this notebook.
+#   value of .9 is a sound decision.
 
 from geomloss import SamplesLoss
 
 blur = .05
-OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, scaling=.9, debias=False, potentials=True)
+OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, 
+                        scaling=.9, debias=False, potentials=True)
 F_i, G_j = OT_solver(X_i, Y_j)
 
 
 ###############################################
-# Transfer of labels:
+# With a linear memory footprint, these two dual vectors encode
+# a full transport plan on the product space 
+# :math:`\{x_i, i \in[1,N]\}\times\{y_j, j \in[1,M]\}`:
+# the **primal** solution of the :math:`\text{OT}_\varepsilon(\alpha,\beta)`
+# problem is simply given through
+#
+# .. math::
+#   \pi~&=~ \exp \tfrac{1}{\varepsilon}[f\oplus g - \text{C}] \cdot \alpha\otimes \beta \\
+#   \text{i.e.}~~ \pi_{i,j}~&=~ \exp \tfrac{1}{\varepsilon}[f_i+ g_j - \text{C}(x_i,y_j)] \cdot \alpha_i \beta_j
+#
+# and is such that
+#
+# .. math::
+#   \pi\,\mathbf{1}~=~\alpha, & \qquad \pi^\intercal\mathbf{1}~=~\beta \\
+#   \text{i.e.}~~ \sum_{j=1}^M \pi_{i,j}~=~\alpha_i, &\qquad \sum_{i=1}^N \pi_{i,j}~=~\beta_j
+# 
+# up to convergence in the Sinkhorn loop.
+#
+# **Transfer of labels.** To transport our source labels :math:`\ell_j`
+# onto the :math:`x_i`'s, a simple idea is to compute the barycentric combination
+#
+# .. math::
+#   \text{Lab}_i ~=~ \frac{1}{\alpha_i} \sum_{j=1}^M \pi_{i,j} \ell_j ~\in~\mathbb{R}^3 
+#
+# for all points :math:`x_i`, interpreting the resulting vectors as soft assignments
+# which may or may not be quantized back to discrete labels.
+# Thanks to the fuzziness induced by the temperature
+# :math:`\varepsilon = \text{blur}^p` in the transport plan :math:`\pi_{i,j}`,
+# the labelling noise is naturally smoothed out with labels
+# :math:`\text{Lab}_i` corresponding to **averages over sets of source points**
+# whose diameters are roughly proportional to the **blur** scale.
+# 
+#
+# **Implicit computations.**
+# Keep in mind, however, that the full :math:`M`-by-:math:`N` matrix
+# :math:`\pi` may not fit in (GPU) memory
+# if the number of samples :math:`\sqrt{M N}`
+# exceeds 10,000 or so. To break this memory bottleneck,
+# we leverage the **online** map-reduce routines provided
+# by the `KeOps library <http://www.kernel-operations.io/>`_ 
+# which allow us to compute and sum the :math:`\pi_{i,j} \ell_j`'s **on-the-fly**.
+# We should simply come back to the expression of :math:`\pi_{i,j}`
+# and write:
+#
+# .. math::
+#   \text{Lab}_i ~&=~ \sum_{j=1}^M \exp \tfrac{1}{\varepsilon}[f_i+ g_j - \text{C}(x_i,y_j)] \cdot \beta_j \ell_j \\
+#   &=~ \frac{1}{M} \sum_{j=1}^M  \exp \tfrac{1}{\varepsilon}[f_i+ g_j - \tfrac{1}{2}\|x_i-y_j\|^2] \cdot \ell_j. 
+#
+# a
+
 
 from pykeops.torch import generic_sum
 
@@ -179,26 +234,25 @@ transfer = generic_sum(
     "G_j = Vj(1)",  # 5th arg: one scalar value per column
     "L_j = Vj(3)")  # 6th arg: one vector of size 3 per column
 
-# And apply it on the data:
+# And apply it on the data (KeOps is pretty picky on the input shapes...):
 labels_i = transfer(torch.Tensor( [blur**2] ).type(dtype), X_i, Y_j, 
                     F_i.view(-1,1), G_j.view(-1,1), l_j ) / M
 
 
-print( (labels_i.sum(1) - 1).abs().mean().item() )
-
 ###############################################
-# Fancy display:
+# That's it! We may now display our target point cloud :math:`(x_i)`
+# with its new set of labels: 
 
 plt.figure(figsize=(8,8)) ; ax = plt.gca()
-ax.scatter( [10], [10] ) # shameless hack to prevent a slight change of axis...
+ax.scatter( [10], [10] )  # shameless hack to prevent a slight change of axis...
 
+# Fancy display:
 display_samples(ax, Y_j, l_j)
 display_samples(ax, X_i, labels_i.clamp(0,1))
-
-ax.set_title("Labeled transfered with Optimal Transport")
+ax.set_title("Labeled transferred with Optimal Transport")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
-ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
+plt.tight_layout()
 
 
 
@@ -206,8 +260,35 @@ ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
 # Unbalanced Optimal Transport
 # -------------------------------
 # 
+# As evidenced above, the **blur** parameter allows us to smooth 
+# our optimal transport plan to **remove noise** in the final labelling.
+# In most real-life situations, we may also wish to gain **robustness against outliers**
+# by preventing samples from having too much influence outside of a fixed neighborhood.
+# 
+# :mod:`SamplesLoss("sinkhorn") <geomloss.SamplesLoss>` allows us to do
+# so through the **reach** parameter, which is set to **None** (:math:`+\infty`)
+# by default and acts as a **threshold** on the maximal distance travelled by points
+# in the assignment problem.
+# From a theoretical point of view, this is done through
+# the resolution of an **unbalanced** Optimal Transport problem:
+# 
+# .. math ::
+#   \text{OT}_{\varepsilon,\rho}(\alpha,\beta)~&=~
+#       \min_{0 \leqslant \pi \ll \alpha\otimes\beta} ~\langle\text{C},\pi\rangle
+#           ~+~\varepsilon\,\text{KL}(\pi,\alpha\otimes\beta) 
+#           ~+~ \rho \, \text{KL}(\pi\,\mathbf{1},\alpha) 
+#           ~+~ \rho \, \text{KL}(\pi^\intercal \mathbf{1},\beta)  \\
+#    &=~ \max_{f,g} ~~\rho\,\langle \alpha, 1 -  e^{-f/\rho} \rangle
+#         ~+ \rho \,\langle \beta, 1 - e^{-g/\rho} \rangle \\
+#         &\qquad\qquad~- \varepsilon\langle \alpha\otimes\beta, 
+#           \exp \tfrac{1}{\varepsilon}[ f\oplus g - \text{C} ] - 1 \rangle,
+#
+# where the hard marginal constraints have been replaced by
+# a **soft Kullback-Leibler penalty** whose strength is specified through
+# a positive parameter :math:`\rho = \text{reach}^p`.
 
-OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, reach=.2, scaling=.9, debias=False, potentials=True)
+OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, reach=.2, 
+                        scaling=.9, debias=False, potentials=True)
 F_i, G_j = OT_solver(X_i, Y_j)
 
 # And apply it on the data:
@@ -215,21 +296,21 @@ labels_i = transfer(torch.Tensor( [blur**2] ).type(dtype), X_i, Y_j,
                     F_i.view(-1,1), G_j.view(-1,1), l_j ) / M
 
 
-print( (labels_i.sum(1) - 1).abs().mean().item() )
-
 ###############################################
-# Fancy display:
+# As we display our new set of labels, we can check that
+# colors don't get transported beyond the specified **reach** = .2.
+# Target points which are **too far away** from the source simply
+# stay **black**, with a soft label :math:`\text{Lab}_i` close to :math:`(0,0,0)`:
 
 plt.figure(figsize=(8,8)) ; ax = plt.gca()
-ax.scatter( [10], [10] ) # shameless hack to prevent a slight change of axis...
+ax.scatter( [10], [10] )  # shameless hack to prevent a slight change of axis...
 
 display_samples(ax, Y_j, l_j)
 display_samples(ax, X_i, labels_i.clamp(0,1))
-
-ax.set_title("Labeled transfered with unbalanced Optimal Transport")
+ax.set_title("Labeled transferred with unbalanced Optimal Transport")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
-ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
+plt.tight_layout()
 
 
 plt.show()
