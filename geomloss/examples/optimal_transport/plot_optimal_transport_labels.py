@@ -25,10 +25,7 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 ###############################################
 # Display routines:
 
-import numpy as np
-import torch
 import imageio
-from matplotlib import pyplot as plt
 
 
 def load_image(fname) :
@@ -218,7 +215,7 @@ F_i, G_j = OT_solver(X_i, Y_j)
 #   \text{Lab}_i ~&=~ \sum_{j=1}^M \exp \tfrac{1}{\varepsilon}[f_i+ g_j - \text{C}(x_i,y_j)] \cdot \beta_j \ell_j \\
 #   &=~ \frac{1}{M} \sum_{j=1}^M  \exp \tfrac{1}{\varepsilon}[f_i+ g_j - \tfrac{1}{2}\|x_i-y_j\|^2] \cdot \ell_j. 
 #
-# a
+
 
 
 from pykeops.torch import generic_sum

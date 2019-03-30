@@ -26,11 +26,8 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 # Display routines
 # ~~~~~~~~~~~~~~~~~
 
-import numpy as np
-import torch
 from random import choices
 from scipy import misc
-from matplotlib import pyplot as plt
 
 
 def load_image(fname) :
