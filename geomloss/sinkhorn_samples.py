@@ -91,7 +91,7 @@ def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scal
 
     # The "cost matrices" are implicitely encoded in the point clouds,
     # and re-computed on-the-fly:
-    C_xx, C_yy = ( (x, x.detach()), (y, y.detach()) ) if debias else None, None
+    C_xx, C_yy = ( (x, x.detach()), (y, y.detach()) ) if debias else (None, None)
     C_xy, C_yx = ( (x, y.detach()), (y, x.detach()) )
 
     diameter, ε, ε_s, ρ = scaling_parameters( x, y, p, blur, reach, diameter, scaling )

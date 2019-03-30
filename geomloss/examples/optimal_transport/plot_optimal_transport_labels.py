@@ -11,15 +11,13 @@ to transfer labels from one point cloud to another.
 ##############################################
 # Setup
 # ---------------------
+#
 # Standard imports:
 
 import numpy as np
 import matplotlib.pyplot as plt
-
 import time
-
 import torch
-from geomloss import SamplesLoss
 
 use_cuda = torch.cuda.is_available()
 dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
@@ -98,7 +96,7 @@ Y_j, l_j = draw_samples("data/threeblobs_b.png", M, dtype, labels=True)
 #
 # In the next few paragraphs, we'll see how to use **regularized Optimal Transport plans**
 # to transfer these labels from the :math:`y_j`'s onto the :math:`x_i`'s.
-# But first, let's display our **source** (labeled) and **target** point clouds:
+# But first, let's display our **source** (noisy, labeled) and **target** point clouds:
 
 
 plt.figure(figsize=(8,8)) ; ax = plt.gca()
@@ -117,8 +115,50 @@ ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
 # Regularized Optimal Transport
 # -------------------------------
 # 
+# The :mod:`SamplesLoss("sinkhorn") <geomloss.SamplesLoss>` layer relies
+# on a fast multiscale solver for the **regularized Optimal Transport problem**:
+#
+# .. math::
+#   \text{OT}_\varepsilon(\alpha,\beta)~&=~
+#       \min_{0 \leqslant \pi \ll \alpha\otimes\beta} ~\langle\text{C},\pi\rangle
+#           ~+~\varepsilon\,\text{KL}(\pi,\alpha\otimes\beta) \quad\text{s.t.}~~
+#        \pi\,\mathbf{1} = \alpha ~~\text{and}~~ \pi^\intercal \mathbf{1} = \beta\\
+#    &=~ \max_{f,g} ~~\langle \alpha,f\rangle + \langle \beta,g\rangle
+#         - \varepsilon\langle \alpha\otimes\beta, 
+#           \exp \tfrac{1}{\varepsilon}[ f\oplus g - \text{C} ] - 1 \rangle,
+#
+# where :math:`\text{C}(x,y)=\tfrac{1}{p}\|x-y\|_2^p` is a **cost** function
+# on the feature space and :math:`\varepsilon` 
+# is a positive regularization strength (the *temperature*)
+# given through the **blur** parameter :math:`\sigma = \varepsilon^{1/p}`.
+# By default, :mod:`SamplesLoss <geomloss.SamplesLoss>` computes the
+# **unbiased** (positive, definite) Sinkhorn divergence
+# 
+# .. math::
+#   \text{S}_\varepsilon(\alpha,\beta) ~=~ \text{OT}_\varepsilon(\alpha,\beta)
+#       - \tfrac{1}{2} \text{OT}_\varepsilon(\alpha,\alpha)
+#       - \tfrac{1}{2} \text{OT}_\varepsilon(\beta,\beta)
+# 
+# and returns a differentiable scalar value.
+# But if we set the optional parameters **debias** to **False**
+# and **potentials** to **True**, 
+#
+# .. note::
+#   By default, :mod:`SamplesLoss("sinkhorn") <geomloss.SamplesLoss>` uses
+#   an **aggressive** optimization heuristic where the blurring scale is halved
+#   between two successive iterations of the Sinkhorn loop, 
+#   until reaching the required target value (**scaling** = .5).
+#   This choice is sensible when the Optimal Transport plan
+#   is used as a (cheap) gradient for an outer registration loop...
+#   But in this tutorial, setting the trade-off between speed
+#   (**scaling** :math:`\rightarrow` 0) 
+#   and accuracy (**scaling** :math:`\rightarrow` 1) to a more **conservative**
+#   value makes more sense. We'll thus err on the side of caution,
+#   and set the **scaling** parameter to .9 for the remainder of this notebook.
 
-blur = .01
+from geomloss import SamplesLoss
+
+blur = .05
 OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, scaling=.9, debias=False, potentials=True)
 F_i, G_j = OT_solver(X_i, Y_j)
 
@@ -128,17 +168,18 @@ F_i, G_j = OT_solver(X_i, Y_j)
 
 from pykeops.torch import generic_sum
 
+# Define our KeOps CUDA kernel:
 transfer = generic_sum(
-    "Exp( (F_i + G_j - IntInv(2)*SqDist(X_i,Y_j)) / E ) * L_j",
-    "Label = Vi(3)",
-    "E = Pm(1)",
-    "X_i = Vi(2)",
-    "Y_j = Vj(2)",
-    "F_i = Vi(1)",
-    "G_j = Vj(1)",
-    "L_j = Vj(3)"
-)
+    "Exp( (F_i + G_j - IntInv(2)*SqDist(X_i,Y_j)) / E ) * L_j",  # See the formula above
+    "Lab = Vi(3)",  # Output:  one vector of size 3 per line
+    "E   = Pm(1)",  # 1st arg: a scalar parameter, the temperature
+    "X_i = Vi(2)",  # 2nd arg: one 2d-point per line
+    "Y_j = Vj(2)",  # 3rd arg: one 2d-point per column
+    "F_i = Vi(1)",  # 4th arg: one scalar value per line
+    "G_j = Vj(1)",  # 5th arg: one scalar value per column
+    "L_j = Vj(3)")  # 6th arg: one vector of size 3 per column
 
+# And apply it on the data:
 labels_i = transfer(torch.Tensor( [blur**2] ).type(dtype), X_i, Y_j, 
                     F_i.view(-1,1), G_j.view(-1,1), l_j ) / M
 
@@ -154,7 +195,7 @@ ax.scatter( [10], [10] ) # shameless hack to prevent a slight change of axis...
 display_samples(ax, Y_j, l_j)
 display_samples(ax, X_i, labels_i.clamp(0,1))
 
-ax.set_title("Source and Target (Labeled) point clouds")
+ax.set_title("Labeled transfered with Optimal Transport")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
 ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
@@ -166,10 +207,10 @@ ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
 # -------------------------------
 # 
 
-blur = .01
 OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, reach=.2, scaling=.9, debias=False, potentials=True)
 F_i, G_j = OT_solver(X_i, Y_j)
 
+# And apply it on the data:
 labels_i = transfer(torch.Tensor( [blur**2] ).type(dtype), X_i, Y_j, 
                     F_i.view(-1,1), G_j.view(-1,1), l_j ) / M
 
@@ -185,7 +226,7 @@ ax.scatter( [10], [10] ) # shameless hack to prevent a slight change of axis...
 display_samples(ax, Y_j, l_j)
 display_samples(ax, X_i, labels_i.clamp(0,1))
 
-ax.set_title("Source and Target (Labeled) point clouds")
+ax.set_title("Labeled transfered with unbalanced Optimal Transport")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
 ax.set_xticks([], []); ax.set_yticks([], []) ; plt.tight_layout()
