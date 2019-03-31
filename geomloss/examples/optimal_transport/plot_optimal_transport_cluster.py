@@ -70,7 +70,7 @@ ax2 = plt.subplot(1,2,2) ; plt.title("Dimensions 2, 3")
 display_4d_samples(ax1, ax2, X_i, [(.95,.55,.55)] )
 display_4d_samples(ax1, ax2, Y_j, [(.55,.55,.95)] )
 
-
+plt.tight_layout()
 
 ###############################################
 # Online Sinkhorn algorithm
@@ -134,7 +134,8 @@ print("Wasserstein distance: {:.3f}, computed in {:.3f}s.".format(
 #
 # **Clustering in high-dimension.** 
 # In this tutorial, we rely on an off-the-shelf
-# K-means clustering, copy-pasted from the examples gallery
+# `K-means clustering <https://en.wikipedia.org/wiki/K-means_clustering>`_, 
+# copy-pasted from the examples gallery
 # of the `KeOps library <https://www.kernel-operations.io>`_: 
 # feel free to replace it with a more clever scheme if needed!
 
@@ -176,6 +177,7 @@ lab_i, c_i = KMeans(X_i, K= 100 if use_cuda else 10)
 lab_j, c_j = KMeans(Y_j, K= 400 if use_cuda else 10)
 
 
+
 ###############################################
 # The average cluster size can be computed with one line of code:
 
@@ -199,6 +201,7 @@ ax4 = plt.subplot(2,2,4) ; plt.title("Dimensions 2, 3")
 display_4d_samples(ax1, ax2, X_i, lab_i )
 display_4d_samples(ax3, ax4, Y_j, lab_j )
 
+plt.tight_layout()
 
 ###############################################
 # To use this information in the **multiscale** Sinkhorn algorithm,

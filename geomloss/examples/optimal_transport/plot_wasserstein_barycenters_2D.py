@@ -13,7 +13,7 @@ of the Monge map.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import misc
+from imageio import imread
 from sklearn.neighbors import KernelDensity
 from torch.nn.functional import avg_pool2d
 
@@ -36,9 +36,9 @@ def grid(W):
 
 
 def load_image(fname) :
-    img = misc.imread(fname, flatten = True) # Grayscale
+    img = np.mean( imread(fname), axis=2)  # Grayscale
     img = (img[:, :])  / 255.
-    return 1 - img                           # black = 1, white = 0
+    return 1 - img                         # black = 1, white = 0
 
 
 def as_measure(fname, size):

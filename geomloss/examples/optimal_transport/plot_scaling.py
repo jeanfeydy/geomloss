@@ -2,14 +2,13 @@
 Influence of the blur parameter, scaling strategy
 =====================================================
 
-
+Dating back to the work of `Schrödinger <http://www.numdam.org/article/AIHP_1932__2_4_269_0.pdf>`_ 
+- see e.g. `(Léonard, 2013) <https://arxiv.org/abs/1308.0215>`_ for a modern review -
+entropy-regularized Optimal Transport is all about
+solving the convex primal/dual problem:
 """
+
 ##################################################
-# Dating back to the work of `Schrödinger <http://www.numdam.org/article/AIHP_1932__2_4_269_0.pdf>`_ 
-# - see e.g. `(Léonard, 2013) <https://arxiv.org/abs/1308.0215>`_ for a modern review -
-# entropy-regularized Optimal Transport is all about
-# solving the convex primal/dual problem:
-#
 # .. math::
 #   \text{OT}_\varepsilon(\alpha,\beta)~&=~
 #       \min_{0 \leqslant \pi \ll \alpha\otimes\beta} ~\langle\text{C},\pi\rangle
@@ -109,10 +108,11 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 ###############################################
 # Display routines:
 
-from scipy import misc
+from imageio import imread
+
 
 def load_image(fname) :
-    img = misc.imread(fname, flatten = True) # Grayscale
+    img = np.mean( imread(fname), axis=2 )  # Grayscale
     img = (img[::-1, :])  / 255.
     return 1 - img
 
@@ -141,7 +141,7 @@ def display_potential(ax, F, color, nlines=21):
 
     # And display it with contour lines:
     levels = np.linspace(-1, 1, nlines)
-    ax.contour(F, origin='lower', linewidths = 1., colors = color,
+    ax.contour(F, origin='lower', linewidths = 2., colors = color,
                levels = levels, extent=[0,1,0,1]) 
 
 
@@ -172,8 +172,8 @@ def display_samples(ax, x, weights, color, v=None) :
 
 sampling = 10 if not use_cuda else 2
 
-A_i, X_i = draw_samples("ell_a.png", sampling)
-B_j, Y_j = draw_samples("ell_b.png", sampling)
+A_i, X_i = draw_samples("data/ell_a.png", sampling)
+B_j, Y_j = draw_samples("data/ell_b.png", sampling)
 
 ###############################################
 # Scaling heuristic
@@ -252,14 +252,14 @@ def display_scaling(scaling = .5, Nits = 9, debias=True) :
 # its Lagrangian gradient :math:`-\tfrac{1}{\alpha_i}\partial_{x_i} \text{OT}(\alpha,\beta)`
 # (i.e. its gradient for the `Wasserstein metric <https://arxiv.org/abs/1609.03890>`_)
 # points towards the **inside** of the target measure :math:`\beta`,
-# as points get attracted to the **Frechet mean** of their :math:`\varepsilon`-targets
+# as points get attracted to the **Fréchet mean** of their :math:`\varepsilon`-targets
 # specified by the **fuzzy** transport plan :math:`\pi`.
 
 display_scaling(scaling = .5, Nits = 9, debias=False)
 
 
 #################################################
-# **Unbiased Sinkhorn divergence.** To alleviate this **mode collapse** phenomenon,
+# **Unbiased Sinkhorn divergences.** To alleviate this **mode collapse** phenomenon,
 # an idea that recently emerged in the Machine Learning community
 # is to use the **unbiased** Sinkhorn loss `(Ramdas et al., 2015) <https://arxiv.org/abs/1509.02237>`_: 
 #
@@ -307,6 +307,7 @@ display_scaling(scaling = .5, Nits = 9, debias=False)
 # can thus be used as a **blurred transport map** that registers measures
 # up to a **detail scale** specified through the **blur** parameter.
 
+# sphinx_gallery_thumbnail_number = 2
 display_scaling(scaling = .5, Nits = 9)
 
 

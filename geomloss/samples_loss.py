@@ -136,6 +136,19 @@ class SamplesLoss(Module):
             **diameter** and the ambient space's dimension, 
             making sure that memory overflows won't take place.
 
+        debias (bool, default=True): If **loss** is ``"sinkhorn"``,
+            specifies if we should compute the **unbiased**
+            Sinkhorn divergence instead of the classic,
+            entropy-regularized "SoftAssign" loss.
+
+        potentials (bool, default=False): When this parameter is set to True,
+            the :mod:`SamplesLoss` layer returns a pair of optimal dual potentials
+            :math:`F` and :math:`G`, sampled on the input measures,
+            instead of differentiable scalar value.
+            These dual vectors :math:`(F(x_i))` and :math:`(G(y_j))`
+            are encoded as Torch tensors, with the same shape
+            as the input weights :math:`(\\alpha_i)` and :math:`(\\beta_j)`.
+
         verbose (bool, default=False): If **backend** is ``"multiscale"``,
             specifies whether information on the clustering and
             :math:`\\varepsilon`-scaling descent should be displayed

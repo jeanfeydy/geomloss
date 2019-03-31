@@ -104,7 +104,7 @@ project = 'GeomLoss'
 #import time
 #copyright = '2018-{}, Benjamin Charlier, Jean Feydy, Joan A. Glaunès'.format(time.strftime("%Y"))
 
-copyright = '2019, Jean Feydy'
+copyright = '2019, Jean Feydy.'
 author = 'Jean Feydy.'
 
 # The version info for the project you're documenting, acts as replacement for

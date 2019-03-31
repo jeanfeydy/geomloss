@@ -247,7 +247,7 @@ ax.scatter( [10], [10] )  # shameless hack to prevent a slight change of axis...
 # Fancy display:
 display_samples(ax, Y_j, l_j)
 display_samples(ax, X_i, labels_i.clamp(0,1))
-ax.set_title("Labeled transferred with Optimal Transport")
+ax.set_title("Labels transferred with Optimal Transport")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
 plt.tight_layout()
@@ -305,7 +305,7 @@ ax.scatter( [10], [10] )  # shameless hack to prevent a slight change of axis...
 
 display_samples(ax, Y_j, l_j)
 display_samples(ax, X_i, labels_i.clamp(0,1))
-ax.set_title("Labeled transferred with unbalanced Optimal Transport")
+ax.set_title("Labels transferred with unbalanced Optimal Transport")
 
 ax.axis([0,1,0,1]) ; ax.set_aspect('equal', adjustable='box')
 plt.tight_layout()
