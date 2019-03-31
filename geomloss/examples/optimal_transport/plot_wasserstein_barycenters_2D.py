@@ -133,7 +133,7 @@ a, b, c, d = models
 # If the weights :math:`w_k` sum up to 1, this update is a barycentric
 # combination of the **target points** :math:`x_i + v_i^A`, :math:`~\dots\,`, :math:`x_i + v_i^D`,
 # images of the source sample :math:`x_i`
-# under the action of the :doc:`generalized Monge maps <plot_interpolation>` that transport
+# under the action of the :doc:`generalized Monge/Brenier maps <plot_scaling>` that transport
 # our uniform sample onto the four target measures.
 # 
 # Using the resulting sample as an **ersatz for the true Wasserstein barycenter**

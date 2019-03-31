@@ -20,6 +20,9 @@ Until then, you may be interested by:
   - Our `ShapeMI2018 paper <https://hal.archives-ouvertes.fr/hal-01827184/>`_, 
     which puts the three geometric loss functions
     in a **common framework**.
+  - Aude Genevay's `PhD thesis <https://audeg.github.io/publications/these_aude.pdf>`_, 
+    which provides an in-depth study of the **statistical properties**
+    of Sinkhorn divergences.
   - Bernhard Schmitzer's `sparse scaling paper <https://arxiv.org/abs/1610.06519>`_,
     which introduced the first **multiscale Sinkhorn loop**. 
 
