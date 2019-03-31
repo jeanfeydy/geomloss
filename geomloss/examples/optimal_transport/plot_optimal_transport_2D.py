@@ -216,3 +216,4 @@ Y_j = draw_samples("data/moon_b.png", M, dtype)
 gradient_descent( SamplesLoss("sinkhorn", p=2, blur=.01) )
 
 plt.show()
+

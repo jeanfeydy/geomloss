@@ -240,6 +240,7 @@ labels_i = transfer(torch.Tensor( [blur**2] ).type(dtype), X_i, Y_j,
 # That's it! We may now display our target point cloud :math:`(x_i)`
 # with its new set of labels: 
 
+# sphinx_gallery_thumbnail_number = 2
 plt.figure(figsize=(8,8)) ; ax = plt.gca()
 ax.scatter( [10], [10] )  # shameless hack to prevent a slight change of axis...
 
@@ -311,3 +312,4 @@ plt.tight_layout()
 
 
 plt.show()
+
