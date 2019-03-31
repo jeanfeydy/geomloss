@@ -122,8 +122,8 @@ def kernel_keops(kernel, α, x, β, y, potentials=False, ranges_xx = None, range
         return a_x - b_x, b_y - a_y
 
     else:  # Return the Kernel norm. N.B.: we assume that 'kernel' is symmetric:
-        return .5 * scal( double_grad(α), a_i ) \
-             + .5 * scal( double_grad(β), b_j )  -  scal( α, b_i )
+        return .5 * scal( double_grad(α), a_x ) \
+             + .5 * scal( double_grad(β), b_y )  -  scal( α, b_x )
               
 
 
