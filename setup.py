@@ -14,7 +14,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 setup(
     name='geomloss',
-    version='0.1',
+    version='0.2',
 
     description='Geometric loss functions between point clouds, images and volumes.',
     long_description=long_description,
@@ -53,4 +53,8 @@ setup(
     install_requires=[
         'numpy',
     ],
+
+    extras_require={
+        'full': ['pykeops[full]'],
+    },
 )

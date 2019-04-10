@@ -26,7 +26,7 @@ import sphinx_gallery
 from recommonmark.transform import AutoStructify
 
 from geomloss import __version__
-if __version__ == "???" : __version__ = "0.1"
+if __version__ == "???" : __version__ = "0.2"
 
 # -- General configuration ------------------------------------------------
 
