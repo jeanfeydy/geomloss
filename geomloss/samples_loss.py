@@ -62,10 +62,10 @@ class SamplesLoss(Module):
                 :math:`k(x,y) = -\|x-y\|_2`.
               - ``"gaussian"``: Gaussian MMD, computed using the kernel
                 :math:`k(x,y) = \exp \\big( -\|x-y\|_2^2 \,/\, 2\sigma^2)`
-                of standard deviation :math:`\sigma` = ``blur``.
+                of standard deviation :math:`\sigma` = **blur**.
               - ``"laplacian"``: Laplacian MMD, computed using the kernel
                 :math:`k(x,y) = \exp \\big( -\|x-y\|_2 \,/\, \sigma)`
-                of standard deviation :math:`\sigma` = ``blur``.
+                of standard deviation :math:`\sigma` = **blur**.
         
         p (int, default=2): If **loss** is ``"sinkhorn"`` or ``"hausdorff"``,
             specifies the ground cost function between points.

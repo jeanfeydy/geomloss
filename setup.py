@@ -35,7 +35,7 @@ setup(
 
         'Operating System :: POSIX :: Linux',
         'Operating System :: MacOS :: MacOS X',
-        'Operating System :: Microsoft :: Windows'
+        'Operating System :: Microsoft :: Windows',
 
         'Programming Language :: Python :: 3 :: Only',
     ],
@@ -46,7 +46,7 @@ setup(
     package_data={
         'geomloss': [
         ]
-    }
+    },
     scripts=[],
     url='',
     license='LICENSE.txt',

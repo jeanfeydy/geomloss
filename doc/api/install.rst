@@ -1,26 +1,33 @@
 Getting started
 =================
 
-Install
-----------
+Install with pip (recommended)
+---------------------------------
 
-Using pip (recommended)
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Soon!
-
-
-Using git
-~~~~~~~~~~~
-
-The **multiscale** backend of :meth:`geomloss.SamplesLoss` relies on KeOps routines
-which have not yet been merged into the **master** branch.
-As of today, to install GeomLoss and all its optional dependencies, 
-you'll thus have to:
+To install GeomLoss and all its (optional) dependencies, please:
 
   1. Install the CUDA toolkit, including the **nvcc** compiler.
   2. Install `PyTorch <https://pytorch.org/>`_.
-  3. Install the `KeOps library <http://www.kernel-operations.io/python/installation.html>`_.
+  3. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.
+  4. Install GeomLoss with::
+    
+      pip install geomloss
+
+On `Google Colab <https://colab.research.google.com/>`_,
+simply typing::
+
+  !pip install geomloss[full]
+
+should allow you to get a working setup in less than twenty seconds.
+
+Install with git
+-------------------
+
+Alternatively, you may:
+
+  1. Install the CUDA toolkit, including the **nvcc** compiler.
+  2. Install `PyTorch <https://pytorch.org/>`_.
+  3. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.
   4. Clone the GeomLoss repository::
     
         git clone https://github.com/jeanfeydy/geomloss.git
@@ -29,15 +36,10 @@ you'll thus have to:
 
 
 
-A simple option may be to use a
-`free Google Colab session <https://colab.research.google.com/notebooks/welcome.ipynb#recent=true>`_,
-as discussed below.
-
-
 Build the documentation
 --------------------------
 
-This website was generated on a `free Google Colab session <https://colab.research.google.com/notebooks/welcome.ipynb#recent=true>`_.
+This website was generated on a `free Google Colab session <https://colab.research.google.com/>`_.
 To reproduce our results and benchmarks, feel free to create
 a new Colab notebook and type the following instructions in the first few cells::
 
@@ -52,32 +54,20 @@ a new Colab notebook and type the following instructions in the first few cells:
     !pip install numpy GPUtil cmake ninja > install.log
     !pip install sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme  >> install.log
 
-    # Download KeOps... And don't forget to update pybind11.
-    !git clone --recursive --branch cluster_sparsity https://plmlab.math.cnrs.fr/benjamin.charlier/libkeops.git keops/  >> install.log
+    # Download KeOps...
+    !pip install pykeops[full]  >> install.log
 
     # Download GeomLoss
     !git clone https://github.com/jeanfeydy/geomloss.git  >> install.log
 
-    # Make sure that new scripts will have access to KeOps
+    # Make sure that new scripts will have access to GeomLoss
     import os
-    os.environ['PYTHONPATH'] += ":/content/geomloss/:/content/keops/"
+    os.environ['PYTHONPATH'] += ":/content/geomloss/"
     !echo $PYTHONPATH
 
-    # Put KeOps in the current environment
+    # Put GeomLoss in the current environment
     import sys
     sys.path.append('/content/geomloss/')
-    sys.path.append('/content/keops/')
-
-    # Test that KeOps is properly installed
-    import torch
-    import pykeops.torch as pktorch
-
-    x = torch.arange(1, 10, dtype=torch.float32).view(-1, 3)
-    y = torch.arange(3, 9, dtype=torch.float32).view(-1, 3)
-
-    my_conv = pktorch.Genred('SqNorm2(x-y)', ['x = Vx(3)', 'y = Vy(3)'])
-    print(my_conv(x, y))
-
 
     # First run, to compile everything
     %cd /content/geomloss/doc

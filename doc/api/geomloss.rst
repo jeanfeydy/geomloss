@@ -12,6 +12,7 @@ to theoretical results on Sinkhorn divergences and applications to medical data.
 Until then, you may be interested by:
 
   - My `slides <https://www.math.ens.fr/~feydy/Talks/GTTI_2019/GTTI_2019.pdf>`_
+    and `poster <https://www.math.ens.fr/~feydy/Talks/AiStats_2019/AiStats_2019_poster.pdf>`_
     on Hausdorff distances, Kernel MMDs and Sinkhorn divergences.
   - The `tutorial on gradient flows <https://www.math.ens.fr/~feydy/Teaching/DataScience/gradient_flows.html>`_
     that I wrote for students at the math department of the ENS.
