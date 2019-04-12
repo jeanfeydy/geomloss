@@ -11,10 +11,11 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
+import geomloss
 
 setup(
     name='geomloss',
-    version='0.2',
+    version=geomloss.__version__,
 
     description='Geometric loss functions between point clouds, images and volumes.',
     long_description=long_description,

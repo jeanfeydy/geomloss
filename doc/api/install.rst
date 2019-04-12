@@ -41,7 +41,7 @@ Build the documentation
 
 This website was generated on a `free Google Colab session <https://colab.research.google.com/>`_.
 To reproduce our results and benchmarks, feel free to create
-a new Colab notebook and type the following instructions in the first few cells::
+a new Colab notebook and to type the following instructions in the first few cells::
 
     # Mount Google drive to save the final documentation
     from google.colab import drive
