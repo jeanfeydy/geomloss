@@ -50,6 +50,10 @@ a new Colab notebook and to type the following instructions in the first few cel
     # Make sure that GDrive is mounted correctly
     !ls gdrive/'My Drive'
 
+    # Install sphinx for Python 3 (instead of the default Python 2)
+    !pip uninstall sphinx
+    !pip3 install sphinx
+
     # Install the dependencies for sphinx and KeOps
     !pip install numpy GPUtil cmake ninja > install.log
     !pip install sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme  >> install.log
