@@ -69,13 +69,14 @@ def softmin_online(ε, C_xy, f_y, log_conv=None):
     return - ε * log_conv( x, y, f_y.view(-1,1), torch.Tensor([1/ε]).type_as(x) ).view(-1)
 
 
-def keops_lse(cost, D):
+def keops_lse(cost, D, dtype="float32"):
     log_conv = generic_logsumexp("( B - (P * " + cost + " ) )",
                                  "A = Vi(1)",
                                  "X = Vi({})".format(D),
                                  "Y = Vj({})".format(D),
                                  "B = Vj(1)",
-                                 "P = Pm(1)")
+                                 "P = Pm(1)",
+                                 dtype = dtype)
     return log_conv
 
 
@@ -87,7 +88,7 @@ def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scal
 
     if cost is None: cost = cost_formulas[p]
 
-    softmin = partial(softmin_online, log_conv=keops_lse(cost, D)) 
+    softmin = partial(softmin_online, log_conv=keops_lse(cost, D, dtype=str(x.dtype)[6:])) 
 
     # The "cost matrices" are implicitely encoded in the point clouds,
     # and re-computed on-the-fly:
@@ -195,7 +196,7 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
     if cost is None: cost = cost_formulas[p], cost_routines[p]
     cost_formula, cost_routine = cost[0], cost[1]
 
-    softmin = partial(softmin_multiscale, log_conv=keops_lse(cost_formula, D)) 
+    softmin = partial(softmin_multiscale, log_conv=keops_lse(cost_formula, D, dtype=str(x.dtype)[6:])) 
     extrapolate = partial(extrapolate_samples, softmin=softmin)
 
     diameter, ε, ε_s, ρ = scaling_parameters( x, y, p, blur, reach, diameter, scaling )
