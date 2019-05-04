@@ -4,7 +4,7 @@ Geometric Loss functions between sampled measures, images and volumes
 **N.B.:** This is still an **alpha** release! 
 Please send me your feedback: I will polish the user interface,
 implement Hausdorff divergences, add support for images/volumes
-and clean the documentation before a first stable release by the end of April 2019 - coming back from `AiStats 2019 <https://www.aistats.org/>`_.
+and clean the documentation before a first stable release by mid-May 2019 - coming back from `AiStats 2019 <https://www.aistats.org/>`_.
 
 The **GeomLoss** library provides efficient GPU implementations for:
 

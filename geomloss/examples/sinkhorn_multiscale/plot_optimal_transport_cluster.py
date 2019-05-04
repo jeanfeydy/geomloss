@@ -1,6 +1,6 @@
 """
-Optimal Transport in high dimension
-====================================
+3) Optimal Transport in high dimension
+=======================================
 
 Let's use a custom clustering scheme to generalize the
 **multiscale** Sinkhorn algorithm to high-dimensional settings.

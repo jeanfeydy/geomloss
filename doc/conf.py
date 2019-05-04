@@ -52,11 +52,16 @@ extensions = [
     'sphinx.ext.napoleon',
 ]
 
-from sphinx_gallery.sorting import FileNameSortKey
+from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
 sphinx_gallery_conf = {
      # path to your examples scripts
      'examples_dirs': ['../geomloss/examples'],
+    'subsection_order': ExplicitOrder(['../geomloss/examples/comparisons',
+                                       '../geomloss/examples/sinkhorn_multiscale',
+                                       '../geomloss/examples/optimal_transport',
+                                       '../geomloss/examples/performances']),
+
      # path where to save gallery generated examples
      'gallery_dirs': ['./_auto_examples'],
      'within_subsection_order': FileNameSortKey,

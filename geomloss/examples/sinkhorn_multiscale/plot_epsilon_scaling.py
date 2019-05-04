@@ -1,5 +1,5 @@
 """
-Influence of the blur parameter, scaling strategy
+1) Blur parameter, scaling strategy
 =====================================================
 
 Dating back to the work of `Schrödinger <http://www.numdam.org/article/AIHP_1932__2_4_269_0.pdf>`_ 
