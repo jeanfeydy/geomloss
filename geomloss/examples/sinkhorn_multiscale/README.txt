@@ -1,3 +1,5 @@
+.. _sinkhorn-multiscale:
+
 The multiscale Sinkhorn algorithm
 -------------------------------------
 

@@ -150,7 +150,7 @@ def display_samples(ax, x, weights, color, v=None) :
     weights_ = weights.detach().cpu().numpy()
 
     weights_[weights_ < 1e-5] = 0
-    ax.scatter( x_[:,0], x_[:,1], 5 * 500 * weights_, color, edgecolors='none' )
+    ax.scatter( x_[:,0], x_[:,1], 10 * 500 * weights_, color, edgecolors='none' )
 
     if v is not None :
         v_ = v.detach().cpu().numpy()
@@ -176,7 +176,7 @@ A_i, X_i = draw_samples("data/ell_a.png", sampling)
 B_j, Y_j = draw_samples("data/ell_b.png", sampling)
 
 ###############################################
-# Scaling heuristic
+# Scaling strategy
 # -------------------
 #
 # We now display the behavior of the Sinkhorn loss across

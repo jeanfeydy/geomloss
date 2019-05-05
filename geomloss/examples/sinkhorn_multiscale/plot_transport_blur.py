@@ -124,9 +124,9 @@ for _ in range(5):  # Repeat the experiment 5 times
 
     for blur in blurs:
         # Compute the Sinkhorn divergence:
-        # N.B.: The "online" backend is much more reliable than the "multiscale" one
-        loss = SamplesLoss("sinkhorn", p=2, blur=blur, scaling=.99, 
-                           backend="online", diameter=1., verbose=True, cluster_scale=.05)
+        # N.B.: To be super-precise, we use the well-tested "online" backend
+        #       with a very large 'scaling' coefficient
+        loss = SamplesLoss("sinkhorn", p=2, blur=blur, scaling=.99, backend="online")
         sink.append( loss(X_i, Y_j).item() )
 
         # Compute the blurred Wasserstein distance:

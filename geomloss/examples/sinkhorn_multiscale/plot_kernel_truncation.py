@@ -12,15 +12,10 @@ compute Sinkhorn divergences in :math:`O(n \log(n))` times, on the GPU.
 """
 
 ##################################################
-# Multiscale Optimal Transport
-# -----------------------------
 #
-# Starting with the seminal work of `Quentin Mérigot <http://quentin.mrgt.fr/>`_
-# `(Mérigot, 2011) <https://hal.archives-ouvertes.fr/hal-00604684>`_
-# 
 # .. warning::
-#   The recent line of Stats-ML papers started by `(Cuturi, 2013) <https://arxiv.org/abs/1306.0895>`_
-#   has prioritized the study of the **statistical properties** of entropic OT
+#   The recent line of Stats-ML papers on entropic OT started by `(Cuturi, 2013) <https://arxiv.org/abs/1306.0895>`_
+#   has prioritized the theoretical study of **statistical properties**
 #   over computational efficiency.
 #   Consequently, in spite of their impact on
 #   `fluid mechanics <https://arxiv.org/abs/1505.03306>`_,
@@ -35,9 +30,136 @@ compute Sinkhorn divergences in :math:`O(n \log(n))` times, on the GPU.
 #   points of view on discrete OT, we will hopefully converge towards
 #   robust, efficient and well-understood generalizations of the Wasserstein distance.
 #
-
-
-##############################################
+# Multiscale Optimal Transport
+# -----------------------------
+#
+# **In the general case,** Optimal Transport problems are linear programs that 
+# cannot be solved with less than :math:`O(n^2)` operations:
+# at the very least, the cost function :math:`\text{C}` should be evaluated on all pairs of points!
+# But fortunately, when the data is **intrinsically low-dimensional**, efficient algorithms
+# allow us to leverage the structure of the cost matrix :math:`(\text{C}(x_i,y_j))_{i,j}`
+# to **prune out** useless computations and reach the optimal :math:`O(n \log(n))`
+# complexity that is commonly found in 
+# `physics <https://en.wikipedia.org/wiki/Fast_multipole_method>`_ 
+# and `computer graphics <https://en.wikipedia.org/wiki/Octree>`_.
+# 
+#
+# As far as I can tell, the first multiscale
+# OT solver was presented in a seminal paper of `Quentin Mérigot <http://quentin.mrgt.fr/>`_,
+# `(Mérigot, 2011) <https://hal.archives-ouvertes.fr/hal-00604684>`_.
+# In the simple case of entropic OT, which was best studied in `(Schmitzer, 2016) <https://arxiv.org/abs/1610.06519>`_,
+# multiscale schemes rely on **two key observations** made on the :math:`\varepsilon`-scaling descent: 
+#
+# 1. When the blurring radius :math:`\sigma = \varepsilon^{1/p}` is large,
+#    the dual potentials :math:`f` and :math:`g` define **smooth** functions
+#    on the ambient space, that can be described accurately with **coarse samples**
+#    at scale :math:`\sigma`. 
+#    The first few iterations of the Sinkhorn loop could thus be performed quickly,
+#    on **sub-sampled point clouds** :math:`\tilde{x}_i` and :math:`\tilde{y}_j` 
+#    computed with an appropriate clustering method.
+#
+# 2. The fuzzy transport plans :math:`\pi_\varepsilon`, solutions of the primal problem :math:`\text{OT}_\varepsilon(\alpha,\beta)`
+#    for decreasing values of :math:`\varepsilon` typically define a **nested sequence** of
+#    measures on the product space :math:`\alpha\otimes \beta`.
+#    Informally, **we may assume that**
+#
+#    .. math::
+#       \varepsilon ~<~\varepsilon' ~\Longrightarrow~ 
+#       \text{Supp}(\pi_\varepsilon) ~\subset~ \text{Supp}(\pi_{\varepsilon'}).
+#
+#    If :math:`(f_\varepsilon,g_\varepsilon)` denotes an optimal dual pair 
+#    for the *coarse* problem :math:`\text{OT}_\varepsilon(\tilde{\alpha},\tilde{\beta})` 
+#    at temperature :math:`\varepsilon`, we know that the **effective support** of
+#
+#    .. math::
+#       \pi_\varepsilon 
+#       ~=~ \exp \tfrac{1}{\varepsilon}[ f_\varepsilon \oplus g_\varepsilon - \text{C}] 
+#       \,\cdot\, \tilde{\alpha}\otimes\tilde{\beta}
+#
+#    is typically restricted to pairs of *coarse points* :math:`(\tilde{x}_i,\tilde{y}_j)`,
+#    i.e. pairs of clusters, such that
+#
+#    .. math::
+#           f_\varepsilon(\tilde{x}_i) + g_\varepsilon(\tilde{y}_j) ~\geqslant~
+#            \text{C}(\tilde{x}_i, \tilde{y}_j) \,-\,5\varepsilon.
+#
+#    By leveraging this coarse-level information to **prune out computations** at
+#    a finer level (*kernel truncation*), we may perform a full Sinkhorn loop **without ever computing**
+#    **point-to-point interactions** that would have a **negligible impact**
+#    on the updates of the dual potentials.
+#
+# The GeomLoss implementation
+# ------------------------------
+#
+# In practice, the :mod:`SamplesLoss("sinkhorn", backend="multiscale") <geomloss.SamplesLoss>`
+# layer relies on a **single loop**
+# that differs significantly from `Bernhard Schmitzer <https://www-m15.ma.tum.de/Allgemeines/BernhardSchmitzer>`_'s 
+# reference `CPU implementation <https://github.com/bernhard-schmitzer/optimal-transport/tree/master/v0.2.0>`_.
+# Some modifications were motivated by **mathematical insights**, and may be relevant
+# for all entropic OT solvers:
+#
+# - As discussed in the previous notebook, if the optional argument **debias** is set to **True**
+#   (the default behavior), we compute the **unbiased** dual potentials :math:`F` and :math:`G`
+#   which correspond to the positive and definite Sinkhorn divergence :math:`\text{S}_\varepsilon`.
+# - For the sake of **numerical stability**, all computations are performed *in the log-domain*.
+#   We rely on efficient, **online** Log-Sum-Exp
+#   routines provided by the `KeOps library <https://www.kernel-operations.io>`_.
+# - For the sake of **symmetry**, we use *averaged* updates on the dual potentials :math:`f` and :math:`g`
+#   instead of the standard *alternate* iterations of the Sinkhorn algorithm.
+#   This allows us to converge (much) faster when the two input measures
+#   are **close to each other**, and we also make sure that:
+# 
+#   .. math::
+#       \text{S}_\varepsilon(\alpha,\beta)=\text{S}_\varepsilon(\beta,\alpha),
+#       ~~\text{S}_\varepsilon(\alpha,\alpha) = 0
+#       ~~\text{and}~~ \partial_{\alpha} \text{S}_\varepsilon(\alpha,\beta=\alpha) = 0,
+#   
+#   even after a *finite* number of iterations.
+# - When jumping from coarse to fine scales, we use the "true", **closed-form** expression
+#   of our dual potentials instead of Bernhard's (simplistic) piecewise-constant **extrapolation** rule.
+#   In practice, this simple trick allows us to be much more aggressive during the descent
+#   and only spend **one iteration per value of the temperature** :math:`\varepsilon`.
+# - Our gradients are computed using an **explicit formula**, at convergence,
+#   thus **bypassing a naive backpropagation** through the whole Sinkhorn loop.
+#
+# Other tricks are more **hardware-dependent**, and result from trade-offs
+# between computation times and memory accesses on the GPU:
+#
+# - CPU implementations typically rely on *lists* and *sparse matrices*;
+#   but for the sake of **performances on GPUs**, we combine a sorting pass with 
+#   a *block-sparse truncation scheme* that enforces **contiguity in memory**.
+#   Once again, we rely on CUDA codes that are abstracted and 
+#   `documented <http://www.kernel-operations.io/keops/python/sparsity.html>`_
+#   in the KeOps library.
+# - For the sake of **simplicity**, I only implemented a **two-scale** algorithm
+#   which performs well when working with 50,000-500,000 samples per measure.
+#   On the GPU, (semi) brute-force methods tend to have less overhead than finely crafted
+#   tree-like methods, and I found that using **a single coarse scale** is a good compromise
+#   for this range of problems. 
+#   In the future, I may try to extend this code
+#   to let it scale on clouds with *more than a million* of points... 
+#   but I don't know if this would be of use to anybody!
+# - As discussed in the next notebook, **our implementation is not limited to dimensions 2 and 3**.
+#   Feel free to use this layer in conjunction with your **favorite clustering scheme**, e.g. a straightforward K-means
+#   in dimension 100, and expect decent speed-ups if your data is **intrinsically low-dimensional**.
+#
+# Crucially, GeomLoss **does not perform any of the sanity checks described in Bernhard's paper**
+# (e.g. on updates of the kernel truncation mask),
+# which allow him to **guarantee** the correctness of his solution
+# to the :math:`\text{OT}_\varepsilon` problem.
+# Running these tests during the descent would induce a significant
+# overhead, for little practical impact.
+# 
+# .. note:: 
+#   As of today, the **"multiscale"** backend of the 
+#   :mod:`SamplesLoss <geomloss.SamplesLoss>` layer 
+#   should thus be understood as a **pragmatic**, GPU-friendly algorithm
+#   that provides quick estimates of the Wasserstein distance and gradient on large-scale problems, 
+#   without guarantees. I find it *good enough* for most measure-fitting applications...
+#   But my personal experience is far from covering all use-cases. 
+#   If you observe weird behaviors on your own range of transportation problems, **please let me know!**
+#
+#
 # Setup
 # ---------------------
 #
@@ -124,7 +246,7 @@ A_i, X_i = draw_samples("data/ell_a.png", sampling)
 B_j, Y_j = draw_samples("data/ell_b.png", sampling)
 
 ###############################################
-# Scaling heuristic
+# Scaling strategy
 # -------------------
 #
 # We now display the behavior of the Sinkhorn loss across
@@ -142,7 +264,7 @@ plt.figure(figsize=( (12, ((Nits-1)//3 + 1) * 4)))
 for i in range(Nits):
     blur = scaling**i
     Loss = SamplesLoss("sinkhorn", p=2, blur=blur, diameter=1., cluster_scale = cluster_scale,
-                        scaling=scaling, verbose=True, backend="multiscale")
+                        scaling=scaling, backend="multiscale")
 
     # Create a copy of the data...
     a_i, x_i = A_i.clone(), X_i.clone()
@@ -197,3 +319,32 @@ for i in range(Nits):
 
 plt.tight_layout()
 plt.show()
+
+##################################################
+# Analogy with a Quicksort algorithm
+# ---------------------------------------
+# 
+# 
+# In some sense, Optimal Transport can be understood as a **generalization of sorting problems**
+# as we "index" a weighted point cloud with another one. But **how far can we go**
+# with this analogy?
+#
+# **In dimension 1**, when :math:`p \geqslant 1`,
+# the optimal Monge map can be computed through a simple **sorting pass** 
+# on the data with :math:`O(n \log(n))` complexity.
+# At the other end of the spectrum, generic OT problems on **high-dimensional**,
+# scattered point clouds have little to **no structure** and cannot be solved
+# with less than :math:`O(n^2)` or :math:`O(n^3)` operations. 
+#
+# From this perspective, multiscale OT solvers should thus be understood
+# as **multi-dimensional Quicksort algorithms**, with coarse **cluster centroids**
+# and their targets playing the part of **median pivots**. With its pragmatic GPU implementation,
+# GeomLoss has simply delivered on the promise
+# made by a long line of research papers:
+# **when your data is intrinsically low-dimensional**,
+# the runtime needed to compute a Wasserstein distance should be closer
+# to a :math:`O(n \log(n))` than to a :math:`O(n^2)`.
+#
+#
+#
+
