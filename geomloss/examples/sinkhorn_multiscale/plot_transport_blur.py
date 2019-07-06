@@ -104,8 +104,8 @@ def rweight():
     """Random weight."""
     return torch.rand(1).type(dtype)
 
-N = 50 if not use_cuda else 10**3  # Number of samples per measure
-C = 10000  # number of copies for the Gaussian blur
+N = 100 if not use_cuda else 10**3  # Number of samples per measure
+C = 100 if not use_cuda else 10000  # number of copies for the Gaussian blur
 
 for _ in range(5):  # Repeat the experiment 5 times
     K = 5  # Generate random 1D measures as the superposition of K=5 intervals
