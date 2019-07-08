@@ -108,12 +108,13 @@ Details and examples are provided below:
 
 **GeomLoss is licensed** under the `MIT license <https://github.com/jeanfeydy/geomloss/blob/master/LICENSE>`_.
 
-Author
--------
+Author and Contributors
+-------------------------
 
-Feel free to contact me for any **bug report** or **feature request**:
+Feel free to contact us for any **bug report** or **feature request**:
 
 - `Jean Feydy <http://www.math.ens.fr/~feydy/>`_
+- `Pierre Roussillon <https://proussillon.gitlab.io/en/>`_ (extensions to brain tractograms and normal cycles)
 
 Related projects
 ------------------
