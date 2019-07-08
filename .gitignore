@@ -113,3 +113,6 @@ geomloss/examples/performances/output/*
 !/build/.gitkeep
 *_auto_examples*
 *_auto_tutorials*
+
+geomloss/examples/performances/data/*
+!geomloss/examples/performances/data/.gitkeep

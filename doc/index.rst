@@ -4,7 +4,7 @@ Geometric Loss functions between sampled measures, images and volumes
 **N.B.:** This is still an **alpha** release! 
 Please send me your feedback: I will polish the user interface,
 implement Hausdorff divergences, add support for images/volumes
-and clean the documentation before a first stable release by mid-May 2019 - coming back from `AiStats 2019 <https://www.aistats.org/>`_.
+and clean the documentation over the summer of 2019.
 
 The **GeomLoss** library provides efficient GPU implementations for:
 
@@ -115,6 +115,24 @@ Feel free to contact us for any **bug report** or **feature request**:
 
 - `Jean Feydy <http://www.math.ens.fr/~feydy/>`_
 - `Pierre Roussillon <https://proussillon.gitlab.io/en/>`_ (extensions to brain tractograms and normal cycles)
+
+Licensing, academic use
+---------------------------
+
+This library is licensed under the permissive `MIT license <https://en.wikipedia.org/wiki/MIT_License>`_,
+which is fully compatible with both **academic** and **commercial** applications.
+If you use this code in a research paper, **please cite**:
+
+::
+
+    @inproceedings{feydy2019interpolating,
+        title={Interpolating between Optimal Transport and MMD using Sinkhorn Divergences},
+        author={Feydy, Jean and S{\'e}journ{\'e}, Thibault and Vialard, Fran{\c{c}}ois-Xavier and Amari, Shun-ichi and Trouve, Alain and Peyr{\'e}, Gabriel},
+        booktitle={The 22nd International Conference on Artificial Intelligence and Statistics},
+        pages={2681--2690},
+        year={2019}
+    }
+
 
 Related projects
 ------------------

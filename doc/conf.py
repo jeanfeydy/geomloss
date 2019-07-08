@@ -60,7 +60,8 @@ sphinx_gallery_conf = {
     'subsection_order': ExplicitOrder(['../geomloss/examples/comparisons',
                                        '../geomloss/examples/sinkhorn_multiscale',
                                        '../geomloss/examples/optimal_transport',
-                                       '../geomloss/examples/performances']),
+                                       '../geomloss/examples/performances',
+                                       '../geomloss/examples/brain_tractograms']),
 
      # path where to save gallery generated examples
      'gallery_dirs': ['./_auto_examples'],
