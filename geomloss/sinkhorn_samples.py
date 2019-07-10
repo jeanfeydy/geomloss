@@ -131,6 +131,8 @@ def clusterize(α, x, scale=None, labels=None) :
         α_c[k], x_c[k] correspond to
         α[x_ranges[k,0]:x_ranges[k,1]], x[x_ranges[k,0]:x_ranges[k,1],:]
     """
+    perm = None  # did we sort the point cloud at some point? Here's the permutation.
+
     if labels is None and scale is None : # No clustering, single-scale Sinkhorn on the way...
         return [α], [x], []
 
@@ -140,9 +142,16 @@ def clusterize(α, x, scale=None, labels=None) :
         # Compute centroids and weights:
         ranges_x, x_c, α_c = cluster_ranges_centroids(x, x_lab, weights=α)
         # Make clusters contiguous in memory:
-        (α, x), x_labels = sort_clusters( (α,x), x_lab)
+        x_labels, perm = torch.sort(x_lab.view(-1))
+        α, x = α[perm], x[perm]
 
-        return [α_c, α], [x_c, x], [ranges_x]
+        # N.B.: the lines above were return to replace a call to
+        #       'sort_clusters' which does not return the permutation,
+        #       an information that is needed to de-permute the dual potentials
+        #       if they are required by the user.
+        # (α, x), x_labels = sort_clusters( (α,x), x_lab)
+
+        return [α_c, α], [x_c, x], [ranges_x], perm
 
 def kernel_truncation( C_xy, C_yx, C_xy_, C_yx_, 
                        b_x, a_y, ε, truncate=None, cost=None, verbose=False):
@@ -204,8 +213,8 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
     # Clusterize and sort our point clouds:
     if cluster_scale is None:
         cluster_scale = diameter / (np.sqrt(D) * 2000**(1/D))
-    [α_c, α], [x_c, x], [ranges_x] = clusterize(α, x, scale=cluster_scale, labels=labels_x)
-    [β_c, β], [y_c, y], [ranges_y] = clusterize(β, y, scale=cluster_scale, labels=labels_y)
+    [α_c, α], [x_c, x], [ranges_x], perm_x = clusterize(α, x, scale=cluster_scale, labels=labels_x)
+    [β_c, β], [y_c, y], [ranges_y], perm_y = clusterize(β, y, scale=cluster_scale, labels=labels_y)
 
     jumps = [ len(ε_s)-1 ]
     for i, ε in enumerate(ε_s[2:]):
@@ -251,4 +260,12 @@ def sinkhorn_multiscale(α, x, β, y, p=2, blur=.05, reach=None, diameter=None,
                                         extrapolate=extrapolate, 
                                         debias = debias)
 
-    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, debias=debias, potentials=potentials)
+    cost = sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, debias=debias, potentials=potentials)
+
+    if potentials:  # we should de-sort the vectors of potential values
+        F_x, G_y = cost
+        f_x, g_y = F_x.clone(), G_y.clone()
+        f_x[perm_x], g_y[perm_y] = F_x, G_y
+        return f_x, g_y
+    else:
+        return cost

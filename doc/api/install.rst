@@ -56,7 +56,7 @@ a new Colab notebook and to type the following instructions in the first few cel
 
     # Install the dependencies for sphinx and KeOps
     !pip install numpy GPUtil cmake ninja > install.log
-    !pip install sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme  >> install.log
+    !pip install sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme plyfile >> install.log
 
     # Download KeOps...
     !pip install pykeops[full]  >> install.log
