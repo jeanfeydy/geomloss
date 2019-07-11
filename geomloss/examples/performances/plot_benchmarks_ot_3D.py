@@ -143,39 +143,197 @@ plt.tight_layout()
 # With 
 
 
-from pykeops import LazyTensor
-from geomloss import SamplesLoss
+from pykeops.torch import LazyTensor
 
-blur = .01
-OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur,
-                        scaling=.9, debias=False, potentials=True, backend="online")
-
-print("Coucou")
-
-a_i, x_i = sources[0]
-b_j, y_j = targets[0]
-F_i, G_j = OT_solver(a_i, x_i, b_j, y_j)
-
-print("Voila")
-
-
-def marginal_constraints(blur, a_i, x_i, b_j, y_j, F_i, G_j) :
+def plan_marginals(blur, a_i, x_i, b_j, y_j, F_i, G_j) :
 
     x_i = LazyTensor( x_i[:,None,:] )
     y_j = LazyTensor( y_j[None,:,:] )
     F_i = LazyTensor( F_i[:,None,None] )
     G_j = LazyTensor( G_j[None,:,None] )
 
+    # Cost matrix:
     C_ij = ((x_i - y_j) ** 2).sum(-1) / 2
+
+    # Scaled kernel matrix:
     K_ij = (( F_i + G_j - C_ij ) / blur**2 ).exp()
 
-    A_i = K_ij@b_j
-    B_j = K_ij.t()@a_i
+    A_i = a_i * (K_ij@b_j)      # First marginal
+    B_j = b_j * (K_ij.t()@a_i)  # Second marginal
 
-    return (A_i - a_i).abs().sum(), (B_j - b_j).abs().sum()
+    return A_i, B_j
+
+def blurred_relative_error(blur, x_i, a_i, A_i):
+    x_j = LazyTensor( x_i[None,:,:] )
+    x_i = LazyTensor( x_i[:,None,:] )
+
+    C_ij = ((x_i - x_j) ** 2).sum(-1) / 2
+    K_ij = ( - C_ij / blur**2 ).exp()
+
+    squared_error = (A_i - a_i).dot( K_ij@(A_i - a_i) )
+    squared_norm  = a_i.dot( K_ij@a_i )
+
+    return ( squared_error / squared_norm ).sqrt()
+
+def marginal_error(blur, a_i, x_i, b_j, y_j, F_i, G_j, mode="blurred"):
+
+    A_i, B_j = plan_marginals(blur, a_i, x_i, b_j, y_j, F_i, G_j)
+
+    if mode == "TV":
+        # Return the (average) total variation error on the marginal constraints:
+        return ( (A_i - a_i).abs().sum() + (B_j - b_j).abs().sum() ) / 2
+    
+    elif mode == "blurred":
+        norm_x = blurred_relative_error(blur, x_i, a_i, A_i)
+        norm_y = blurred_relative_error(blur, y_j, b_j, B_j)
+        return ( norm_x + norm_y ) / 2
+
+    else:
+        raise NotImplementedError()
 
 
-print( marginal_constraints(blur, a_i, x_i, b_j, y_j, F_i, G_j) )
+
+def transport_cost(a_i, b_j, F_i, G_j):
+    return a_i.dot(F_i) + b_j.dot(G_j)
+
+def wasserstein_distance(a_i, b_j, F_i, G_j):
+    return (2 * transport_cost(a_i, b_j, F_i, G_j)).sqrt()
+
+
+def benchmark_solver(OT_solver, blur, source, target):
+    a_i, x_i = source
+    b_j, y_j = target
+
+    start = time.time()
+    F_i, G_j = OT_solver(a_i, x_i, b_j, y_j)
+    if use_cuda: torch.cuda.synchronize()
+    end = time.time()
+
+    return end - start, \
+           marginal_error(blur, a_i, x_i, b_j, y_j, F_i, G_j).item(), \
+           wasserstein_distance(a_i, b_j, F_i, G_j).item()
+        
+
+
+def benchmark_solvers(name, OT_solvers, source, target, ground_truth, 
+                      blur = .01, display=False, maxtime=None):
+
+    timings, errors, costs = [], [], []
+
+    print('Benchmarking the "{}" family of OT solvers:'.format(name))
+    for i, OT_solver in enumerate(OT_solvers):
+
+        timing, error, cost = benchmark_solver(OT_solver, blur, source, target)
+
+        timings.append(timing) ; errors.append(error) ; costs.append(cost)
+        print("{}-th solver : t = {:.4f}, error on the constraints = {:.3f}, cost = {:.6f}".format(
+                i+1, timing, error, cost))
+
+        if maxtime is not None and timing > maxtime:
+            not_performed = len(OT_solvers) - (i + 1)
+            timings += [np.nan] * not_performed
+            errors  += [np.nan] * not_performed
+            costs   += [np.nan] * not_performed
+            break
+
+    timings, errors, costs = np.array(timings), np.array(errors), np.array(costs)
+
+
+    if display: # Fancy display
+        fig = plt.figure(figsize=(12,8))
+
+        ax_1 = fig.subplots()
+        ax_1.set_title("Benchmarking \"{}\"\non a {:,}-by-{:,} entropic OT problem, with a blur radius of {:.3f}".format(
+            name, len(source[0]), len(target[0]), blur
+        ))
+        ax_1.set_xlabel("time (s)")
+
+        ax_1.plot(timings, errors, color="b")
+        ax_1.set_ylabel("Relative error on the marginal constraints", color="b")
+        ax_1.tick_params("y", colors="b") ; ax_1.set_ylim(bottom=0)
+
+        ax_2 = ax_1.twinx()
+
+        ax_2.plot(timings, abs(costs - ground_truth) / ground_truth, color="r")
+        ax_2.set_ylabel("Relative error on the cost value", color="r")
+        ax_2.tick_params("y", colors="r") ; ax_2.set_ylim(bottom=0)
+
+    return timings, errors, costs
+
+
+
+def sinkhorn_loop(a_i, x_i, b_j, y_j, blur = .01, nits = 100, backend = "keops"):
+
+    loga_i, logb_j = a_i.log(), b_j.log()
+    loga_i, logb_j = loga_i[:,None,None], logb_j[None,:,None]
+
+
+    if backend == "keops":
+        x_i, y_j = LazyTensor( x_i[:,None,:] ), LazyTensor( y_j[None,:,:] )
+        C_ij = ((x_i - y_j) ** 2).sum(-1) / 2
+        
+    elif backend == "pytorch":
+      
+        # C_ij = ((x_i[:,None,:] - y_j[None,:,:]) ** 2).sum(-1) / 2
+        D_xx = (x_i ** 2).sum(-1)[:,None]  # (N,1)
+        D_xy = x_i@y_j.t()   # (N,D)@(D,M) = (N,M)
+        D_yy = (y_j ** 2).sum(-1)[None,:]  # (1,M)
+        C_ij = (D_xx + D_yy) / 2 - D_xy
+
+        C_ij = C_ij[:,:,None]
+
+    eps = blur**2
+    F_i, G_j = torch.zeros_like(loga_i), torch.zeros_like(logb_j)
+
+    for _ in range(nits):
+        F_i = - ( (- C_ij / eps + (G_j + logb_j) ) ).logsumexp(dim=1)[:,None,:]
+        G_j = - ( (- C_ij / eps + (F_i + loga_i) ) ).logsumexp(dim=0)[None,:,:]
+
+    return eps * F_i, eps * G_j
+
+from functools import partial
+sinkhorn_solver = lambda blur, nits, backend: partial(sinkhorn_loop, blur=blur, nits=nits, backend=backend)
+
+
+
+def full_benchmark(source, target, blur, maxtime=None):
+
+    # Compute a suitable "ground truth"
+    OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur,
+                            scaling=.999, debias=False, potentials=True)
+    _, _, ground_truth = benchmark_solver(OT_solver, blur, sources[0], targets[0])
+
+    results = {}
+
+    # Compute statistics for the three backends of GeomLoss: -------------------
+
+    for backend in ["multiscale", "online", "tensorized"]:
+        OT_solvers = [ SamplesLoss("sinkhorn", p=2, blur=blur, scaling=scaling,
+                                backend=backend, debias=False, potentials=True)
+                    for scaling in [.6, .7, .8, .9, .95, .99] ]
+
+        results[backend] = benchmark_solvers("GeomLoss "+backend, OT_solvers, 
+                                              source, target, ground_truth, 
+                                              blur = blur, display=True, maxtime=maxtime)
+
+
+    # Compute statistics for a naive Sinkhorn loop -----------------------------
+
+    for backend in ["pytorch", "keops"]:
+        OT_solvers = [ sinkhorn_solver(blur, nits = nits, backend = backend)
+                       for nits in [5, 10, 20, 50, 100, 200, 500, 1000] ]
+
+        results[backend] = benchmark_solvers("Sinkhorn loop - " + backend, OT_solvers, 
+                                                source, target, ground_truth, 
+                                                blur = blur, display=True, maxtime=maxtime)
+
+    
+from geomloss import SamplesLoss
+
+blur = .01
+results = full_benchmark(sources[0], targets[0], blur)
+
+
 
 if False:
     # Creates a pyplot figure:

@@ -30,7 +30,7 @@ cost_routines = {
 
 def softmin_tensorized(ε, C, f):
     B = C.shape[0]
-    return - ε * ( f.view(B,1,-1) - C/ε ).logsumexp(2)
+    return - ε * ( f.view(B,1,-1) - C/ε ).logsumexp(2).view(-1)
 
 def sinkhorn_tensorized(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, 
                         debias = True, potentials = False, **kwargs):
