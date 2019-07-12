@@ -150,13 +150,17 @@ def full_benchmark(source, target, blur, maxtime=None):
     results = {}  # Dict of "timings vs errors" arrays
 
     # Compute statistics for the three backends of GeomLoss: -------------------
+    
+    for name in ["multiscale-3", "multiscale-5", "online", "tensorized"]:
+        if   backend == "multiscale-3": backend, truncate = "multiscale", 3
+        elif backend == "multiscale-5": backend, truncate = "multiscale", 5
+        else:                           backend, truncate = name, None
 
-    for backend in ["multiscale", "online", "tensorized"]:
-        OT_solvers = [ SamplesLoss("sinkhorn", p=2, blur=blur, scaling=scaling,
+        OT_solvers = [ SamplesLoss("sinkhorn", p=2, blur=blur, scaling=scaling, truncate=truncate,
                                    backend=backend, debias=False, potentials=True)
                        for scaling in [.5, .6, .7, .8, .9, .95, .99] ]
 
-        results[backend] = benchmark_solvers("GeomLoss - " + backend, OT_solvers, 
+        results[name] = benchmark_solvers("GeomLoss - " + name, OT_solvers, 
                                              source, target, ground_truth, 
                                              blur = blur, display=False, maxtime=maxtime)
 
@@ -175,34 +179,36 @@ def full_benchmark(source, target, blur, maxtime=None):
 
 ###############################################################################
 # Having solved the entropic OT problem with dozens of solvers,
-# we will display our results in a "timing vs error" log-log plot:
+# we will display our results in an "error vs timing" log-log plot:
 # 
 
 def display_statistics(title, results, ground_truth, maxtime=None):
-    """Displays a "timing vs error" plot in log-log scale."""
+    """Displays a "error vs timing" plot in log-log scale."""
 
     curves = [ ("pytorch",    "Sinkhorn loop - PyTorch backend"),
                ("keops",      "Sinkhorn loop - KeOps backend"),
                ("tensorized", "Sinkhorn with ε-scaling - PyTorch backend"),
                ("online",     "Sinkhorn with ε-scaling - KeOps backend"),
-               ("multiscale", "Sinkhorn multiscale - KeOps backend") ]
+               ("multiscale-3", "Sinkhorn multiscale - truncate=3 (fast)"),
+               ("multiscale-5", "Sinkhorn multiscale - truncate=5 (safe)"),
+                ]
 
     fig = plt.figure(figsize=(12,8))
     ax = fig.subplots()
     ax.set_title(title)
-    ax.set_xlabel("Relative error made on the entropic Wasserstein distance")
-    ax.set_xscale('log') ; ax.set_xlim(left=1e-1, right=1e-3)
-    ax.set_ylabel("Time (s)")
-    ax.set_yscale('log') ; ax.set_ylim(bottom=1e-3, top=maxtime)
+    ax.set_ylabel("Relative error made on the entropic Wasserstein distance")
+    ax.set_yscale('log') ; ax.set_ylim(top=1e-1, bottom=1e-3)
+    ax.set_xlabel("Time (s)")
+    ax.set_xscale('log') ; ax.set_xlim(left=1e-3, right=maxtime)
 
     ax.grid(True, which="major", linestyle="-")
     ax.grid(True, which="minor", linestyle="dotted")
 
     for key, name in curves:
         timings, errors, costs = results[key]
-        ax.plot( np.abs(costs - ground_truth), timings, label = name)
+        ax.plot( timings, np.abs(costs - ground_truth), label = name)
 
-    ax.legend(loc='upper left')
+    ax.legend(loc='upper right')
     
 
 def full_statistics(source, target, blur=.01, maxtime=None):
