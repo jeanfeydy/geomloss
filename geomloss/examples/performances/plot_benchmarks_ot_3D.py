@@ -152,9 +152,9 @@ def full_benchmark(source, target, blur, maxtime=None):
     # Compute statistics for the three backends of GeomLoss: -------------------
     
     for name in ["multiscale-3", "multiscale-5", "online", "tensorized"]:
-        if   backend == "multiscale-3": backend, truncate = "multiscale", 3
-        elif backend == "multiscale-5": backend, truncate = "multiscale", 5
-        else:                           backend, truncate = name, None
+        if   name == "multiscale-3": backend, truncate = "multiscale", 3
+        elif name == "multiscale-5": backend, truncate = "multiscale", 5
+        else:                        backend, truncate = name, None
 
         OT_solvers = [ SamplesLoss("sinkhorn", p=2, blur=blur, scaling=scaling, truncate=truncate,
                                    backend=backend, debias=False, potentials=True)
@@ -162,7 +162,7 @@ def full_benchmark(source, target, blur, maxtime=None):
 
         results[name] = benchmark_solvers("GeomLoss - " + name, OT_solvers, 
                                              source, target, ground_truth, 
-                                             blur = blur, display=False, maxtime=maxtime)
+                                             blur=blur, display=False, maxtime=maxtime)
 
 
     # Compute statistics for a naive Sinkhorn loop -----------------------------
