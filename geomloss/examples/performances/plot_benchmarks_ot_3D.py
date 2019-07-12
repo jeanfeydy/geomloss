@@ -13,12 +13,224 @@ in the ambient space :math:`\mathbb{R}^3`.
 
 """
 
+######################################################################
+# More precisely: having loaded and represented our 3D meshes
+# as discrete probability measures
+#
+# .. math::
+#   \alpha ~=~ \sum_{i=1}^N \alpha_i\,\delta_{x_i}, ~~~
+#   \beta  ~=~ \sum_{j=1}^M \beta_j\,\delta_{y_j},
+#
+# we will strive to solve the primal-dual entropic OT problem:
+# 
+# .. math::
+#   \text{OT}_\varepsilon(\alpha,\beta)~&=~
+#       \min_{0 \leqslant \pi \ll \alpha\otimes\beta} ~\langle\text{C},\pi\rangle
+#           ~+~\varepsilon\,\text{KL}(\pi,\alpha\otimes\beta) \quad\text{s.t.}~~
+#        \pi\,\mathbf{1} = \alpha ~~\text{and}~~ \pi^\intercal \mathbf{1} = \beta\\
+#    &=~ \max_{f,g} ~~\langle \alpha,f\rangle + \langle \beta,g\rangle
+#         - \varepsilon\langle \alpha\otimes\beta, 
+#           \exp \tfrac{1}{\varepsilon}[ f\oplus g - \text{C} ] - 1 \rangle
+#
+# as fast as possible, optimizing on **dual vectors**:
+#
+# .. math::
+#   F_i ~=~ f(x_i), ~~~ G_j ~=~ g(y_j)
+#
+# that encode an implicit transport plan:
+#
+# .. math::
+#   \pi ~&=~ \exp \tfrac{1}{\varepsilon}( f\oplus g - \text{C})~\cdot~ \alpha\otimes\beta,\\
+#   \text{i.e.}~~\pi_{x_i \leftrightarrow y_j}~&=~ \exp \tfrac{1}{\varepsilon}( F_i + G_j - \text{C}(x_i,y_j))~\cdot~ \alpha_i \beta_j.
+#
+
+######################################################################
+# Comparing OT solvers with each other
+# --------------------------------------
+#
+# First, let's make some standard imports:
+
+import numpy as np
+import torch
+
+use_cuda = torch.cuda.is_available()
+tensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
+numpy = lambda x : x.detach().cpu().numpy()
+
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+
+#############################################################
+# This tutorial is all about highlighting the differences between
+# the GeomLoss solvers, packaged in the :mod:`SamplesLoss <geomloss.SamplesLoss>`
+# module, and a standard Sinkhorn (= soft-Auction) loop.
+
+from geomloss import SamplesLoss
+
+#############################################################
+#
+# Our baseline is provided by a simple **Sinkhorn loop**, implemented
+# in the **log-domain** for the sake of numerical stability.
+# Using the same code, we provide two backends:
+# a **tensorized** PyTorch implementation (which has a quadratic memory footprint)
+# and a **scalable** KeOps code (which has a **linear** memory footprint).
+
+from pykeops.torch import LazyTensor
+
+def sinkhorn_loop(a_i, x_i, b_j, y_j, blur = .01, nits = 100, backend = "keops"):
+    """Straightforward implementation of the Sinkhorn-IPFP-SoftAssign loop in the log domain."""
+
+    # Compute the logarithm of the weights (needed in the softmin reduction) ---
+    loga_i, logb_j = a_i.log(), b_j.log()
+    loga_i, logb_j = loga_i[:,None,None], logb_j[None,:,None]
+
+    # Compute the cost matrix C_ij = (1/2) * |x_i-y_j|^2 -----------------------
+    if backend == "keops":  # C_ij is a *symbolic* LazyTensor
+        x_i, y_j = LazyTensor( x_i[:,None,:] ), LazyTensor( y_j[None,:,:] )
+        C_ij = ((x_i - y_j) ** 2).sum(-1) / 2  # (N,M,1) LazyTensor
+        
+    elif backend == "pytorch":  # C_ij is a *full* Tensor, with a quadratic memory footprint
+        # N.B.: The separable implementation below is slightly more efficient than:
+        # C_ij = ((x_i[:,None,:] - y_j[None,:,:]) ** 2).sum(-1) / 2
+
+        D_xx = (x_i ** 2).sum(-1)[:,None]  # (N,1)
+        D_xy = x_i@y_j.t()   # (N,D)@(D,M) = (N,M)
+        D_yy = (y_j ** 2).sum(-1)[None,:]  # (1,M)
+        C_ij = (D_xx + D_yy) / 2 - D_xy    # (N,M) matrix of halved squared distances
+
+        C_ij = C_ij[:,:,None]  # reshape as a (N,M,1) Tensor
+
+    # Setup the dual variables -------------------------------------------------
+    eps = blur ** 2  # "Temperature" epsilon associated to our blurring scale
+    F_i, G_j = torch.zeros_like(loga_i), torch.zeros_like(logb_j)  # (scaled) dual vectors
+
+    # Sinkhorn loop = coordinate ascent on the dual maximization problem -------
+    for _ in range(nits): 
+        F_i = - ( (- C_ij / eps + (G_j + logb_j) ) ).logsumexp(dim=1)[:,None,:]
+        G_j = - ( (- C_ij / eps + (F_i + loga_i) ) ).logsumexp(dim=0)[None,:,:]
+    
+    # Return the dual vectors F and G, sampled on the x_i's and y_j's respectively:
+    return eps * F_i, eps * G_j  
+
+# Create a sinkhorn_solver "layer" with the same signature as SamplesLoss:
+from functools import partial
+sinkhorn_solver = lambda blur, nits, backend: partial(sinkhorn_loop, blur=blur, nits=nits, backend=backend)
+
+
+################################################################################
+# Benchmarking loops
+# ------------------------
+#
+# As usual, writing up a proper benchmark requires a lot of verbose,
+# not-so-interesting code. For the sake of readabiliity, key routines are
+# abstracted in a separate :doc:`file <./benchmarks_ot_solvers>`
+# where error functions, timers and Wasserstein distances are properly defined.
+# Feel free to have a look!
+
+
+from benchmarks_ot_solvers import benchmark_solver, benchmark_solvers
+
+######################################################################
+# The GeomLoss routines rely on a **scaling** parameter to tune
+# the tradeoff between **speed** (scaling :math:`\rightarrow` 0)
+# and **accuracy** (scaling :math:`\rightarrow` 1).
+# Meanwhile, the Sinkhorn loop is directly controlled
+# by the **number of iterations** that should be chosen with respect to
+# the available time budget.
+
+
+def full_benchmark(source, target, blur, maxtime=None):
+
+    # Compute a suitable "ground truth" ----------------------------------------
+    OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur, backend="online",
+                            scaling=.999, debias=False, potentials=True)
+    _, _, ground_truth = benchmark_solver(OT_solver, blur, sources[0], targets[0])
+
+    results = {}  # Dict of "timings vs errors" arrays
+
+    # Compute statistics for the three backends of GeomLoss: -------------------
+
+    for backend in ["multiscale", "online", "tensorized"]:
+        OT_solvers = [ SamplesLoss("sinkhorn", p=2, blur=blur, scaling=scaling,
+                                   backend=backend, debias=False, potentials=True)
+                       for scaling in [.5, .6, .7, .8, .9, .95, .99] ]
+
+        results[backend] = benchmark_solvers("GeomLoss - " + backend, OT_solvers, 
+                                             source, target, ground_truth, 
+                                             blur = blur, display=False, maxtime=maxtime)
+
+
+    # Compute statistics for a naive Sinkhorn loop -----------------------------
+
+    for backend in ["pytorch", "keops"]:
+        OT_solvers = [ sinkhorn_solver(blur, nits = nits, backend = backend)
+                       for nits in [5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000] ]
+
+        results[backend] = benchmark_solvers("Sinkhorn loop - " + backend, OT_solvers, 
+                                             source, target, ground_truth, 
+                                             blur = blur, display=False, maxtime=maxtime)
+    
+    return results, ground_truth
+
+###############################################################################
+# Having solved the entropic OT problem with dozens of solvers,
+# we will display our results in a "timing vs error" log-log plot:
+# 
+
+def display_statistics(title, results, ground_truth, maxtime=None):
+    """Displays a "timing vs error" plot in log-log scale."""
+
+    curves = [ ("pytorch",    "Sinkhorn loop - PyTorch backend"),
+               ("keops",      "Sinkhorn loop - KeOps backend"),
+               ("tensorized", "Sinkhorn with ε-scaling - PyTorch backend"),
+               ("online",     "Sinkhorn with ε-scaling - KeOps backend"),
+               ("multiscale", "Sinkhorn multiscale - KeOps backend") ]
+
+    fig = plt.figure(figsize=(12,8))
+    ax = fig.subplots()
+    ax.set_title(title)
+    ax.set_xlabel("Relative error made on the entropic Wasserstein distance")
+    ax.set_xscale('log') ; ax.set_xlim(left=1e-1, right=1e-3)
+    ax.set_ylabel("Time (s)")
+    ax.set_yscale('log') ; ax.set_ylim(bottom=1e-3, top=maxtime)
+
+    ax.grid(True, which="major", linestyle="-")
+    ax.grid(True, which="minor", linestyle="dotted")
+
+    for key, name in curves:
+        timings, errors, costs = results[key]
+        ax.plot( np.abs(costs - ground_truth), timings, label = name)
+
+    ax.legend(loc='upper left')
+    
+
+def full_statistics(source, target, blur=.01, maxtime=None):
+    results, ground_truth = full_benchmark(source, target, blur, maxtime=maxtime)
+
+    display_statistics(
+        "Solving a {:,}-by-{:,} OT problem, with a blurring scale σ = {:}".format(len(source[0]), len(target[0]), blur),
+        results, ground_truth, maxtime=maxtime)
+    
+    return results, ground_truth
+
+
+
 
 ##############################################
-# Setup
-# ---------------------
+# Building our dataset
+# ----------------------------
 #
-# First, let's fetch our model from the Stanford repository:
+# Our **source measures**: unit spheres, sampled with (roughly) the same number of points
+# as the target meshes.
+#
+
+from benchmarks_ot_solvers import create_sphere
+
+sources = [ create_sphere( npoints ) for npoints in [1e4, 5e4, 2e5, 8e5] ]
+
+###########################################################
+# Then, we fetch our target models from the Stanford repository:
 
 import os
 
@@ -31,332 +243,89 @@ if not os.path.exists('data/dragon_recon/dragon_vrip_res4.ply'):
     import shutil
     shutil.unpack_archive('data/dragon.tar.gz', 'data')
 
-
 ##############################################
 # To read the raw ``.ply`` ascii files, we rely on the
 # `plyfile <https://github.com/dranjan/python-plyfile>`_ package:
 
-import time
-import importlib
-
-import numpy as np
-import torch
-
-use_cuda = torch.cuda.is_available()
-tensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
-numpy = lambda x : x.detach().cpu().numpy()
-
-from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-
-from plyfile import PlyData, PlyElement
-
-def load_ply_file(fname, offset = [-0.011,  0.109, -0.008], scale = .04) :
-    """Loads a .ply mesh to return a collection of weighted Dirac atoms: one per triangle face."""
-
-    # Load the data, and read the connectivity information:
-    plydata = PlyData.read(fname)
-    triangles = np.vstack( plydata['face'].data['vertex_indices'] )
-
-    # Normalize the point cloud, as specified by the user:
-    points = np.vstack( [ [x,y,z] for (x,y,z) in  plydata['vertex'] ] )
-    points -= offset
-    points /= 2 * scale
-
-    # Our mesh is given as a collection of ABC triangles:
-    A, B, C = points[triangles[:, 0]], points[triangles[:, 1]], points[triangles[:, 2]]
-
-    # Locations and weights of our Dirac atoms:
-    X = (A + B + C) / 3  # centers of the faces
-    S = np.sqrt(np.sum(np.cross(B - A, C - A) ** 2, 1)) / 2  # areas of the faces
-
-    print("File loaded, and encoded as the weighted sum of {:,} atoms in 3D.".format(len(X)))
-
-    # We return a (normalized) vector of weights + a "list" of points
-    return tensor(S / np.sum(S)), tensor(X)
+from benchmarks_ot_solvers import load_ply_file, display_cloud
 
 
 ############################################################
+# Our meshes are encoded using **one weighted Dirac mass per triangle**.
 # To keep things simple, we use as **targets** the subsamplings provided
 # in the reference Stanford archive. Feel free to re-run
 # this script with your own models!
-
-# N.B.: Since Plyfile is far from being optimized, this may take some time!
-targets = [ load_ply_file( fname ) for fname in 
-            ['data/dragon_recon/dragon_vrip_res4.ply',
-             'data/dragon_recon/dragon_vrip_res3.ply',
-             'data/dragon_recon/dragon_vrip_res2.ply',
-             #'data/dragon_recon/dragon_vrip.ply',  
-          ] ]
-
-###########################################################
-# Our **source measures**: unit spheres, sampled with the same number of points
-# as the target meshes.
 #
 
-def create_sphere(n_samples = 1000):
-    """Creates a uniform sample on the unit sphere."""
+# N.B.: Since Plyfile is far from being optimized, this may take some time!
+targets = [ load_ply_file( fname, offset = [-0.011,  0.109, -0.008], scale = .04 ) 
+            for fname in 
+            ['data/dragon_recon/dragon_vrip_res4.ply', # ~ 10,000 triangles
+             'data/dragon_recon/dragon_vrip_res3.ply', # ~ 50,000 triangles
+             'data/dragon_recon/dragon_vrip_res2.ply', # ~200,000 triangles
+             #'data/dragon_recon/dragon_vrip.ply',     # ~800,000 triangles
+          ] ]
 
-    indices = np.arange(0, n_samples, dtype=float) + 0.5
-    phi = np.arccos(1 - 2 * indices / n_samples)
-    theta = np.pi * (1 + 5**0.5) * indices
 
-    x, y, z = np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi);
-    points  = np.vstack( (x, y, z)).T
-    weights = np.ones(n_samples) / n_samples
+################################################################################
+# Finally, if we don't have access to a GPU, we subsample point clouds
+# while making sure that weights still sum up to one:
 
-    return tensor(weights), tensor(points)
+def subsample(measure, decimation=500):
+    weights, locations = measure
+    weights, locations = weights[::decimation], locations[::decimation]
+    weights = weights / weights.sum()
+    return weights.contiguous(), locations.contiguous()
 
-sources = [ create_sphere( len(X) ) for (_, X) in targets ]
+if not use_cuda:
+    sources = [subsample(s) for s in sources]
+    targets = [subsample(t) for t in targets]
+
 
 ############################################################
-# As expected, our source and target point clouds are roughly aligned with each other.
-# Now, let's move on to the interesting part!
-
-def display_cloud(ax, measure, color) :
-
-    w_i, x_i = numpy( measure[0] ), numpy( measure[1] )
-
-    ax.view_init(elev=110, azim=-90)
-    ax.set_aspect('equal')
-
-    weights = w_i / w_i.sum()
-    ax.scatter( x_i[:,0], x_i[:,1], x_i[:,2], 
-                s = 25*500 * weights, c = color, edgecolors='none' )
-
-    ax.axes.set_xlim3d(left=-1.4, right=1.4) 
-    ax.axes.set_ylim3d(bottom=-1.4, top=1.4) 
-    ax.axes.set_zlim3d(bottom=-1.4, top=1.4) 
+# In this simple benchmark, we will only use the **coarse** and **medium** resolutions
+# of our meshes: 200,000 points should be more than enough to compute
+# sensible approximations of the Wasserstein distance between the Stanford dragon and a unit sphere!
 
 
 fig = plt.figure(figsize=(12,12))
 ax = fig.add_subplot(1, 1, 1, projection='3d')
 display_cloud(ax, sources[0], 'red')
 display_cloud(ax, targets[0], 'blue')
-ax.set_title("Source and target point clouds - low resolution")
+ax.set_title("Low resolution dataset:\n" \
+            +"Source (N={:,}) and target (M={:,}) point clouds".format(len(sources[0][0]), len(targets[0][0])))
+plt.tight_layout()
+
+# sphinx_gallery_thumbnail_number = 2
+fig = plt.figure(figsize=(12,12))
+ax = fig.add_subplot(1, 1, 1, projection='3d')
+display_cloud(ax, sources[2], 'red')
+display_cloud(ax, targets[2], 'blue')
+ax.set_title("Medium resolution dataset:\n" \
+            +"Source (N={:,}) and target (M={:,}) point clouds".format(len(sources[2][0]), len(targets[2][0])))
 plt.tight_layout()
 
 
+################################################################################
+# Benchmarks
+# ----------------------------
+#
+# 
+#
 
+maxtime = 100 if use_cuda else 1
 
-#############################################################
-# With 
+full_statistics(sources[0], targets[0], blur=.10, maxtime=maxtime)
 
+################################################################################
+#
 
-from pykeops.torch import LazyTensor
+full_statistics(sources[0], targets[0], blur=.01, maxtime=maxtime)
 
-def plan_marginals(blur, a_i, x_i, b_j, y_j, F_i, G_j) :
+################################################################################
+# Blabla
 
-    x_i = LazyTensor( x_i[:,None,:] )
-    y_j = LazyTensor( y_j[None,:,:] )
-    F_i = LazyTensor( F_i[:,None,None] )
-    G_j = LazyTensor( G_j[None,:,None] )
-
-    # Cost matrix:
-    C_ij = ((x_i - y_j) ** 2).sum(-1) / 2
-
-    # Scaled kernel matrix:
-    K_ij = (( F_i + G_j - C_ij ) / blur**2 ).exp()
-
-    A_i = a_i * (K_ij@b_j)      # First marginal
-    B_j = b_j * (K_ij.t()@a_i)  # Second marginal
-
-    return A_i, B_j
-
-def blurred_relative_error(blur, x_i, a_i, A_i):
-    x_j = LazyTensor( x_i[None,:,:] )
-    x_i = LazyTensor( x_i[:,None,:] )
-
-    C_ij = ((x_i - x_j) ** 2).sum(-1) / 2
-    K_ij = ( - C_ij / blur**2 ).exp()
-
-    squared_error = (A_i - a_i).dot( K_ij@(A_i - a_i) )
-    squared_norm  = a_i.dot( K_ij@a_i )
-
-    return ( squared_error / squared_norm ).sqrt()
-
-def marginal_error(blur, a_i, x_i, b_j, y_j, F_i, G_j, mode="blurred"):
-
-    A_i, B_j = plan_marginals(blur, a_i, x_i, b_j, y_j, F_i, G_j)
-
-    if mode == "TV":
-        # Return the (average) total variation error on the marginal constraints:
-        return ( (A_i - a_i).abs().sum() + (B_j - b_j).abs().sum() ) / 2
-    
-    elif mode == "blurred":
-        norm_x = blurred_relative_error(blur, x_i, a_i, A_i)
-        norm_y = blurred_relative_error(blur, y_j, b_j, B_j)
-        return ( norm_x + norm_y ) / 2
-
-    else:
-        raise NotImplementedError()
-
-
-
-def transport_cost(a_i, b_j, F_i, G_j):
-    return a_i.dot(F_i) + b_j.dot(G_j)
-
-def wasserstein_distance(a_i, b_j, F_i, G_j):
-    return (2 * transport_cost(a_i, b_j, F_i, G_j)).sqrt()
-
-
-def benchmark_solver(OT_solver, blur, source, target):
-    a_i, x_i = source
-    b_j, y_j = target
-
-    start = time.time()
-    F_i, G_j = OT_solver(a_i, x_i, b_j, y_j)
-    if use_cuda: torch.cuda.synchronize()
-    end = time.time()
-
-    return end - start, \
-           marginal_error(blur, a_i, x_i, b_j, y_j, F_i, G_j).item(), \
-           wasserstein_distance(a_i, b_j, F_i, G_j).item()
-        
-
-
-def benchmark_solvers(name, OT_solvers, source, target, ground_truth, 
-                      blur = .01, display=False, maxtime=None):
-
-    timings, errors, costs = [], [], []
-
-    print('Benchmarking the "{}" family of OT solvers:'.format(name))
-    for i, OT_solver in enumerate(OT_solvers):
-
-        timing, error, cost = benchmark_solver(OT_solver, blur, source, target)
-
-        timings.append(timing) ; errors.append(error) ; costs.append(cost)
-        print("{}-th solver : t = {:.4f}, error on the constraints = {:.3f}, cost = {:.6f}".format(
-                i+1, timing, error, cost))
-
-        if maxtime is not None and timing > maxtime:
-            not_performed = len(OT_solvers) - (i + 1)
-            timings += [np.nan] * not_performed
-            errors  += [np.nan] * not_performed
-            costs   += [np.nan] * not_performed
-            break
-
-    timings, errors, costs = np.array(timings), np.array(errors), np.array(costs)
-
-
-    if display: # Fancy display
-        fig = plt.figure(figsize=(12,8))
-
-        ax_1 = fig.subplots()
-        ax_1.set_title("Benchmarking \"{}\"\non a {:,}-by-{:,} entropic OT problem, with a blur radius of {:.3f}".format(
-            name, len(source[0]), len(target[0]), blur
-        ))
-        ax_1.set_xlabel("time (s)")
-
-        ax_1.plot(timings, errors, color="b")
-        ax_1.set_ylabel("Relative error on the marginal constraints", color="b")
-        ax_1.tick_params("y", colors="b") ; ax_1.set_ylim(bottom=0)
-
-        ax_2 = ax_1.twinx()
-
-        ax_2.plot(timings, abs(costs - ground_truth) / ground_truth, color="r")
-        ax_2.set_ylabel("Relative error on the cost value", color="r")
-        ax_2.tick_params("y", colors="r") ; ax_2.set_ylim(bottom=0)
-
-    return timings, errors, costs
-
-
-
-def sinkhorn_loop(a_i, x_i, b_j, y_j, blur = .01, nits = 100, backend = "keops"):
-
-    loga_i, logb_j = a_i.log(), b_j.log()
-    loga_i, logb_j = loga_i[:,None,None], logb_j[None,:,None]
-
-
-    if backend == "keops":
-        x_i, y_j = LazyTensor( x_i[:,None,:] ), LazyTensor( y_j[None,:,:] )
-        C_ij = ((x_i - y_j) ** 2).sum(-1) / 2
-        
-    elif backend == "pytorch":
-      
-        # C_ij = ((x_i[:,None,:] - y_j[None,:,:]) ** 2).sum(-1) / 2
-        D_xx = (x_i ** 2).sum(-1)[:,None]  # (N,1)
-        D_xy = x_i@y_j.t()   # (N,D)@(D,M) = (N,M)
-        D_yy = (y_j ** 2).sum(-1)[None,:]  # (1,M)
-        C_ij = (D_xx + D_yy) / 2 - D_xy
-
-        C_ij = C_ij[:,:,None]
-
-    eps = blur**2
-    F_i, G_j = torch.zeros_like(loga_i), torch.zeros_like(logb_j)
-
-    for _ in range(nits):
-        F_i = - ( (- C_ij / eps + (G_j + logb_j) ) ).logsumexp(dim=1)[:,None,:]
-        G_j = - ( (- C_ij / eps + (F_i + loga_i) ) ).logsumexp(dim=0)[None,:,:]
-
-    return eps * F_i, eps * G_j
-
-from functools import partial
-sinkhorn_solver = lambda blur, nits, backend: partial(sinkhorn_loop, blur=blur, nits=nits, backend=backend)
-
-
-
-def full_benchmark(source, target, blur, maxtime=None):
-
-    # Compute a suitable "ground truth"
-    OT_solver = SamplesLoss("sinkhorn", p=2, blur=blur,
-                            scaling=.999, debias=False, potentials=True)
-    _, _, ground_truth = benchmark_solver(OT_solver, blur, sources[0], targets[0])
-
-    results = {}
-
-    # Compute statistics for the three backends of GeomLoss: -------------------
-
-    for backend in ["multiscale", "online", "tensorized"]:
-        OT_solvers = [ SamplesLoss("sinkhorn", p=2, blur=blur, scaling=scaling,
-                                backend=backend, debias=False, potentials=True)
-                    for scaling in [.6, .7, .8, .9, .95, .99] ]
-
-        results[backend] = benchmark_solvers("GeomLoss "+backend, OT_solvers, 
-                                              source, target, ground_truth, 
-                                              blur = blur, display=True, maxtime=maxtime)
-
-
-    # Compute statistics for a naive Sinkhorn loop -----------------------------
-
-    for backend in ["pytorch", "keops"]:
-        OT_solvers = [ sinkhorn_solver(blur, nits = nits, backend = backend)
-                       for nits in [5, 10, 20, 50, 100, 200, 500, 1000] ]
-
-        results[backend] = benchmark_solvers("Sinkhorn loop - " + backend, OT_solvers, 
-                                                source, target, ground_truth, 
-                                                blur = blur, display=True, maxtime=maxtime)
-
-    
-from geomloss import SamplesLoss
-
-blur = .01
-results = full_benchmark(sources[0], targets[0], blur)
-
-
-
-if False:
-    # Creates a pyplot figure:
-    plt.figure()
-    linestyles = ["o-", "s-", "^-"]
-    for i, backend in enumerate(backends):
-        plt.plot( benches[:,0], benches[:,i+1], linestyles[i], 
-                    linewidth=2, label='backend="{}"'.format(backend) )
-
-    plt.title('Runtime for SamplesLoss("{}") in dimension {}'.format(Loss.loss, D))
-    plt.xlabel('Number of samples per measure')
-    plt.ylabel('Seconds')
-    plt.yscale('log') ; plt.xscale('log')
-    plt.legend(loc='upper left')
-    plt.grid(True, which="major", linestyle="-")
-    plt.grid(True, which="minor", linestyle="dotted")
-    plt.axis([ NS[0], NS[-1], 1e-3, MAXTIME ])
-    plt.tight_layout()
-
-    # Save as a .csv to put a nice Tikz figure in the papers:
-    header = "Npoints " + " ".join(backends)
-    np.savetxt("output/benchmark_"+Loss.loss+"_3D.csv", benches, 
-                fmt='%-9.5f', header=header, comments='')
+full_statistics(sources[2], targets[2], blur=.01, maxtime=maxtime)
 
 
 plt.show()
