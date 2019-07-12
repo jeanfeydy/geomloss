@@ -105,6 +105,12 @@ X_i_flip = X_i.reshape( ( len(X_i) , 20 , 3 ) )[:,::-1,:].copy().reshape( np.sha
 X_i = np.concatenate( ( X_i , X_i_flip ) , axis = 0 ) 
 X_i = torch.from_numpy( X_i ).type( dtype ).view( len(X_i), -1).contiguous()
 
+
+gamma = 3.
+X_i[ : , 0 ], X_i[ : , -1 ] = gamma * X_i[ : , 0 ] , gamma * X_i[ : , -1 ] 
+Y_j[ : , 0 ], Y_j[ : , -1 ] = gamma * Y_j[ : , 0 ] , gamma * Y_j[ : , -1 ] 
+
+
 N,M = len( X_i ), len( Y_j )
 print( 'data loaded.' )
 n_labels = lab_j.max() + 1
@@ -288,6 +294,7 @@ for i in range(10):
     new_lab = torch.cat((new_lab, new_lab_batch),0)
     value = torch.cat((value, value_batch),0)
 
+X_i[ : , 0 ], X_i[ : , -1 ] = X_i[ : , 0 ] / gamma ,  X_i[ : , -1 ] / gamma 
 
 new_lab[(value < 10**(-2)) ] = new_lab.max() + 1 #we add a new labels of outliers : fibers that were not assign during the OT. 
 save_tracts_labels_separate('Output/segmented_subject/labels_subject', X_i, new_lab, 0, new_lab.max() + 1) #save the data
