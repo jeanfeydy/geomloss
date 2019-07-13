@@ -223,7 +223,7 @@ def benchmark_solvers(name, OT_solvers, source, target, ground_truth,
 
     timings, errors, costs = [], [], []
     break_loop = False
-    print('Benchmarking the "{}" family of OT solvers:'.format(name))
+    print('Benchmarking the "{}" family of OT solvers - ground truth = {:.6f}:'.format(name, ground_truth))
     for i, OT_solver in enumerate(OT_solvers):
 
         try:
