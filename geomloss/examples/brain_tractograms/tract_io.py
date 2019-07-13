@@ -225,3 +225,32 @@ if __name__=="__main__":
 	save_vtk(file_name+'_resampled'+file_extension,np.array(resampled))
 	
 	sys.exit()
+
+
+
+def save_tract(x, fname, NPOINTS=20) :
+    tract = x.view(len(x), -1, 3) * np.sqrt(NPOINTS)
+    save_vtk(fname, tract.detach().cpu().numpy())
+    
+def save_tract_numpy(x, fname, NPOINTS=20):
+    tract = x.view(len(x), -1, 3) * np.sqrt(NPOINTS)
+    np.save(fname, np.float16(tract.detach().cpu().numpy()), allow_pickle = False, fix_imports = False)    
+    
+def save_tract_with_labels(fname, x , scalars, subsampling_fibers = None, NPOINTS=20):
+#save tracts +label information on each fiber
+    tract = x.view(len(x), -1, 3)* np.sqrt(NPOINTS)
+    tract = tract[0::subsampling_fibers,:,:]
+    nf,ns,d = tract.shape
+    labels = scalars.view(-1,1).repeat(1,ns)
+    save_vtk_labels(fname,tract.detach().cpu().numpy(),labels.view(-1).detach().cpu().numpy().astype(int))
+
+def save_tracts_labels_separate(fname, x , labels, start, end, NPOINTS=20):
+#save tracts +label information on each fiber
+    tract = x.view(len(x), -1, 3)* np.sqrt(NPOINTS)
+    for l in range(start, end):
+        if (labels == l).nonzero().shape[0] != 0: 
+            tract_l = tract[(labels == l).nonzero().view(-1),:,:]
+            save_vtk(fname+'_{:05d}.vtk'.format(l),tract_l.detach().cpu().numpy())
+        else: 
+            save_vtk(fname+'_{:05d}.vtk'.format(l),np.array([[0,0,0]]))
+            

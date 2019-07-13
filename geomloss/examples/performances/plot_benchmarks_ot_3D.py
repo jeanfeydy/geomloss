@@ -391,8 +391,6 @@ maxtime = 100 if use_cuda else 1
 full_statistics(sources[0], targets[0], blur=.10, maxtime=maxtime)
 
 
-full_statistics(sources[2], targets[2], blur=.10, maxtime=maxtime)
-
 ################################################################################
 # **Breakdown of the results.**
 # When the diameter-to-blur ratio :math:`D/\sigma` is of order 10, as is often the case in ML,

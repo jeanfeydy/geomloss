@@ -116,3 +116,6 @@ geomloss/examples/performances/output/*
 
 geomloss/examples/performances/data/*
 !geomloss/examples/performances/data/.gitkeep
+
+geomloss/examples/brain_tractograms/data/*
+!geomloss/examples/brain_tractograms/data/.gitkeep

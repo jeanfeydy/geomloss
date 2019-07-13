@@ -17,15 +17,12 @@ two fibers are compared with each other. They can be set according to anatomical
 #
 
 
-
-
-
 ##############################################
 # Setup
 # ---------------------
 #
 # Standard imports:
-from resampling_perc import read_vtk, streamlines_resample, save_vtk, save_vtk_labels
+
 import numpy as np
 import matplotlib.pyplot as plt
 import time
@@ -33,106 +30,124 @@ import torch
 from geomloss import SamplesLoss
 use_cuda = torch.cuda.is_available()
 dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
-dtypeint = torch.cuda.LongTensor if use_cuda else torch.LongTensor
+dtypeint = torch.cuda.LongTensor  if use_cuda else torch.LongTensor
 
 ###############################################
 #Loading and saving data routines
-#----------------------
+#----------------------------------------
+#
 
-NPOINTS = 20    #number of points per fiber. 
+NPOINTS = 20  # Number of points per fiber. 
 
-
-def save_tract(x, fname) :
-    tract = x.view(len(x), -1, 3) * np.sqrt(NPOINTS)
-    save_vtk(fname, tract.detach().cpu().numpy())
-    
-def save_tract_numpy(x, fname):
-    tract = x.view(len(x), -1, 3) * np.sqrt(NPOINTS)
-    np.save(fname, np.float16(tract.detach().cpu().numpy()), allow_pickle = False, fix_imports = False)    
-    
-def save_tract_with_labels(fname, x , scalars, subsampling_fibers = None):
-#save tracts +label information on each fiber
-    tract = x.view(len(x), -1, 3)* np.sqrt(NPOINTS)
-    tract = tract[0::subsampling_fibers,:,:]
-    nf,ns,d = tract.shape
-    labels = scalars.view(-1,1).repeat(1,ns)
-    save_vtk_labels(fname,tract.detach().cpu().numpy(),labels.view(-1).detach().cpu().numpy().astype(int))
-
-def save_tracts_labels_separate(fname, x , labels, start, end):
-#save tracts +label information on each fiber
-    tract = x.view(len(x), -1, 3)* np.sqrt(NPOINTS)
-    for l in range(start, end):
-        if (labels == l).nonzero().shape[0] != 0: 
-            tract_l = tract[(labels == l).nonzero().view(-1),:,:]
-            save_vtk(fname+'_{:05d}.vtk'.format(l),tract_l.detach().cpu().numpy())
-        else: 
-            save_vtk(fname+'_{:05d}.vtk'.format(l),np.array([[0,0,0]]))
-            
+from tract_io import read_vtk, streamlines_resample, save_vtk, save_vtk_labels
+from tract_io import save_tract, save_tract_numpy
+from tract_io import save_tract_with_labels, save_tracts_labels_separate
 
 ##############################################
 # Dataset
 # ---------------------
+#
+# Fetch data from the KeOps website:
+
+import os
+
+def fetch_file(name):
+    if not os.path.exists(f'data/{name}.npy'):
+        import urllib.request
+        print("Fetching the atlas... ", end="", flush=True)
+        urllib.request.urlretrieve(
+            f'https://www.kernel-operations.io/data/{name}.npy', 
+            f'data/{name}.npy')
+        print("Done.")
+
+fetch_file("tracto_atlas")
+fetch_file("atlas_labels")
+fetch_file("tracto1")
+
+###############################################################################
 # Each fiber is sampled with 20 points in R^3. 
 # Thus, one tractogram is a matrix of size n x 60 where n is the number of fibers
 # The atlas is labelled, wich means that each fiber belong to a cluster. 
 # This is summarized by the vector lab_j of size n x 1. lab_j[i] is the label of the fiber i. 
+# Subsample the data by a factor 4 if you want to reduce the computational time:
 
-if True:
-    subsample = 4 #subsample the data by a factor 4 if you want to reduce the computational time 
-else: 
-    subsample = 1
-    
+subsample = 4 if True else 1    
 
+###############################################################################
+# 
+# Load atlas (segmented, each fiber has a label):
 
-#Load atlas (segmented, each fiber has a label)
-Y_j, lab_j = (np.load( "Data/tracto_atlas.npy")  / np.sqrt(NPOINTS))[::subsample,:] , np.load("Data/atlas_labels.npy" )[::subsample]
+Y_j   = np.load("data/tracto_atlas.npy")[::subsample, :]  / np.sqrt(NPOINTS)
+lab_j = np.load("data/atlas_labels.npy")[::subsample]
 
 ##############################################
-#fibers do not have a canonical orientation. Since our ground distance is a simple
+# Fibers do not have a canonical orientation. Since our ground distance is a simple
 # L2-distance on the sampled fibers, we augment the dataset with the mirror flip 
-#of all fibers and perform the OT on this augmented dataset.
+# of all fibers and perform the OT on this augmented dataset.
     
-Y_j_flip = Y_j.reshape( ( len(Y_j) , 20 , 3 ) )[:,::-1,:].copy().reshape( np.shape( Y_j ) )
-Y_j, lab_j = np.concatenate( ( Y_j , Y_j_flip ) , axis = 0 ) , np.concatenate( ( lab_j , lab_j ) , axis = 0 )
-Y_j, lab_j = torch.from_numpy( Y_j ).type( dtype ).view( len(Y_j), -1 ).contiguous() , torch.from_numpy( lab_j ).type( dtypeint ).contiguous()
-nf_j = len( Y_j ) // 2
+Y_j_flip = Y_j.reshape( (-1, NPOINTS, 3) )[:,::-1,:].copy().reshape( Y_j.shape )
 
+##############################################
+# 
 
-#Load a new subject (unlabelled)
-X_i = ( np.load( "Data/tracto1.npy" ) / np.sqrt(NPOINTS) )[::subsample,:]#load the unlabeled fibers
-#add the flip:
-X_i_flip = X_i.reshape( ( len(X_i) , 20 , 3 ) )[:,::-1,:].copy().reshape( np.shape(X_i) ) 
-X_i = np.concatenate( ( X_i , X_i_flip ) , axis = 0 ) 
+Y_j   = np.concatenate( (Y_j,   Y_j_flip), axis = 0)
+lab_j = np.concatenate( (lab_j, lab_j),    axis = 0)
+
+##############################################
+# 
+
+Y_j   = torch.from_numpy( Y_j   ).type( dtype ).view( len(Y_j), -1 ).contiguous()
+lab_j = torch.from_numpy( lab_j ).type( dtypeint ).contiguous()
+nf_j  = len( Y_j ) // 2
+
+##############################################
+# Load a new subject (unlabelled)
+#
+
+# load the unlabeled fibers
+X_i = ( np.load( "data/tracto1.npy" ) / np.sqrt(NPOINTS) )[::subsample,:]
+# add the flip:
+X_i_flip = X_i.reshape( (-1, NPOINTS, 3) )[:,::-1,:].copy().reshape( X_i.shape ) 
+X_i = np.concatenate( (X_i, X_i_flip), axis = 0) 
 X_i = torch.from_numpy( X_i ).type( dtype ).view( len(X_i), -1).contiguous()
 
+##############################################
+# Add some weight on both ends of our fibers:
+#
 
 gamma = 3.
-X_i[ : , 0 ], X_i[ : , -1 ] = gamma * X_i[ : , 0 ] , gamma * X_i[ : , -1 ] 
-Y_j[ : , 0 ], Y_j[ : , -1 ] = gamma * Y_j[ : , 0 ] , gamma * Y_j[ : , -1 ] 
+X_i[:, 0], X_i[:, -1] = gamma * X_i[:, 0] , gamma * X_i[:, -1] 
+Y_j[:, 0], Y_j[:, -1] = gamma * Y_j[:, 0] , gamma * Y_j[:, -1] 
 
+##############################################
+# 
 
-N,M = len( X_i ), len( Y_j )
-print( 'data loaded.' )
+N, M = len( X_i ), len( Y_j )
+print("Data loaded.")
+
 n_labels = lab_j.max() + 1
 
 
 
 ##############################################
-#Pre processing for the multi-scale      
-# ---------------------
+# Pre processing for the multi-scale      
+# --------------------------------------
+#
 # To use the multiscale version of the regularized OT, 
 # we need to have a cluster of our input data (atlas and new subject).
-#For the atlas, the cluster is given by the segmentation. We use a Kmeans to 
-#separate the fibers and the flips within a cluser, in order to have clusters whose fibers have similar
-#orientation
+# For the atlas, the cluster is given by the segmentation. We use a Kmeans to 
+# separate the fibers and the flips within a cluser, in order to have clusters whose fibers have similar
+# orientation
 #
 
 from pykeops.torch import generic_argmin
 
+############################################################################################
+# Kmeans adapted on our labeled atlas (estimate centroids + labels given the initial segmented atlas)
+# number of clusters : twice the number of labels (since we augmented the data with the flips)   
+# We perform this in order to have clusters with the same orientation. 
+#
 
-#Kmeans adapted on our labeled atlas (estimate centroids + labels given the initial segmented atlas)
-#number of clusters : twice the number of labels (since we augmented the data with the flips)   
-#We perform this in order to have clusters with the same orientation. 
 def KMeans_atlas(x, lab, nf, Niter = 10, verbose = True):
     N, D = x.shape  # Number of samples, dimension of the ambient space
     nn_search = generic_argmin(  # Argmin reduction for generic formulas:
@@ -170,8 +185,9 @@ def KMeans_atlas(x, lab, nf, Niter = 10, verbose = True):
 
 
 ##############################################
-#For new subject (unlabelled), we perform a simple Kmean
+# For new subject (unlabelled), we perform a simple Kmean
 # on R^60 to obtain a cluster of the data.
+#
 
 
 #KMeans on the data with flips
@@ -222,8 +238,9 @@ print("K means Done.")
 
 
 ##############################################
-#Compute the OT plan with the multiscale algorithm    
-# ---------------------
+# Compute the OT plan with the multiscale algorithm    
+# ------------------------------------------------------
+#
 # To use the **multiscale** Sinkhorn algorithm,
 # we should simply provide:
 #
@@ -235,6 +252,7 @@ print("K means Done.")
 blur = 3.
 Loss =  SamplesLoss("sinkhorn", p=2, blur= blur, reach = 20,  scaling=.9, cluster_scale = max(std_i,std_j), debias = False, potentials = True, verbose=True) 
 
+############################################################################################
 # To specify explicit cluster labels, SamplesLoss also requires
 # explicit weights. Let's go with the default option - a uniform distribution:
 
@@ -251,11 +269,11 @@ print('OT computed in  in {:.3f}s.'.format(end-start))
 
 
 ##############################################
-#Use the OT to perform thes label transfer
+# Use the OT to perform thes label transfer
 # ---------------------
-#The transport plan pi_{i,j} gives the probability for 
-#a fiber i of the subject to be assigned to the (labeled) fiber j of the atlas.
-#We assign a label l to the fiber i as the label with maximum probability for all the soft assignement of i. 
+# The transport plan pi_{i,j} gives the probability for 
+# a fiber i of the subject to be assigned to the (labeled) fiber j of the atlas.
+# We assign a label l to the fiber i as the label with maximum probability for all the soft assignement of i. 
 
 X_i = X_i[:len(X_i)//2,:]#return to the original data (unflipped)
 N_batch = len(X_i) // 10
