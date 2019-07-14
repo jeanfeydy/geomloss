@@ -36,11 +36,58 @@ Alternatively, you may:
 
 
 
-Build the documentation
---------------------------
 
-This website was generated on a `free Google Colab session <https://colab.research.google.com/>`_.
+Build the documentation on Google Cloud
+-----------------------------------------
+
+For each release, this website is generated on a fresh `Google Compute session <https://cloud.google.com/compute>`_,
+cloning the reference "NVidia/Pytorch" model (to get the correct drivers) on a machine with
+8 CPUs and a single V100 GPU (the default configuration - you should
+get similar levels of performance with an RTX 2080 card, which is much cheaper!).
 To reproduce our results and benchmarks, feel free to create
+a new GPE session and to type the following instructions in the SSH prompt::
+
+    # Install nvcc:
+    sudo apt install nvidia-cuda-toolkit
+
+    # Install pip and the necessary packages to run all tutorials:
+    sudo apt install python3-pip
+    pip3 install numpy GPUtil cmake ninja sklearn scipy imageio
+    pip3 install torch torchvision
+    pip3 install dipy nibabel vtk
+    pip3 install sphinx sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme plyfile >> install.log
+    
+    # Clone the latest versions of keops and geomloss, adding them to the path
+    git clone --quiet --recursive https://github.com/getkeops/keops.git keops/  >> install.log
+    git clone --quiet  https://github.com/jeanfeydy/geomloss.git geomloss/  >> install.log
+    echo "export PYTHONPATH=$PYTHONPATH:~/keops/:~/geomloss/" >> ~/.bashrc
+    
+    # Launch a "detachable" session:
+    tmux
+    cd geomloss/doc
+    
+    # Run the doc once to compile all the KeOps routines:
+    make html
+    # Clean up everything...
+    make clean
+    # And re-run all scripts to get the correct timings:
+    make html
+
+    # Zip everything into an archive:
+    sudo apt install zip
+    zip -r geomloss_documentation.zip _build/
+
+    # On the *local* machine: download the zipped documentation.
+    # Typically, with a properly configured "gcloud" command:
+    gcloud compute scp root@nvidia-gpu-cloud-pytorch-image-1-vm:/home/jean_feydy/geomloss/doc/geomloss_documentation.zip ~
+
+
+
+Build the documentation on Google Colab
+-----------------------------------------
+
+Alternatively, you may also generate this website on a `free Google Colab session <https://colab.research.google.com/>`_.
+To reproduce our results (with longer runtimes), please create
 a new Colab notebook and to type the following instructions in the first few cells::
 
     # Mount Google drive to save the final documentation
