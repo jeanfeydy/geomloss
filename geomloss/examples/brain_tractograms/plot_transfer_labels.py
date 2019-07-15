@@ -1,6 +1,6 @@
 """
-Fast and Scalable Optimal Transport for Brain Tractograms: Application to Labels Transfer
-==================================
+Transferring labels from a segmented atlas
+=============================================
 
 We use a new multiscale algorithm for solving regularized Optimal Transport 
 problems on the GPU, with a linear memory footprint. 
@@ -10,11 +10,6 @@ segmentation of fiber tractograms. The parameters -- \emph{blur} and \emph{reach
 of our method are meaningful, defining the minimum and maximum distance at which 
 two fibers are compared with each other. They can be set according to anatomical knowledge.
 """
-##################################################
-#
-# Multiscale Optimal Transport
-# -----------------------------
-#
 
 
 ##############################################
@@ -33,11 +28,8 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 dtypeint = torch.cuda.LongTensor  if use_cuda else torch.LongTensor
 
 ###############################################
-#Loading and saving data routines
-#----------------------------------------
+# Loading and saving data routines
 #
-
-NPOINTS = 20  # Number of points per fiber. 
 
 from tract_io import read_vtk, streamlines_resample, save_vtk, save_vtk_labels
 from tract_io import save_tract, save_tract_numpy
@@ -64,6 +56,94 @@ fetch_file("tracto_atlas")
 fetch_file("atlas_labels")
 fetch_file("tracto1")
 
+
+##############################################
+# Fibers do not have a canonical orientation. Since our ground distance is a simple
+# L2-distance on the sampled fibers, we augment the dataset with the mirror flip 
+# of all fibers and perform the OT on this augmented dataset.
+
+def torch_load(X, dtype=dtype):
+    return torch.from_numpy(X).type(dtype).contiguous()
+
+
+def add_flips(X):
+    """Adds flips and loads on the GPU the input fiber track."""
+    X_flip = X[:,::-1,:].copy()
+    X = torch.stack((X, X_flip), dim=1)  # (Nfibers, 2, NPOINTS, 3)
+    return X
+
+###############################################################################
+# Source atlas 
+# ~~~~~~~~~~~~~~~~~~~
+#
+# Load atlas (segmented, each fiber has a label):
+
+Y_j   = torch_load( np.load("data/tracto_atlas.npy") )
+lab_j = torch_load( np.load("data/atlas_labels.npy"), dtype=dtypeint )
+
+###############################################################################
+#
+
+M, NPOINTS = Y_j.shape[0], Y_j.shape[1] / 3  # Number of fibers, points per fiber
+
+###############################################################################
+#
+
+Y_j = Y_j.view(M, NPOINTS, 3) / np.sqrt(NPOINTS)
+
+###############################################################################
+#
+
+Y_j = add_flips(Y_j)  # Shape (M, 2, NPOINTS, 3)
+
+##############################################
+# Target subject
+# ~~~~~~~~~~~~~~~~~~~~
+#
+# Load a new subject (unlabelled)
+#
+
+X_i = np.load("data/tracto1.npy")
+N, NPOINTS_i = X_i.shape[0], X_i.shape[1] / 3  # Number of fibers, points per fiber
+
+if NPOINTS != NPOINTS_i:
+    raise ValueError("The atlas and the subject are not sampled with the same number of points: "
+                    +f"{NPOINTS} and {NPOINTS_i}, respectively.")
+
+X_i = X_i.view(N, NPOINTS, 3) / np.sqrt(NPOINTS)
+X_i = add_flips(X_i)  # Shape (N, 2, NPOINTS, 3)
+
+
+##############################################
+# Feature engineering 
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Add some weight on both ends of our fibers:
+#
+
+gamma = 3.
+X_i[:,:,0,:] *= gamma ;  X_i[:,:,-1,:] *= gamma
+Y_j[:,:,0,:] *= gamma ;  Y_j[:,:,-1,:] *= gamma
+
+
+###############################################################################
+# Optimizing performances
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Contiguous memory accesses are critical for performances on the GPU.
+# 
+
+from pykeops.torch.cluster import sort_clusters, cluster_ranges
+
+ranges_j   = cluster_ranges(lab_j)      # Ranges for all clusters
+Y_j, lab_j = sort_clusters(Y_j, lab_j)  # Make sure that all clusters are contiguous in memory
+
+C = len(ranges_j)  # Number of classes
+
+for j, (start_j, end_j) in enumerate(ranges_j):
+    if start_j >= end_j:
+        raise ValueError(f"The {j}-th cluster of the atlas seems to be empty.")
+
 ###############################################################################
 # Each fiber is sampled with 20 points in R^3. 
 # Thus, one tractogram is a matrix of size n x 60 where n is the number of fibers
@@ -71,66 +151,37 @@ fetch_file("tracto1")
 # This is summarized by the vector lab_j of size n x 1. lab_j[i] is the label of the fiber i. 
 # Subsample the data by a factor 4 if you want to reduce the computational time:
 
-subsample = 4 if True else 1    
+subsample = 20 if True else 1    
 
-###############################################################################
-# 
-# Load atlas (segmented, each fiber has a label):
-
-Y_j   = np.load("data/tracto_atlas.npy")[::subsample, :]  / np.sqrt(NPOINTS)
-lab_j = np.load("data/atlas_labels.npy")[::subsample]
-
-##############################################
-# Fibers do not have a canonical orientation. Since our ground distance is a simple
-# L2-distance on the sampled fibers, we augment the dataset with the mirror flip 
-# of all fibers and perform the OT on this augmented dataset.
-    
-Y_j_flip = Y_j.reshape( (-1, NPOINTS, 3) )[:,::-1,:].copy().reshape( Y_j.shape )
 
 ##############################################
 # 
 
-Y_j   = np.concatenate( (Y_j,   Y_j_flip), axis = 0)
-lab_j = np.concatenate( (lab_j, lab_j),    axis = 0)
+to_keep = []
+for start_j, end_j in ranges_j:
+    to_keep += list(range(start_j, end_j, subsample))
+
+Y_j, lab_j = Y_j[to_keep].contiguous(), lab_j[to_keep].contiguous()
+
 
 ##############################################
 # 
 
-Y_j   = torch.from_numpy( Y_j   ).type( dtype ).view( len(Y_j), -1 ).contiguous()
-lab_j = torch.from_numpy( lab_j ).type( dtypeint ).contiguous()
-nf_j  = len( Y_j ) // 2
+X_i = X_i[::subsample].contiguous()
 
-##############################################
-# Load a new subject (unlabelled)
-#
-
-# load the unlabeled fibers
-X_i = ( np.load( "data/tracto1.npy" ) / np.sqrt(NPOINTS) )[::subsample,:]
-# add the flip:
-X_i_flip = X_i.reshape( (-1, NPOINTS, 3) )[:,::-1,:].copy().reshape( X_i.shape ) 
-X_i = np.concatenate( (X_i, X_i_flip), axis = 0) 
-X_i = torch.from_numpy( X_i ).type( dtype ).view( len(X_i), -1).contiguous()
-
-##############################################
-# Add some weight on both ends of our fibers:
-#
-
-gamma = 3.
-X_i[:, 0], X_i[:, -1] = gamma * X_i[:, 0] , gamma * X_i[:, -1] 
-Y_j[:, 0], Y_j[:, -1] = gamma * Y_j[:, 0] , gamma * Y_j[:, -1] 
 
 ##############################################
 # 
 
-N, M = len( X_i ), len( Y_j )
+N, M = len(X_i), len(Y_j)
+
 print("Data loaded.")
 
-n_labels = lab_j.max() + 1
 
 
 
 ##############################################
-# Pre processing for the multi-scale      
+# Pre-computing cluster prototypes     
 # --------------------------------------
 #
 # To use the multiscale version of the regularized OT, 
@@ -149,7 +200,10 @@ from pykeops.torch import generic_argmin
 #
 
 def KMeans_atlas(x, lab, nf, Niter = 10, verbose = True):
-    N, D = x.shape  # Number of samples, dimension of the ambient space
+
+    C = lab.max() + 1  # Number of classes in the atlas
+    N, D = x.shape     # Number of fibers, dimension of the feature space (~20*3 = 60)
+
     nn_search = generic_argmin(  # Argmin reduction for generic formulas:
         'SqDist(x,y)',           # A simple squared L2 distance
         'ind = Vi(1)',           # Output one index per "line" (reduction over "j")
@@ -157,20 +211,28 @@ def KMeans_atlas(x, lab, nf, Niter = 10, verbose = True):
         'y = Vj({})'.format(D))  # 2nd arg: one point per "column"
 
 
-    #centroids:
-    c_j = torch.zeros(lab.max()+1,x.shape[1]).type_as(x)
-    c_j_flip = torch.zeros(lab.max()+1,x.shape[1]).type_as(x)
+    # Centroids:
+    c_j      = torch.zeros(C, D).type_as(x)
+    c_j_flip = torch.zeros(C, D).type_as(x)
     
-    cl_j = torch.zeros(len(x)).type(dtypeint)
+    # Labels:
+    cl_j = torch.zeros(N).type(dtypeint)
     nf_visited = 0
-    for l in range(lab.max() + 1):  # loop on the labels
-        i_l = (lab == l).nonzero()
+
+    for l in range(C):  # Loop on the labels
+        i_l  = (lab == l).nonzero()
         nf_l = len(i_l)
-        #careful initialization of the centroids : one for the original fibers, one for the flips taken in the dataset:
+
+        # Careful initialization of the centroids: 
+        # - one for the original fibers
+        # - one for the flips taken in the dataset
         c_l, c_l_flip  = x[i_l[0],:], x[nf + i_l[0],:]
-        fibers, fibers_flip = x[i_l.view(-1),:], x[nf + i_l.view(-1),:] #fibers and mirror flips in the current label
+
+        # Fibers and mirror flips in the current label:
+        fibers, fibers_flip = x[i_l.view(-1),:], x[nf + i_l.view(-1),:] 
         y = torch.cat((fibers,fibers_flip),0) 
         c = torch.cat((c_l,c_l_flip),0) 
+
         for i in range(Niter): #Kmeans estimation with two classes : one original, one flip. 
             cl  = nn_search(y,c).view(-1)  # Points -> Nearest cluster
             Ncl = torch.bincount(cl).type(dtype)  # Class weights
@@ -225,7 +287,7 @@ def KMeans_withflip(x, K, Niter= 10, verbose = True):
     return cl, c
 
 # Perform the computation:
-cl_j, c_j = KMeans_atlas(Y_j,lab_j[:len(lab_j)//2],nf_j)
+cl_j,  c_j = KMeans_atlas(Y_j,lab_j[:len(lab_j)//2],nf_j)
 lab_i, c_i = KMeans_withflip(X_i, K = 1000)
 print("Computed.")
 
