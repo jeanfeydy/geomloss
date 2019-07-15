@@ -30,6 +30,24 @@ import matplotlib.pyplot as plt
 # In this tutorial, we work with square images
 # understood as densities on the unit square.
 
+
+import os
+
+def fetch_file(name):
+    if not os.path.exists(f'data/{name}'):
+        import urllib.request
+        print("Fetching the atlas... ", end="", flush=True)
+        urllib.request.urlretrieve(
+            f'https://www.kernel-operations.io/data/{name}', 
+            f'data/{name}')
+        print("Done.")
+
+for i in range(5):
+    fetch_file(f"manual_ifof{i+1}.nii")
+
+
+
+
 affine_transform = nib.load('Data_MRI/manual_ifof1.nii').affine
 
 def load_data_nii(fname):

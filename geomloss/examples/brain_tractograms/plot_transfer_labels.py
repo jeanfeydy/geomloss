@@ -184,6 +184,71 @@ print("Data loaded.")
 # Pre-computing cluster prototypes     
 # --------------------------------------
 #
+
+from pykeops.torch import LazyTensor
+
+def nn_search(x_i, y_j, ranges = None):
+    x_i = LazyTensor( x_i[:,None,:] )  # Broadcasted "line" variable
+    y_j = LazyTensor( y_j[None,:,:] )  # Broadcasted "column" variable
+
+    D_ij = ((x_i - y_j) ** 2).sum(-1)  # Symbolic matrix of squared distances
+    D_ij.ranges = ranges  # Apply our block-sparsity pattern
+
+    return D_ij.argmin(dim=1)
+
+
+################################################################################
+# K-Means loop:
+#
+
+def KMeans(x_i, c_j, Nits = 10, ranges = None):
+
+    D = x_i.shape[1]
+    for i in range(10):
+        # Points -> Nearest cluster
+        labs_i = nn_search(x_i, c_j, ranges = ranges)
+        # Class cardinals:
+        Ncl = torch.bincount(labs_i).type(dtype)
+
+        # Compute the cluster centroids with torch.bincount:
+        for d in range(D):  # Unfortunately, vector weights are not supported...
+            c_j[:, d] = torch.bincount(labs_i, weights=x_i[:, d]) / Ncl
+    
+    return c_j, labs_i
+
+
+##############################################
+# On the subject
+# ~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# For new subject (unlabelled), we perform a simple Kmean
+# on R^60 to obtain a cluster of the data.
+#
+
+K = 1000
+
+# Pick K fibers at random:
+perm = torch.randperm(N)
+random_labels = perm[:K]
+C_i = X_i[random_labels] # (K, 2, NPOINTS, 3)
+
+# Reshape our data as "N-by-60" tensors:
+C_i_flat = C_i.view(K * 2, NPOINTS * 3)  # Flattened list of centroids
+X_i_flat = X_i.view(N * 2, NPOINTS * 3)  # Flattened list of fibers
+
+# Retrieve our new centroids:
+C_i_flat, labs_i = KMeans(X_i_flat, C_i_flat)
+C_i = C_i_flat.view(N, 2, NPOINTS, 3)
+
+# Standard deviation of our clusters:
+std_i = (( X_i - C_i[labs_i] ) ** 2).sum([1,2,3]).mean().sqrt()
+
+
+############################################################################################
+#
+# On the atlas
+# ~~~~~~~~~~~~~~~~~~~~~~~
+#
 # To use the multiscale version of the regularized OT, 
 # we need to have a cluster of our input data (atlas and new subject).
 # For the atlas, the cluster is given by the segmentation. We use a Kmeans to 
@@ -191,115 +256,37 @@ print("Data loaded.")
 # orientation
 #
 
-from pykeops.torch import generic_argmin
+ranges_yi = 2 * ranges_j
+
+ranges_cj = 2 * torch.arange(C)
+ranges_cj = torch.stack((ranges_cj, ranges_cj + 2)).t().contiguous()
+
+from pykeops.torch.cluster import from_matrix
+
+ranges_yi_cj = from_matrix(ranges_yi, ranges_cj, torch.eye(C) )
+
+
+################################################################################
+# Pick one unoriented (i.e. two oriented) fibers per class:
+
+first_labels = ranges_j[:,0]  # One label per class
+
+C_j      = Y_j[first_labels]             # (C, 2, NPOINTS, 3)
+C_j_flat = C_j.view(C * 2, NPOINTS * 3)  # Flattened list of centroids
 
 ############################################################################################
-# Kmeans adapted on our labeled atlas (estimate centroids + labels given the initial segmented atlas)
-# number of clusters : twice the number of labels (since we augmented the data with the flips)   
-# We perform this in order to have clusters with the same orientation. 
 #
 
-def KMeans_atlas(x, lab, nf, Niter = 10, verbose = True):
+Y_j_flat = Y_j.view(M * 2, NPOINTS * 3)
 
-    C = lab.max() + 1  # Number of classes in the atlas
-    N, D = x.shape     # Number of fibers, dimension of the feature space (~20*3 = 60)
+C_j_flat, labs_j = KMeans(Y_j_flat, C_j_flat, ranges = ranges_yi_cj)
+C_j = C_j_flat.view(C, 2, NPOINTS, 3)
 
-    nn_search = generic_argmin(  # Argmin reduction for generic formulas:
-        'SqDist(x,y)',           # A simple squared L2 distance
-        'ind = Vi(1)',           # Output one index per "line" (reduction over "j")
-        'x = Vi({})'.format(D),  # 1st arg: one point per "line"
-        'y = Vj({})'.format(D))  # 2nd arg: one point per "column"
-
-
-    # Centroids:
-    c_j      = torch.zeros(C, D).type_as(x)
-    c_j_flip = torch.zeros(C, D).type_as(x)
-    
-    # Labels:
-    cl_j = torch.zeros(N).type(dtypeint)
-    nf_visited = 0
-
-    for l in range(C):  # Loop on the labels
-        i_l  = (lab == l).nonzero()
-        nf_l = len(i_l)
-
-        # Careful initialization of the centroids: 
-        # - one for the original fibers
-        # - one for the flips taken in the dataset
-        c_l, c_l_flip  = x[i_l[0],:], x[nf + i_l[0],:]
-
-        # Fibers and mirror flips in the current label:
-        fibers, fibers_flip = x[i_l.view(-1),:], x[nf + i_l.view(-1),:] 
-        y = torch.cat((fibers,fibers_flip),0) 
-        c = torch.cat((c_l,c_l_flip),0) 
-
-        for i in range(Niter): #Kmeans estimation with two classes : one original, one flip. 
-            cl  = nn_search(y,c).view(-1)  # Points -> Nearest cluster
-            Ncl = torch.bincount(cl).type(dtype)  # Class weights
-            for d in range(D):  # Compute the cluster centroids with torch.bincount:
-                c[:, d] = torch.bincount(cl, weights=y[:, d]) / Ncl
-        c_j[l,:], c_j_flip[l,:] = c[0,:], c[1,:]   #update the centroids (original and flip)
-        cl_j[ torch.cat((i_l.view(-1), i_l.view(-1) + nf), 0)] = l*(1-cl) + cl*(l+lab.max()+1) #update the classes (original and flips)
-        nf_visited = nf_visited + 2*nf_l
-        print(l)
-        print('fibers labeled = ', nf_visited)
-    return cl_j, torch.cat((c_j,c_j_flip),0)
-
-
-##############################################
-# For new subject (unlabelled), we perform a simple Kmean
-# on R^60 to obtain a cluster of the data.
-#
-
-
-#KMeans on the data with flips
-def KMeans_withflip(x, K, Niter= 10, verbose = True):
-    N, D = x.shape  # Number of samples, dimension of the ambient space
-    
-    # Define our KeOps CUDA kernel:Y_j,lab_j = import_tract_with_labels('k_means_atlas_left.vtk')
-    nn_search = generic_argmin(  # Argmin reduction for generic formulas:
-        'SqDist(x,y)',           # A simple squared L2 distanceY_j, lab_j
-        'ind = Vi(1)',           # Output one index per "line" (reduction over "j")
-        'x = Vi({})'.format(D),  # 1st arg: one point per "line"
-        'y = Vj({})'.format(D))  # 2nd arg: one point per "column"
-
-    # K-means loop:
-    # - x  is the point cloud, 
-    # - cl is the vector of class labels
-    # - c  is the cloud of cluster centroids
-    start = time.time()
-
-    # Simplistic random initialization for the cluster centroids:
-    perm = torch.randperm(N // 2)
-    idx = perm[:K]
-    #initialize centroids carefully with the flips (same random initialization for the original data and the flips)
-    c = torch.cat((x[idx, :].clone(), x[N // 2 + idx, :].clone()),0)
-
-    for i in range(Niter):
-        cl  = nn_search(x,c).view(-1)  # Points -> Nearest cluster
-        Ncl = torch.bincount(cl).type(dtype)  # Class weights
-        for d in range(D):  # Compute the cluster centroids with torch.bincount:
-            c[:, d] = torch.bincount(cl, weights=x[:, d]) / Ncl
-    if use_cuda: torch.cuda.synchronize()
-    end = time.time()
-    if verbose: print("KMeans performed in {:.3f}s.".format(end-start))
-
-    return cl, c
-
-# Perform the computation:
-cl_j,  c_j = KMeans_atlas(Y_j,lab_j[:len(lab_j)//2],nf_j)
-lab_i, c_i = KMeans_withflip(X_i, K = 1000)
-print("Computed.")
-
-#standard deviation of the clusters size
-std_i = (( X_i - c_i[lab_i, :] )**2).sum(1).mean().sqrt()
-std_j = (( Y_j - c_j[cl_j , :] )**2).sum(1).mean().sqrt()
-
-print("K means Done.")
+std_j = (( Y_j - C_j[labs_j] ) ** 2).sum([1,2,3]).mean().sqrt()
 
 
 
-##############################################
+########################################################
 # Compute the OT plan with the multiscale algorithm    
 # ------------------------------------------------------
 #
@@ -312,34 +299,43 @@ print("K means Done.")
 #   of the data.
 #
 blur = 3.
-Loss =  SamplesLoss("sinkhorn", p=2, blur= blur, reach = 20,  scaling=.9, cluster_scale = max(std_i,std_j), debias = False, potentials = True, verbose=True) 
+OT_solver =  SamplesLoss("sinkhorn", p=2, blur=blur, reach=20,  
+                         scaling=.9, cluster_scale = max(std_i,std_j), 
+                         debias=False, potentials=True, verbose=True) 
 
 ############################################################################################
 # To specify explicit cluster labels, SamplesLoss also requires
 # explicit weights. Let's go with the default option - a uniform distribution:
 
-a_i = torch.ones(N).type(dtype) / N
-b_j = torch.ones(M).type(dtype) / M
+a_i = torch.ones(2 * N).type(dtype) / (2 * N)
+b_j = torch.ones(2 * M).type(dtype) / (2 * M)
 
 start = time.time()
+
+# Compute the dual vectors F_i and G_j:
 # 6 args -> labels_i, weights_i, locations_i, labels_j, weights_j, locations_j
-F_i, G_j = Loss( lab_i, a_i, X_i , cl_j, b_j, Y_j ) #Compute the dual vectors F_i and G_j
+F_i, G_j = Loss(labs_i, a_i, X_i.view(N * 2, NPOINTS * 3), 
+                labs_j, b_j, Y_j.view(M * 2, NPOINTS * 3)) 
+
 if use_cuda: torch.cuda.synchronize()
 end = time.time()
 
-print('OT computed in  in {:.3f}s.'.format(end-start))
+print("OT computed in  in {:.3f}s.".format(end-start))
 
 
 ##############################################
-# Use the OT to perform thes label transfer
-# ---------------------
+# Use the OT to perform the transfer of labels
+# ----------------------------------------------
+# 
 # The transport plan pi_{i,j} gives the probability for 
 # a fiber i of the subject to be assigned to the (labeled) fiber j of the atlas.
 # We assign a label l to the fiber i as the label with maximum probability for all the soft assignement of i. 
 
-X_i = X_i[:len(X_i)//2,:]#return to the original data (unflipped)
-N_batch = len(X_i) // 10
-F_i = F_i[:len(F_i)//2]
+# Return to the original data (unflipped)
+X_i = X_i[:,0,:,:].contiguous()
+F_i = F_i[::2].contiguous()
+
+N_batch = N // 10
 new_lab = torch.zeros(0).cuda().type(dtypeint) #label assignement 
 value = torch.zeros(0).cuda()
 
