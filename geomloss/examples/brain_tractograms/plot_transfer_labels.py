@@ -79,7 +79,7 @@ def add_flips(X):
 # Load atlas (segmented, each fiber has a label):
 
 Y_j   = torch_load( np.load("data/tracto_atlas.npy") )
-lab_j = torch_load( np.load("data/atlas_labels.npy"), dtype=dtypeint )
+labels_j = torch_load( np.load("data/atlas_labels.npy"), dtype=dtypeint )
 
 ###############################################################################
 #
@@ -135,10 +135,13 @@ Y_j[:,:,0,:] *= gamma ;  Y_j[:,:,-1,:] *= gamma
 
 from pykeops.torch.cluster import sort_clusters, cluster_ranges
 
-ranges_j   = cluster_ranges(lab_j)      # Ranges for all clusters
-Y_j, lab_j = sort_clusters(Y_j, lab_j)  # Make sure that all clusters are contiguous in memory
+ranges_j   = cluster_ranges(labels_j)         # Ranges for all clusters
+Y_j, labels_j = sort_clusters(Y_j, labels_j)  # Make sure that all clusters are contiguous in memory
 
 C = len(ranges_j)  # Number of classes
+
+if C != labels_j.max() + 1:
+    raise ValueError("???")
 
 for j, (start_j, end_j) in enumerate(ranges_j):
     if start_j >= end_j:
@@ -148,7 +151,7 @@ for j, (start_j, end_j) in enumerate(ranges_j):
 # Each fiber is sampled with 20 points in R^3. 
 # Thus, one tractogram is a matrix of size n x 60 where n is the number of fibers
 # The atlas is labelled, wich means that each fiber belong to a cluster. 
-# This is summarized by the vector lab_j of size n x 1. lab_j[i] is the label of the fiber i. 
+# This is summarized by the vector labels_j of size n x 1. labels_j[i] is the label of the fiber i. 
 # Subsample the data by a factor 4 if you want to reduce the computational time:
 
 subsample = 20 if True else 1    
@@ -161,7 +164,7 @@ to_keep = []
 for start_j, end_j in ranges_j:
     to_keep += list(range(start_j, end_j, subsample))
 
-Y_j, lab_j = Y_j[to_keep].contiguous(), lab_j[to_keep].contiguous()
+Y_j, labels_j = Y_j[to_keep].contiguous(), labels_j[to_keep].contiguous()
 
 
 ##############################################
@@ -332,47 +335,61 @@ print("OT computed in  in {:.3f}s.".format(end-start))
 # We assign a label l to the fiber i as the label with maximum probability for all the soft assignement of i. 
 
 # Return to the original data (unflipped)
-X_i = X_i[:,0,:,:].contiguous()
-F_i = F_i[::2].contiguous()
+X_i = X_i[:,0,:,:].contiguous()  # (N, NPOINTS, 3)
+F_i = F_i[::2].contiguous()      # (N,)
 
-N_batch = N // 10
-new_lab = torch.zeros(0).cuda().type(dtypeint) #label assignement 
-value = torch.zeros(0).cuda()
 
-from pykeops.torch import generic_sum
+################################################
+# Compute the transport plan:
+#
 
-# Define our KeOps CUDA kernel:
-print('lab_j max = ', lab_j.max())
-#Compute soft-segmentation score
-transfer = generic_sum(
-    "Exp( (F_i + G_j - IntInv(2)*SqDist(X_i,Y_j)) / E )",  # See the formula above
-    "Lab = Vi(1)",  # Output:  one vector of size 3 per line
-    "E   = Pm(1)",  # 1st arg: a scalar parameter, the temperature
-    "X_i = Vi({})".format(NPOINTS*3),  # 2nd arg: one 2d-point per line
-    "Y_j = Vj({})".format(NPOINTS*3),  # 3rd arg: one 2d-point per column
-    "F_i = Vi(1)",  # 4th arg: one scalar value per line
-    "G_j = Vj(1)") # 5th arg: one scalar value per column
+XX_i = LazyTensor( X_i.view( N,     1, NPOINTS * 3) )
+YY_j = LazyTensor( Y_j.view( 1, M * 2, NPOINTS * 3) )
+FF_i = LazyTensor( F_i.view( N,     1,      1     ) )
+GG_j = LazyTensor( G_j.view( 1, M * 2,      1     ) )
 
-for i in range(10):
-    Lab_i_batch = torch.zeros( N_batch, lab_j.max()+1).type(dtype)
-    start = i * N_batch
-    end = (i + 1 ) * N_batch
-    print(start, end)
-    new_labels_i = torch.zeros( len(X_i) // 10, 1, n_labels ).cuda()
-    for k in range(n_labels):
-        # And apply it on the data (KeOps is pretty picky on the input shapes...):
-        G_j_lab_k = G_j[lab_j == k]
-        Y_j_lab_k = Y_j[lab_j == k,:]
-        new_labels_i[:,:,k] = transfer(torch.Tensor( [blur**2] ).type(dtype), X_i[start:end,:], Y_j_lab_k, 
-                                    F_i[start:end].view(-1,1), G_j_lab_k.view(-1,1)) / M
-    
-    value_batch, new_lab_batch = new_labels_i.squeeze().max(1)
-    new_lab = torch.cat((new_lab, new_lab_batch),0)
-    value = torch.cat((value, value_batch),0)
+# Cost matrix:
+CC_ij = ((XX_i - YY_j) ** 2).sum(-1) / 2  # (N, M * 2, 1) LazyTensor
 
-X_i[ : , 0 ], X_i[ : , -1 ] = X_i[ : , 0 ] / gamma ,  X_i[ : , -1 ] / gamma 
+# Scaled kernel matrix:
+KK_ij = (( FF_i + GG_j - CC_ij ) / blur**2 ).exp()  # (N, M * 2, 1) LazyTensor
 
-new_lab[(value < 10**(-2)) ] = new_lab.max() + 1 #we add a new labels of outliers : fibers that were not assign during the OT. 
-save_tracts_labels_separate('Output/segmented_subject/labels_subject', X_i, new_lab, 0, new_lab.max() + 1) #save the data
+# Entropic transport plan, PP_ij = KK_ij * a_i * b_j:
+PP_ij = KK_ij / (N * 2 * M)  # (N, M * 2, 1) LazyTensor
+
+
+################################################
+# Transfer the labels, bypassing the one-hot vector encoding
+# for the sake of efficiency:
+
+
+def slicing_ranges(start, end):
+    """KeOps does not yet support sliced indexing of LazyTensors, so we have to resort to some black magic..."""
+    ranges_i    = torch.Tensor([[0, N]]      ).type(dtypeint).int()  # Int32, on the correct device
+    slices_i    = torch.Tensor( [1]          ).type(dtypeint).int()
+    redranges_j = torch.Tensor([[start, end]]).type(dtypeint).int()
+    return (ranges_i, slices_i, redranges_j, None, None, None)
+
+
+weights_i = torch.zeros(C + 1, N).type(dtype)  # C classes + outliers
+
+for c in range(C):
+    start, end = 2 * ranges_j
+    PP_ij.ranges = slicing_ranges(start, end)  # equivalent to "PP_ij[:, start:end]", which is not supported yet...
+    weights_i[c] = PP_ij.sum(dim=1).view(N)
+
+weights_i[C] = 1e-2  # If no label has a bigger weight than .01, this fiber is an outlier
+
+labels_i = weights_i.argmax(dim=0)  # (N,) vector
+
+
+
+################################################
+# Save our new cluster information as a signal:
+
+# Come back to the original data
+X_i[:,0,:] /= gamma ;  X_i[:,-1,:] /= gamma
+
+save_tracts_labels_separate('Output/segmented_subject/labels_subject', X_i, labels_i, 0, labels_i.max() + 1) #save the data
 
 
