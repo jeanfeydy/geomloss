@@ -261,12 +261,11 @@ std_i = (( X_i - C_i[labs_i] ) ** 2).sum([1,2,3]).mean().sqrt()
 
 ranges_yi = 2 * ranges_j
 
-ranges_cj = 2 * torch.arange(C)
+ranges_cj = 2 * torch.arange(C).type_as(ranges_j)
 ranges_cj = torch.stack((ranges_cj, ranges_cj + 2)).t().contiguous()
 
-from pykeops.torch.cluster import from_matrix
-
-ranges_yi_cj = from_matrix(ranges_yi, ranges_cj, torch.eye(C) )
+slices_i = torch.arange(C).type_as(ranges_j)
+ranges_yi_cj = (ranges_yi, slices_i, ranges_cj, None, None, None)
 
 
 ################################################################################
