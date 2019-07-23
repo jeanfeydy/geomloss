@@ -27,6 +27,7 @@ use_cuda = torch.cuda.is_available()
 dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 dtypeint = torch.cuda.LongTensor  if use_cuda else torch.LongTensor
 
+
 ###############################################
 # Loading and saving data routines
 #
@@ -68,7 +69,8 @@ def torch_load(X, dtype=dtype):
 
 def add_flips(X):
     """Adds flips and loads on the GPU the input fiber track."""
-    X_flip = X[:,::-1,:].copy()
+#    X = X[:,None,:,:]
+    X_flip = torch.flip( X, (1,) )
     X = torch.stack((X, X_flip), dim=1)  # (Nfibers, 2, NPOINTS, 3)
     return X
 
@@ -84,7 +86,7 @@ labels_j = torch_load( np.load("data/atlas_labels.npy"), dtype=dtypeint )
 ###############################################################################
 #
 
-M, NPOINTS = Y_j.shape[0], Y_j.shape[1] / 3  # Number of fibers, points per fiber
+M, NPOINTS = Y_j.shape[0], Y_j.shape[1]  # Number of fibers, points per fiber
 
 ###############################################################################
 #
@@ -95,7 +97,6 @@ Y_j = Y_j.view(M, NPOINTS, 3) / np.sqrt(NPOINTS)
 #
 
 Y_j = add_flips(Y_j)  # Shape (M, 2, NPOINTS, 3)
-
 ##############################################
 # Target subject
 # ~~~~~~~~~~~~~~~~~~~~
@@ -103,8 +104,8 @@ Y_j = add_flips(Y_j)  # Shape (M, 2, NPOINTS, 3)
 # Load a new subject (unlabelled)
 #
 
-X_i = np.load("data/tracto1.npy")
-N, NPOINTS_i = X_i.shape[0], X_i.shape[1] / 3  # Number of fibers, points per fiber
+X_i = torch_load( np.load("data/tracto1.npy") )
+N, NPOINTS_i = X_i.shape[0], X_i.shape[1]   # Number of fibers, points per fiber
 
 if NPOINTS != NPOINTS_i:
     raise ValueError("The atlas and the subject are not sampled with the same number of points: "
@@ -125,7 +126,6 @@ gamma = 3.
 X_i[:,:,0,:] *= gamma ;  X_i[:,:,-1,:] *= gamma
 Y_j[:,:,0,:] *= gamma ;  Y_j[:,:,-1,:] *= gamma
 
-
 ###############################################################################
 # Optimizing performances
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,7 +135,7 @@ Y_j[:,:,0,:] *= gamma ;  Y_j[:,:,-1,:] *= gamma
 
 from pykeops.torch.cluster import sort_clusters, cluster_ranges
 
-ranges_j   = cluster_ranges(labels_j)         # Ranges for all clusters
+ranges_j   = cluster_ranges(labels_j)     # Ranges for all clusters
 Y_j, labels_j = sort_clusters(Y_j, labels_j)  # Make sure that all clusters are contiguous in memory
 
 C = len(ranges_j)  # Number of classes
@@ -154,7 +154,7 @@ for j, (start_j, end_j) in enumerate(ranges_j):
 # This is summarized by the vector labels_j of size n x 1. labels_j[i] is the label of the fiber i. 
 # Subsample the data by a factor 4 if you want to reduce the computational time:
 
-subsample = 20 if True else 1    
+subsample = 20 if False else 1    
 
 
 ##############################################
@@ -211,11 +211,11 @@ def KMeans(x_i, c_j, Nits = 10, ranges = None):
         # Points -> Nearest cluster
         labs_i = nn_search(x_i, c_j, ranges = ranges)
         # Class cardinals:
-        Ncl = torch.bincount(labs_i).type(dtype)
+        Ncl = torch.bincount(labs_i.view(-1)).type(dtype)
 
         # Compute the cluster centroids with torch.bincount:
         for d in range(D):  # Unfortunately, vector weights are not supported...
-            c_j[:, d] = torch.bincount(labs_i, weights=x_i[:, d]) / Ncl
+            c_j[:, d] = torch.bincount(labs_i.view(-1), weights=x_i[:, d]) / Ncl
     
     return c_j, labs_i
 
@@ -241,10 +241,9 @@ X_i_flat = X_i.view(N * 2, NPOINTS * 3)  # Flattened list of fibers
 
 # Retrieve our new centroids:
 C_i_flat, labs_i = KMeans(X_i_flat, C_i_flat)
-C_i = C_i_flat.view(N, 2, NPOINTS, 3)
-
+C_i = C_i_flat.view(K, 2, NPOINTS, 3)
 # Standard deviation of our clusters:
-std_i = (( X_i - C_i[labs_i] ) ** 2).sum([1,2,3]).mean().sqrt()
+std_i = (( X_i_flat - C_i_flat[labs_i.view(-1),:] ) ** 2).sum(dim = 1).mean().sqrt()
 
 
 ############################################################################################
@@ -258,14 +257,14 @@ std_i = (( X_i - C_i[labs_i] ) ** 2).sum([1,2,3]).mean().sqrt()
 # separate the fibers and the flips within a cluser, in order to have clusters whose fibers have similar
 # orientation
 #
-
 ranges_yi = 2 * ranges_j
 
 ranges_cj = 2 * torch.arange(C).type_as(ranges_j)
 ranges_cj = torch.stack((ranges_cj, ranges_cj + 2)).t().contiguous()
 
 slices_i = torch.arange(C).type_as(ranges_j)
-ranges_yi_cj = (ranges_yi, slices_i, ranges_cj, None, None, None)
+ranges_yi_cj = (ranges_yi.cpu(), slices_i.cpu(), ranges_cj.cpu(), None, None, None)
+
 
 
 ################################################################################
@@ -273,18 +272,18 @@ ranges_yi_cj = (ranges_yi, slices_i, ranges_cj, None, None, None)
 
 first_labels = ranges_j[:,0]  # One label per class
 
-C_j      = Y_j[first_labels]             # (C, 2, NPOINTS, 3)
+C_j      = Y_j[first_labels.type(dtypeint),:,:,:]             # (C, 2, NPOINTS, 3)
 C_j_flat = C_j.view(C * 2, NPOINTS * 3)  # Flattened list of centroids
 
 ############################################################################################
 #
 
-Y_j_flat = Y_j.view(M * 2, NPOINTS * 3)
 
+Y_j_flat = Y_j.view(M * 2, NPOINTS * 3)
 C_j_flat, labs_j = KMeans(Y_j_flat, C_j_flat, ranges = ranges_yi_cj)
 C_j = C_j_flat.view(C, 2, NPOINTS, 3)
 
-std_j = (( Y_j - C_j[labs_j] ) ** 2).sum([1,2,3]).mean().sqrt()
+std_j = (( Y_j_flat - C_j_flat[labs_j.view(-1),:] ) ** 2).sum(dim = 1).mean().sqrt()
 
 
 
@@ -316,7 +315,7 @@ start = time.time()
 
 # Compute the dual vectors F_i and G_j:
 # 6 args -> labels_i, weights_i, locations_i, labels_j, weights_j, locations_j
-F_i, G_j = Loss(labs_i, a_i, X_i.view(N * 2, NPOINTS * 3), 
+F_i, G_j = OT_solver(labs_i, a_i, X_i.view(N * 2, NPOINTS * 3), 
                 labs_j, b_j, Y_j.view(M * 2, NPOINTS * 3)) 
 
 if use_cuda: torch.cuda.synchronize()
@@ -370,7 +369,7 @@ def slicing_ranges(start, end):
     return (ranges_i, slices_i, redranges_j, None, None, None)
 
 
-weights_i = torch.zeros(C + 1, N).type(dtype)  # C classes + outliers
+weights_i = torch.zeros(C + 1, N).type(dtype)  # C classes + outliers
 
 for c in range(C):
     start, end = 2 * ranges_j
