@@ -154,7 +154,7 @@ for j, (start_j, end_j) in enumerate(ranges_j):
 # This is summarized by the vector labels_j of size n x 1. labels_j[i] is the label of the fiber i. 
 # Subsample the data by a factor 4 if you want to reduce the computational time:
 
-subsample = 20 if False else 1    
+subsample = 20 if True else 1    
 
 
 ##############################################
@@ -165,7 +165,7 @@ for start_j, end_j in ranges_j:
     to_keep += list(range(start_j, end_j, subsample))
 
 Y_j, labels_j = Y_j[to_keep].contiguous(), labels_j[to_keep].contiguous()
-
+ranges_j = cluster_ranges(labels_j)  # Keep the ranges up to date!
 
 ##############################################
 # 
@@ -197,7 +197,7 @@ def nn_search(x_i, y_j, ranges = None):
     D_ij = ((x_i - y_j) ** 2).sum(-1)  # Symbolic matrix of squared distances
     D_ij.ranges = ranges  # Apply our block-sparsity pattern
 
-    return D_ij.argmin(dim=1)
+    return D_ij.argmin(dim=1).view(-1)
 
 
 ################################################################################
@@ -262,8 +262,8 @@ ranges_yi = 2 * ranges_j
 ranges_cj = 2 * torch.arange(C).type_as(ranges_j)
 ranges_cj = torch.stack((ranges_cj, ranges_cj + 2)).t().contiguous()
 
-slices_i = torch.arange(C).type_as(ranges_j)
-ranges_yi_cj = (ranges_yi.cpu(), slices_i.cpu(), ranges_cj.cpu(), None, None, None)
+slices_i = 1 + torch.arange(C).type_as(ranges_j)
+ranges_yi_cj = (ranges_yi, slices_i, ranges_cj, ranges_cj, slices_i, ranges_yi)
 
 
 
@@ -352,9 +352,6 @@ CC_ij = ((XX_i - YY_j) ** 2).sum(-1) / 2  # (N, M * 2, 1) LazyTensor
 # Scaled kernel matrix:
 KK_ij = (( FF_i + GG_j - CC_ij ) / blur**2 ).exp()  # (N, M * 2, 1) LazyTensor
 
-# Entropic transport plan, PP_ij = KK_ij * a_i * b_j:
-PP_ij = KK_ij / (N * 2 * M)  # (N, M * 2, 1) LazyTensor
-
 
 ################################################
 # Transfer the labels, bypassing the one-hot vector encoding
@@ -366,15 +363,15 @@ def slicing_ranges(start, end):
     ranges_i    = torch.Tensor([[0, N]]      ).type(dtypeint).int()  # Int32, on the correct device
     slices_i    = torch.Tensor( [1]          ).type(dtypeint).int()
     redranges_j = torch.Tensor([[start, end]]).type(dtypeint).int()
-    return (ranges_i, slices_i, redranges_j, None, None, None)
+    return (ranges_i, slices_i, redranges_j, redranges_j, slices_i, ranges_i)
 
 
 weights_i = torch.zeros(C + 1, N).type(dtype)  # C classes + outliers
 
 for c in range(C):
-    start, end = 2 * ranges_j
-    PP_ij.ranges = slicing_ranges(start, end)  # equivalent to "PP_ij[:, start:end]", which is not supported yet...
-    weights_i[c] = PP_ij.sum(dim=1).view(N)
+    start, end = 2 * ranges_j[c]
+    KK_ij.ranges = slicing_ranges(start, end)  # equivalent to "PP_ij[:, start:end]", which is not supported yet...
+    weights_i[c] = KK_ij.sum(dim=1).view(N) / (2 * M)
 
 weights_i[C] = 1e-2  # If no label has a bigger weight than .01, this fiber is an outlier
 
