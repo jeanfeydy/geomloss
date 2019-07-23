@@ -1,6 +1,9 @@
 """
 Create an atlas using Wasserstein barycenters
 ==================================================
+
+In this tutorial, we compute the barycenter of a dataset of probability tracks. 
+The barycenter is computed as the Fréchet mean for the Sinkhorn divergence, using a Lagrangian optimization scheme. 
 """
 
 #############################################
@@ -19,6 +22,12 @@ use_cuda = torch.cuda.is_available()
 dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 from scipy.interpolate import RegularGridInterpolator
 
+
+import gzip
+import shutil
+import pdb
+
+
 import nibabel as nib
 import matplotlib.pyplot as plt
 
@@ -27,29 +36,32 @@ import matplotlib.pyplot as plt
 # Dataset
 # ~~~~~~~~~~~~~~~~~~
 #
-# In this tutorial, we work with square images
-# understood as densities on the unit square.
+# In this tutorial, we work with probability tracks, that can be understood as normalized 3D images. We will compute the Wasserstein barycenter of this dataset. 
 
 
 import os
 
 def fetch_file(name):
-    if not os.path.exists(f'data/{name}'):
+    if not os.path.exists(f'data/{name}.nii.gz'):
         import urllib.request
         print("Fetching the atlas... ", end="", flush=True)
         urllib.request.urlretrieve(
-            f'https://www.kernel-operations.io/data/{name}', 
-            f'data/{name}')
+            f'https://www.kernel-operations.io/data/{name}.nii.gz', 
+            f'data/{name}.nii.gz')
+        with gzip.open(f'data/{name}.nii.gz', 'rb') as f_in:
+            with open(f'data/{name}.nii', 'wb') as f_out:
+                    shutil.copyfileobj(f_in, f_out)
         print("Done.")
 
 for i in range(5):
-    fetch_file(f"manual_ifof{i+1}.nii")
+    fetch_file(f"manual_ifof{i+1}")
 
 
 
 
-affine_transform = nib.load('Data_MRI/manual_ifof1.nii').affine
+affine_transform = nib.load('data/manual_ifof1.nii').affine
 
+#load data in the nii format to a 3D, normalized array. 
 def load_data_nii(fname):
     img = nib.load(fname)
     affine_mat=img.affine
@@ -63,15 +75,16 @@ def grid(nx,ny,nz):
     x,y,z = torch.meshgrid( torch.arange(0.,nx).type(dtype) ,  torch.arange(0.,ny).type(dtype), torch.arange(0.,nz).type(dtype) )
     return torch.stack( (x,y,z), dim=3 ).view(-1,3).detach().cpu().numpy()
 
+#load the data set (here, we have 5 subjects)
 dataset = []
 for i in range(5):
-    fname = 'Data_MRI/manual_ifof'+str(i+1)+'.nii'
+    fname = 'data/manual_ifof'+str(i+1)+'.nii'
     image_norm = load_data_nii(fname)
     print(image_norm.shape)
     dataset.append(image_norm)
 
 ###############################################
-
+#In this tutorial, we work with 3D images, understood as densities on the cube. 
 
 def img_to_points_cloud(data_norm):#normalized images (between 0 and 1)
     nx,ny,nz = data_norm.shape
@@ -90,8 +103,17 @@ def measure_to_image(x,nx,ny,nz, weights = None):
     return count.view(nx,ny,nz)
      
 
-Loss = SamplesLoss( "sinkhorn", blur=1, scaling=.9, debias = False)
-models = []
+###############################################################################
+#To perform our computations, we turn these 3D arrays into weighted point cloud, regularly spaced in the grid. 
+    
+
+a, b = img_to_points_cloud( dataset[0] ), img_to_points_cloud( dataset[1] )
+c, d, e = img_to_points_cloud( dataset[2] ), img_to_points_cloud( dataset[3] ), img_to_points_cloud( dataset[4] ) 
+
+###############################################################################
+#We initialize the barycenter as an upsampled, arithmetic mean of the data set. 
+    
+
 nx,ny,nz = image_norm.shape
 
 def initialize_barycenter(dataset):
@@ -110,7 +132,16 @@ def initialize_barycenter(dataset):
     return bar_pos, bar_weight
 
 x_i,a_i = initialize_barycenter(dataset)
-x_i.requires_grad = True
+
+###############################################################################
+# The barycenter will be the minimizer of the sum of Sinkhorn distances to the dataset.
+# It is computed through a Lagrangian gradient descent on the particles' positions. 
+ 
+Loss = SamplesLoss( "sinkhorn", blur=1, scaling=.9, debias = False)
+models = []
+x_i.requires_grad = True 
+
+
    
 start = time.time()
 for j in range(len(dataset)):
@@ -121,28 +152,20 @@ for j in range(len(dataset)):
     models.append( x_i - g_i / a_i.view(-1,1) )
 
 a, b, c, d, e = models
-
-###############################################
-# If the weights :math:`w_k` sum up to 1, this update is a barycentric
-# combination of the **target points** :math:`x_i + v_i^A`, :math:`~\dots\,`, :math:`x_i + v_i^D`,
-# images of the source sample :math:`x_i`
-# under the action of the :doc:`generalized Monge maps <plot_interpolation>` that transport
-# our uniform sample onto the four target measures.
-# 
-# Using the resulting sample as an **ersatz for the true Wasserstein barycenter**
-# is thus an approximation that holds in dimension 1, and is reasonable
-# for most applications. As evidenced below, it allows us to interpolate
-# between arbitrary densities at a low numerical cost:
-
-
 barycenter = (a+b+c+d+e)/5
 if use_cuda: torch.cuda.synchronize()
 end = time.time()
 print('barycenter computed in {:.3f}s.'.format(end-start))
+
+##############################################################################
+# We can plot slices of the computed barycenters
 img_barycenter = measure_to_image(barycenter, nx,ny,nz,a_i)
 plt.figure()
 plt.imshow(img_barycenter.detach().cpu().numpy()[20,:,:])
 plt.show()
+
+#############################################################################
+#Or save the 3D image in .nii format, once put in the same coordinates system as the data images. 
 linear_transform_inv = np.linalg.inv(affine_transform[:3,:3])
 translation_inv = -affine_transform[:3,3]
 affine_inv = np.r_[np.c_[linear_transform_inv,translation_inv],np.array([[0,0,0,1]])]
