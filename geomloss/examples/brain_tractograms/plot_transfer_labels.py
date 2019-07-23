@@ -27,7 +27,6 @@ use_cuda = torch.cuda.is_available()
 dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 dtypeint = torch.cuda.LongTensor  if use_cuda else torch.LongTensor
 
-
 ###############################################
 # Loading and saving data routines
 #
@@ -122,7 +121,7 @@ X_i = add_flips(X_i)  # Shape (N, 2, NPOINTS, 3)
 # Add some weight on both ends of our fibers:
 #
 
-gamma = 3.
+gamma = 2.
 X_i[:,:,0,:] *= gamma ;  X_i[:,:,-1,:] *= gamma
 Y_j[:,:,0,:] *= gamma ;  Y_j[:,:,-1,:] *= gamma
 
@@ -181,8 +180,6 @@ N, M = len(X_i), len(Y_j)
 print("Data loaded.")
 
 
-
-
 ##############################################
 # Pre-computing cluster prototypes     
 # --------------------------------------
@@ -212,7 +209,6 @@ def KMeans(x_i, c_j, Nits = 10, ranges = None):
         labs_i = nn_search(x_i, c_j, ranges = ranges)
         # Class cardinals:
         Ncl = torch.bincount(labs_i.view(-1)).type(dtype)
-
         # Compute the cluster centroids with torch.bincount:
         for d in range(D):  # Unfortunately, vector weights are not supported...
             c_j[:, d] = torch.bincount(labs_i.view(-1), weights=x_i[:, d]) / Ncl
@@ -366,14 +362,14 @@ def slicing_ranges(start, end):
     return (ranges_i, slices_i, redranges_j, redranges_j, slices_i, ranges_i)
 
 
-weights_i = torch.zeros(C + 1, N).type(dtype)  # C classes + outliers
+weights_i = torch.zeros(C + 1, N).type(torch.FloatTensor)  # C classes + outliers
 
 for c in range(C):
     start, end = 2 * ranges_j[c]
     KK_ij.ranges = slicing_ranges(start, end)  # equivalent to "PP_ij[:, start:end]", which is not supported yet...
-    weights_i[c] = KK_ij.sum(dim=1).view(N) / (2 * M)
+    weights_i[c] = (KK_ij.sum(dim=1).view(N) / (2 * M)).cpu()
 
-weights_i[C] = 1e-2  # If no label has a bigger weight than .01, this fiber is an outlier
+weights_i[C] = 0.2  # If no label has a bigger weight than .01, this fiber is an outlier
 
 labels_i = weights_i.argmax(dim=0)  # (N,) vector
 
@@ -385,6 +381,6 @@ labels_i = weights_i.argmax(dim=0)  # (N,) vector
 # Come back to the original data
 X_i[:,0,:] /= gamma ;  X_i[:,-1,:] /= gamma
 
-save_tracts_labels_separate('Output/segmented_subject/labels_subject', X_i, labels_i, 0, labels_i.max() + 1) #save the data
+save_tracts_labels_separate('output/labels_subject', X_i, labels_i, 0, labels_i.max() + 1) #save the data
 
 
