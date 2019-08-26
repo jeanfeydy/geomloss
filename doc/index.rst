@@ -5,6 +5,8 @@ Geometric Loss functions between sampled measures, images and volumes
 Please send me your feedback: I will polish the user interface,
 implement Hausdorff divergences, add support for images/volumes
 and clean the documentation over the summer of 2019.
+Hopefully, a first stable release should be ready for
+`Miccai 2019 <https://www.miccai2019.org/>`_, in October.
 
 The **GeomLoss** library provides efficient GPU implementations for:
 
