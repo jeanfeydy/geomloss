@@ -129,7 +129,7 @@ sinkhorn_solver = lambda blur, nits, backend: partial(sinkhorn_loop, blur=blur, 
 # Feel free to have a look!
 
 
-from benchmarks_ot_solvers import benchmark_solver, benchmark_solvers
+from geomloss.examples.performances.benchmarks_ot_solvers import benchmark_solver, benchmark_solvers
 
 ######################################################################
 # The GeomLoss routines rely on a **scaling** parameter to tune
@@ -231,7 +231,7 @@ def full_statistics(source, target, blur=.01, maxtime=None):
 # as the target meshes:
 #
 
-from benchmarks_ot_solvers import create_sphere
+from geomloss.examples.performances.benchmarks_ot_solvers import create_sphere
 
 sources = [ create_sphere( npoints ) for npoints in [1e4, 5e4, 2e5, 8e5] ]
 
@@ -253,7 +253,7 @@ if not os.path.exists('data/dragon_recon/dragon_vrip_res4.ply'):
 # To read the raw ``.ply`` ascii files, we rely on the
 # `plyfile <https://github.com/dranjan/python-plyfile>`_ package:
 
-from benchmarks_ot_solvers import load_ply_file, display_cloud
+from geomloss.examples.performances.benchmarks_ot_solvers import load_ply_file, display_cloud
 
 
 ############################################################

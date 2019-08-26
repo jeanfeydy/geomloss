@@ -119,3 +119,6 @@ geomloss/examples/performances/data/*
 
 geomloss/examples/brain_tractograms/data/*
 !geomloss/examples/brain_tractograms/data/.gitkeep
+
+geomloss/examples/optimal_transport/data/wasserstein_3D_models*
+geomloss/examples/optimal_transport/output*

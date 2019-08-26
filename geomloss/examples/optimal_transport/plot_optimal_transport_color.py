@@ -47,7 +47,7 @@ def RGB_cloud(fname, sampling, dtype=torch.FloatTensor) :
 def display_cloud(ax, x) :
     x_ = x.detach().cpu().numpy()
     ax.scatter( x_[:,0], x_[:,1], x_[:,2], 
-                s = 25*500 / len(x_), c = x_, edgecolors='none' )
+                s = 25*500 / len(x_), c = x_ )
 
 def display_image(ax, x) :
     W = int(np.sqrt(len(x)))

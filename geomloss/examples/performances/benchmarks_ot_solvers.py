@@ -69,11 +69,11 @@ def display_cloud(ax, measure, color) :
     w_i, x_i = numpy( measure[0] ), numpy( measure[1] )
 
     ax.view_init(elev=110, azim=-90)
-    ax.set_aspect('equal')
+    #ax.set_aspect('equal')
 
     weights = w_i / w_i.sum()
     ax.scatter( x_i[:,0], x_i[:,1], x_i[:,2], 
-                s = 25*500 * weights, c = color, edgecolors='none' )
+                s = 25*500 * weights, c = color)
 
     ax.axes.set_xlim3d(left=-1.4, right=1.4) 
     ax.axes.set_ylim3d(bottom=-1.4, top=1.4) 

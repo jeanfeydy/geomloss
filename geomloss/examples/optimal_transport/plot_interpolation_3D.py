@@ -110,11 +110,11 @@ def display_cloud(ax, measure, color) :
     w_i, x_i = numpy( measure[0] ), numpy( measure[1] )
 
     ax.view_init(elev=110, azim=-90)
-    ax.set_aspect('equal')
+    #ax.set_aspect('equal')
 
     weights = w_i / w_i.sum()
     ax.scatter( x_i[:,0], x_i[:,1], x_i[:,2], 
-                s = 25*500 * weights, c = color, edgecolors='none' )
+                s = 25*500 * weights, c = color )
 
     ax.axes.set_xlim3d(left=-1.4, right=1.4) 
     ax.axes.set_ylim3d(bottom=-1.4, top=1.4) 
@@ -143,12 +143,17 @@ def save_vtk(fname, points, colors):
 #
 # Shall we work on subsampled data or at full resolution?
 
-fast_demo = True
+fast_demo = False if use_cuda else True
+
+if use_cuda:
+    Npoints = 1e4 if fast_demo else 2e5
+else:
+    Npoints = 1e3
 
 ##############################################################
 # Create a reference template:
 
-template = create_sphere( 1e4 if fast_demo else 2e5)
+template = create_sphere( Npoints )
 
 #################################################
 # Use color labels to track the particles:
@@ -156,7 +161,8 @@ template = create_sphere( 1e4 if fast_demo else 2e5)
 
 K = 12
 colors = (K * template[1][:,0]).cos()
-colors = colors.detach().cpu().numpy()
+colors = colors.view(-1).detach().cpu().numpy()
+
 
 #################################################
 # Fetch the data:
@@ -213,13 +219,13 @@ def normalize(measure, n = None):
     return weights, locations
 
 
-targets = [ normalize(t, n = (1e4 if fast_demo else 2e5) ) for t in targets ]
+targets = [ normalize(t, n = Npoints ) for t in targets ]
 
 ########################################################################
 # Fine tuning:
 
 template   = template[0],   template[1] / 2 + tensor([.5,0.,0.])  # Smaller sphere, towards the back of the dragon
-targets[1] = targets[1][0], targets[1][1] @ tensor([[0,0,1],[0,1,0],[1,0,0]])  # Turn the vertebra
+targets[1] = targets[1][0], targets[1][1]@tensor([[0,0,1],[0,1,0],[1,0,0]])  # Turn the vertebra
 targets[2] = targets[2][0],-targets[2][1]  # Flip the brain
 
 #########################################################################
@@ -268,11 +274,11 @@ matchings = [ OT_registration(template, target, f"shape{i+1}")
 #################################################################
 # Display our matchings:
 
-plt.set_cmap("hsv")
-
 for (i, (matching, target)) in enumerate(zip(matchings, targets)):
 
     fig = plt.figure(figsize=(6,6))
+    plt.set_cmap("hsv")
+
     ax = fig.add_subplot(1, 1, 1, projection='3d')
 
     display_cloud(ax, (template[0], matching), colors)
