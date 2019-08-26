@@ -31,12 +31,12 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 import numpy as np
 import torch
 from random import choices
-from scipy import misc
+from imageio import imread
 from matplotlib import pyplot as plt
 
 
 def load_image(fname) :
-    img = misc.imread(fname, flatten = True) # Grayscale
+    img = imread(fname, as_gray = True) # Grayscale
     img = (img[::-1, :])  / 255.
     return 1 - img
 

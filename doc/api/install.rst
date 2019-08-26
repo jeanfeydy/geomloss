@@ -52,7 +52,7 @@ a new GPE session and to type the following instructions in the SSH prompt::
 
     # Install pip and the necessary packages to run all tutorials:
     sudo apt install python3-pip
-    pip3 install numpy GPUtil cmake ninja sklearn scipy imageio
+    pip3 install numpy GPUtil cmake ninja sklearn scipy imageio scikit-image
     pip3 install torch torchvision
     pip3 install dipy nibabel vtk pyvtk SimpleITK
     pip3 install sphinx sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme plyfile >> install.log
