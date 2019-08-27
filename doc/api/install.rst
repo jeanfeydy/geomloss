@@ -45,10 +45,10 @@ cloning the reference "NVidia/Pytorch" model (to get the correct drivers) on a m
 8 CPUs and a single V100 GPU (the default configuration - you should
 get similar levels of performance with an RTX 2080 card, which is much cheaper!).
 To reproduce our results and benchmarks, feel free to create
-a new GPE session and to type the following instructions in the SSH prompt::
-
-    # Install nvcc:
-    sudo apt install nvidia-cuda-toolkit
+a new GPE session, 
+to install CUDA and nvcc by following
+`these instructions <https://askubuntu.com/questions/1077061/how-do-i-install-nvidia-and-cuda-drivers-into-ubuntu>`_ 
+and to type the following lines in the SSH prompt::
 
     # Install pip and the necessary packages to run all tutorials:
     sudo apt install python3-pip
