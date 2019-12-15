@@ -40,7 +40,7 @@ try:  # Import the keops library, www.kernel-operations.io
 except:
     keops_available = False
     
-from .utils import scal, squared_distances, distances
+from .utils import scal
 
 
 # ==============================================================================
