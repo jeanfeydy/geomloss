@@ -40,9 +40,9 @@ def squared_distances(x, y):
     else:
         print("x.shape : ", x.shape)
         raise ValueError("Incorrect number of dimensions")
-
     return D_xx - 2*D_xy + D_yy
 
 
 def distances(x, y):
     return sqrt_0( squared_distances(x,y) )
+
