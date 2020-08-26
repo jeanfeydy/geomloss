@@ -62,7 +62,6 @@ x_i, y_j, z_j = X_i.clone(), Y_j.clone(), Z_j.clone() # make sure we don't chang
 
 ####################
 # We use the Wasserstein-:math:`2` distance with the ``tensorized``` backend.
-# Other backends are currently incompatible with the batch mode.
 
 loss = SamplesLoss("sinkhorn", p=2, blur=.05, backend="tensorized")
 
@@ -137,14 +136,15 @@ print("Is loss close for the 2nd target?", torch.isclose(x_to_z, stacked_alpha_t
 # Giving weights and targets as lists.
 
 print("----------- Giving x_, α_ and y, β as lists ---------")
-all_list = loss(alpha_, x_, [beta, gamma], [y_j, z_j])
+all_list = loss(alpha_, x_i, [beta, gamma], [y_j, z_j])
 print("Is loss close for the 1st target?", torch.isclose(x_to_y, all_list[0], atol=1e-3).item())
 print("Is loss close for the 2nd target?", torch.isclose(x_to_z, all_list[1], atol=1e-3).item())
 
 #######################
 # .. note::
-#        Here, giving the list of weights induces that the source must have the same number
-#        of batches as the targets have. So we use the stacked version of the source. 
+#        Here, giving the list of weights induces that the target weights at the end must have the
+#        same dimension than the source weights in input. To avoid any shapes issues, one can give in input
+#        either ``x_i`` or ``x_`` in this situation. 
 
 #######################
 # Giving targets as a list with uniform weights.

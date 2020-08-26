@@ -299,12 +299,12 @@ class SamplesLoss(Module):
 
         if x.dim() == 2:
             x = x.unsqueeze(0).repeat(len(y), 1, 1)
-            if x.dim() == 3:
-                if x.shape[0] == 1:
-                    x.repeat(len(y), 1, 1)
-                elif x.shape[0] != len(y):
-                    raise ValueError(
-                        "Input sample 'x' and 'y' must be compatibles.")
+        elif x.dim() == 3:
+            if x.shape[0] == 1:
+                x.repeat(len(y), 1, 1)
+            elif x.shape[0] != len(y):
+                raise ValueError(
+                    "Input sample 'x' and 'y' must be compatibles.")
 
         if not given_weights:
             α = self.generate_weights(x)
