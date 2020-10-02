@@ -105,6 +105,21 @@ def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scal
 # ==============================================================================
 #                          backend == "multiscale"
 # ==============================================================================
+cost_formulas = {
+    1 : "Norm2(X-Y)",
+    2 : "(SqDist(X,Y) / IntCst(2))",
+}
+
+def keops_lse(cost, D, dtype="float32"):
+    log_conv = generic_logsumexp("( B - (P * " + cost + " ) )",
+                                 "A = Vi(1)",
+                                 "X = Vi({})".format(D),
+                                 "Y = Vj({})".format(D),
+                                 "B = Vj(1)",
+                                 "P = Pm(1)",
+                                 dtype = dtype)
+    return log_conv
+
 
 
 def softmin_multiscale(ε, C_xy, f_y, log_conv=None):
