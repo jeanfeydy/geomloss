@@ -71,7 +71,7 @@ def load_ply_file(fname) :
 #
 
 import SimpleITK as sitk
-import skimage
+import skimage.measure
 
 def load_nii_file(fname, threshold=.5):
     """Uses the marching cube algorithm to turn a .nii binary mask into a surface weighted point cloud."""
