@@ -8,6 +8,7 @@ try:  # Import the keops library, www.kernel-operations.io
     from pykeops.torch import generic_logsumexp
     from pykeops.torch.cluster import grid_cluster, cluster_ranges_centroids
     from pykeops.torch.cluster import sort_clusters, from_matrix, swap_axes
+    from pykeops.torch import LazyTensor
     keops_available = True
 except:
     keops_available = False
@@ -58,37 +59,33 @@ def sinkhorn_tensorized(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, 
 #                          backend == "online"
 # ==============================================================================
 
-cost_formulas = {
-    1 : "Norm2(X-Y)",
-    2 : "(SqDist(X,Y) / IntCst(2))",
-}
-
-def softmin_online(ε, C_xy, f_y, log_conv=None):
+def softmin_online(ε, C_xy, f_y, p=2):
     x, y = C_xy
-    # KeOps is pretty picky on the input shapes...
-    return - ε * log_conv( x, y, f_y.view(-1,1), torch.Tensor([1/ε]).type_as(x) ).view(-1)
+    B = x.shape[0]
 
+    x_ = LazyTensor(x.unsqueeze(2) )
+    y_ = LazyTensor(y.unsqueeze(1) )
+    u_ = LazyTensor(f_y.unsqueeze(-1).unsqueeze(1))
+    Constant2 = torch.Tensor([2.]).type_as(x)
 
-def keops_lse(cost, D, dtype="float32"):
-    log_conv = generic_logsumexp("( B - (P * " + cost + " ) )",
-                                 "A = Vi(1)",
-                                 "X = Vi({})".format(D),
-                                 "Y = Vj({})".format(D),
-                                 "B = Vj(1)",
-                                 "P = Pm(1)",
-                                 dtype = dtype)
-    return log_conv
+    if p == 2:
+        Dis = ((x_ - y_) ** 2).sum(3) / Constant2
+    elif p == 1:
+        Dis = ((x_ - y_) ** 2).sum(3) ** 0.5
+
+    inner = u_ -  torch.Tensor([1/ε]).type_as(x) *  Dis 
+    outer = inner.logsumexp(2).view(B,-1)
+
+    return - ε * outer
 
 
 def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, 
                     debias = True, potentials = False, **kwargs):
     
-    N, D = x.shape
-    M, _ = y.shape
+    B, N, D = x.shape
+    B, M, _ = y.shape
 
-    if cost is None: cost = cost_formulas[p]
-
-    softmin = partial(softmin_online, log_conv=keops_lse(cost, D, dtype=str(x.dtype)[6:])) 
+    softmin = partial(softmin_online, p=p)
 
     # The "cost matrices" are implicitely encoded in the point clouds,
     # and re-computed on-the-fly:
@@ -101,7 +98,7 @@ def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scal
                                         log_weights(α), log_weights(β), 
                                         C_xx, C_yy, C_xy, C_yx, ε_s, ρ, debias=debias )
 
-    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, debias=debias, potentials=potentials)
+    return sinkhorn_cost(ε, ρ, α, β, a_x, b_y, a_y, b_x, batch=True, debias=debias, potentials=potentials)
 
 
 
