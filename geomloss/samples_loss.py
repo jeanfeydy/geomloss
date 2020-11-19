@@ -80,7 +80,7 @@ class SamplesLoss(Module):
             
             - If **loss** is ``"gaussian"`` or ``"laplacian"``,
               it is the standard deviation :math:`\sigma` of the convolution kernel.
-            - If **loss** is ``"sinkhorn"`` or ``"haudorff"``,
+            - If **loss** is ``"sinkhorn"`` or ``"hausdorff"``,
               it is the typical scale :math:`\sigma` associated
               to the temperature :math:`\\varepsilon = \sigma^p`.
               The default value of .05 is sensible for input
