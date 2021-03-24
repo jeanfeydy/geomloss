@@ -63,10 +63,9 @@ def softmin_online(ε, C_xy, f_y, p=2):
     x, y = C_xy
     B = x.shape[0]
 
-    x_ = LazyTensor(x.unsqueeze(2) )
-    y_ = LazyTensor(y.unsqueeze(1) )
-    u_ = LazyTensor(f_y.unsqueeze(-1).unsqueeze(1))
-    Constant2 = torch.Tensor([2.]).type_as(x)
+    x_i = LazyTensor(x[:, :, None, :])
+    y_j = LazyTensor(y[:, None, :, :])
+    f_j = LazyTensor(f_y[:, None, :, None])
 
     if p == 2:
         Dis = ((x_ - y_) ** 2).sum(3) / Constant2
