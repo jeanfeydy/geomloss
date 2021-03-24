@@ -68,14 +68,13 @@ def softmin_online(ε, C_xy, f_y, p=2):
     f_j = LazyTensor(f_y[:, None, :, None])
 
     if p == 2:
-        Dis = ((x_ - y_) ** 2).sum(3) / Constant2
+        D_ij = ((x_i - y_j) ** 2).sum(-1) / 2
     elif p == 1:
-        Dis = ((x_ - y_) ** 2).sum(3) ** 0.5
+        Dis = ((x_i - y_j) ** 2).sum(-1).sqrt()
 
-    inner = u_ -  torch.Tensor([1/ε]).type_as(x) *  Dis 
-    outer = inner.logsumexp(2).view(B,-1)
+    smin = (f_j -  D_ij /  ε).logsumexp(2).view(B,-1)
 
-    return - ε * outer
+    return - ε * smin
 
 
 def sinkhorn_online(α, x, β, y, p=2, blur=.05, reach=None, diameter=None, scaling=.5, cost=None, 
