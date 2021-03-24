@@ -1,12 +1,6 @@
 Geometric Loss functions between sampled measures, images and volumes
 ---------------------------------------------------------------------
 
-**N.B.:** This is still an **alpha** release! 
-Please send me your feedback: I will polish the user interface,
-implement Hausdorff divergences, add support for images/volumes
-and clean the documentation over the summer of 2019.
-Hopefully, a first stable release should be ready for
-`Miccai 2019 <https://www.miccai2019.org/>`_, in October.
 
 The **GeomLoss** library provides efficient GPU implementations for:
 
@@ -14,15 +8,21 @@ The **GeomLoss** library provides efficient GPU implementations for:
   (also known as `Maximum Mean Discrepancies <http://www.jmlr.org/papers/volume13/gretton12a/gretton12a.pdf>`_).
 - `Hausdorff divergences <https://hal.archives-ouvertes.fr/hal-01827184v2>`_, which are
   positive definite generalizations of the
-  `ICP <https://en.wikipedia.org/wiki/Iterative_closest_point>`_ loss,
+  `Chamfer-ICP <https://en.wikipedia.org/wiki/Iterative_closest_point>`_ loss
+  and are
   analogous to **log-likelihoods** of Gaussian Mixture Models.
-- `Unbiased Sinkhorn divergences <https://arxiv.org/abs/1810.08278>`_, which are
-  cheap yet **positive definite** approximations of 
+- `Debiased Sinkhorn divergences <https://arxiv.org/abs/1810.08278>`_, which are
+  affordable yet **positive and definite** approximations of 
   `Optimal Transport <https://arxiv.org/abs/1803.00567>`_ 
-  (`Wasserstein <https://en.wikipedia.org/wiki/Wasserstein_metric>`_) costs.
+  (`Wasserstein <https://en.wikipedia.org/wiki/Wasserstein_metric>`_) distances.
 
 
-These loss functions, defined between positive measures, 
+It is hosted on `GitHub <https://github.com/jeanfeydy/geomloss>`_
+and distributed under the permissive `MIT license <https://en.wikipedia.org/wiki/MIT_License>`_. |br|  
+|PyPi version| |Downloads| 
+
+
+GeomLoss functions
 are available through the custom `PyTorch <https://pytorch.org/>`_ layers 
 :class:`SamplesLoss <geomloss.SamplesLoss>`, 
 :class:`ImagesLoss <geomloss.ImagesLoss>` and 
@@ -108,14 +108,13 @@ Details and examples are provided below:
 * `Source code <https://github.com/jeanfeydy/geomloss>`_
 * :doc:`Examples <_auto_examples/index>`
 
-**GeomLoss is licensed** under the `MIT license <https://github.com/jeanfeydy/geomloss/blob/master/LICENSE>`_.
 
 Author and Contributors
 -------------------------
 
 Feel free to contact us for any **bug report** or **feature request**:
 
-- `Jean Feydy <http://www.math.ens.fr/~feydy/>`_
+- `Jean Feydy <https://www.jeanfeydy.com>`_
 - `Pierre Roussillon <https://proussillon.gitlab.io/en/>`_ (extensions to brain tractograms and normal cycles)
 
 Licensing, academic use
@@ -144,7 +143,7 @@ You may be interested by:
 - The `KeOps library <http://www.kernel-operations.io/>`_, which provides 
   **efficient CUDA routines**
   for point cloud processing, with full `PyTorch <https://pytorch.org/>`_ support.
-- Rémi Flamary and Nicolas Courty's 
+- Rémi Flamary's 
   `Python Optimal Transport library <https://pot.readthedocs.io/en/stable/>`_,
   which provides a reference implementation of **OT-related methods** for small problems.
 - Bernhard Schmitzer's `Optimal Transport toolbox <https://github.com/bernhard-schmitzer/optimal-transport/tree/master/v0.2.0>`_,
@@ -162,3 +161,12 @@ Table of contents
    _auto_examples/index
 
 
+.. |PyPi version| image:: https://img.shields.io/pypi/v/geomloss?color=blue
+   :target: https://pypi.org/project/geomloss/
+.. |Downloads| image:: https://pepy.tech/badge/geomloss?color=green
+   :target: https://pepy.tech/project/geomloss
+
+
+.. |br| raw:: html
+
+  <br/>

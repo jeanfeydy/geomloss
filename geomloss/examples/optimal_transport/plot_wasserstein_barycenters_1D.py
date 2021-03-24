@@ -19,7 +19,7 @@ import torch
 from geomloss import SamplesLoss
 
 use_cuda = torch.cuda.is_available()
-dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
+dtype = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 ###############################################
 # Dataset
@@ -37,7 +37,7 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 #
 # which coincides with :math:`\alpha` when :math:`w=0`
 # and with :math:`\beta` when :math:`w=1`.
-# 
+#
 # If our input measures
 #
 # .. math::
@@ -53,25 +53,25 @@ dtype    = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 
 N, M = (50, 50) if not use_cuda else (500, 500)
- 
-t_i = torch.linspace(0, 1, M).type(dtype).view(-1,1)
-t_j = torch.linspace(0, 1, M).type(dtype).view(-1,1)
 
-X_i, Y_j  = .1 * t_i, .2 * t_j + .8  # Intervals [0., 0.1] and [.8, 1.].
+t_i = torch.linspace(0, 1, M).type(dtype).view(-1, 1)
+t_j = torch.linspace(0, 1, M).type(dtype).view(-1, 1)
+
+X_i, Y_j = 0.1 * t_i, 0.2 * t_j + 0.8  # Intervals [0., 0.1] and [.8, 1.].
 
 
 ###############################################
 # In this notebook, we thus propose to solve the barycentric
 # optimization problem through a (quasi-)convex optimization
 # on the (log-)weights :math:`\log(\gamma_k)` - with fixed :math:`\delta_{z_k}`'s -
-# and through a well-conditioned 
+# and through a well-conditioned
 # descent on the samples' positions :math:`\delta_{z_k}`
 # - with uniform weights :math:`\gamma_k = 1/N`.
 #
 # In both sections (Eulerian vs. Lagrangian), we'll start from a
 # uniform sample on the unit interval:
 
-t_k = torch.linspace(0, 1, N).type(dtype).view(-1,1)
+t_k = torch.linspace(0, 1, N).type(dtype).view(-1, 1)
 Z_k = t_k
 
 
@@ -81,87 +81,98 @@ Z_k = t_k
 #
 # We display our samples using (smoothed) density
 # curves, computed with a straightforward Gaussian convolution:
- 
-t_plot = np.linspace(-0.1, 1.1, 1000)[:,np.newaxis]
 
-def display_samples(ax, x, color, weights=None, blur=.002):
+t_plot = np.linspace(-0.1, 1.1, 1000)[:, np.newaxis]
+
+
+def display_samples(ax, x, color, weights=None, blur=0.002):
     """Displays samples on the unit interval using a density curve."""
-    kde  = KernelDensity(kernel='gaussian', bandwidth= blur ).fit(
-            x.data.cpu().numpy(), 
-            sample_weight = None if weights is None else weights.data.cpu().numpy())
-    dens = np.exp( kde.score_samples(t_plot) )
-    dens[0] = 0 ; dens[-1] = 0
+    kde = KernelDensity(kernel="gaussian", bandwidth=blur).fit(
+        x.data.cpu().numpy(),
+        sample_weight=None if weights is None else weights.data.cpu().numpy(),
+    )
+    dens = np.exp(kde.score_samples(t_plot))
+    dens[0] = 0
+    dens[-1] = 0
     ax.fill(t_plot, dens, color=color)
-
 
 
 ###############################################
 # Eulerian gradient flow
 # ------------------------------------------
-# 
+#
 # Taking advantage of the **convexity** of Sinkhorn divergences
 # with respect to the measures' weights, we first solve
-# the barycentric optimization problem through a 
+# the barycentric optimization problem through a
 # (quasi-convex) **Eulerian**
 # descent on the **log-weights** :math:`l_k = \log(\gamma_k)`:
 
 
-from geomloss.examples.optimal_transport.model_fitting import fit_model  # Wrapper around scipy.optimize
+from geomloss.examples.optimal_transport.model_fitting import (
+    fit_model,
+)  # Wrapper around scipy.optimize
 from torch.nn import Module, Parameter  # PyTorch syntax for optimization problems
+
 
 class Barycenter(Module):
     """Abstract model for the computation of Sinkhorn barycenters."""
-    
-    def __init__(self, loss, w=.5):
+
+    def __init__(self, loss, w=0.5):
         super(Barycenter, self).__init__()
-        self.loss = loss   # Sinkhorn divergence to optimize
-        self.w = w         # Interpolation coefficient
+        self.loss = loss  # Sinkhorn divergence to optimize
+        self.w = w  # Interpolation coefficient
         # We copy the reference starting points, to prevent in-place modification:
         self.x_i, self.y_j, self.z_k = X_i.clone(), Y_j.clone(), Z_k.clone()
 
     def fit(self, display=False, tol=1e-10):
         """Uses a custom wrapper around the scipy.optimize module."""
-        fit_model(self, method = "L-BFGS", lr = 1., display = display, tol=tol, gtol=tol)
+        fit_model(self, method="L-BFGS", lr=1.0, display=display, tol=tol, gtol=tol)
 
     def weights(self):
         """The default weights are uniform, equal to 1/N."""
         return (torch.ones(len(self.z_k)) / len(self.z_k)).type_as(self.z_k)
-    
+
     def plot(self, nit=0, cost=0, ax=None, title=None):
         """Displays the descent using a custom 'waffle' layout.
-        
+
         N.B.: As the L-BFGS descent typically induces high-frequencies in
               the optimization process, we blur the 'interpolating' measure
               a little bit more than the two endpoints.
         """
         if ax is None:
-            if nit == 0 or nit % 16 == 4: 
-                plt.pause(.01)
-                plt.figure(figsize=(16,4))
+            if nit == 0 or nit % 16 == 4:
+                plt.pause(0.01)
+                plt.figure(figsize=(16, 4))
 
             if nit <= 4 or nit % 4 == 0:
-                if nit < 4: index = nit + 1
-                else:       index = (nit//4 - 1) % 4 + 1
-                ax = plt.subplot(1,4, index)
-                
+                if nit < 4:
+                    index = nit + 1
+                else:
+                    index = (nit // 4 - 1) % 4 + 1
+                ax = plt.subplot(1, 4, index)
+
         if ax is not None:
-            display_samples(ax, self.x_i, (.95,.55,.55))
-            display_samples(ax, self.y_j, (.55,.55,.95))
-            display_samples(ax, self.z_k, (.55,.95,.55), weights = self.weights(), blur=.005)
+            display_samples(ax, self.x_i, (0.95, 0.55, 0.55))
+            display_samples(ax, self.y_j, (0.55, 0.55, 0.95))
+            display_samples(
+                ax, self.z_k, (0.55, 0.95, 0.55), weights=self.weights(), blur=0.005
+            )
 
             if title is None:
                 ax.set_title("nit = {}, cost = {:3.4f}".format(nit, cost))
             else:
                 ax.set_title(title)
 
-            ax.axis([-.1,1.1,-.1,20.5])
-            ax.set_xticks([], []); ax.set_yticks([], [])
+            ax.axis([-0.1, 1.1, -0.1, 20.5])
+            ax.set_xticks([], [])
+            ax.set_yticks([], [])
             plt.tight_layout()
 
 
-class EulerianBarycenter(Barycenter) :
+class EulerianBarycenter(Barycenter):
     """Barycentric model with fixed locations z_k, as we optimize on the log-weights l_k."""
-    def __init__(self, loss, w=.5) :
+
+    def __init__(self, loss, w=0.5):
         super(EulerianBarycenter, self).__init__(loss, w)
 
         # We're going to work with variable weights, so we should explicitely
@@ -170,17 +181,18 @@ class EulerianBarycenter(Barycenter) :
         self.b_j = (torch.ones(len(self.y_j)) / len(self.y_j)).type_as(self.y_j)
 
         # Our parameter to optimize: the logarithms of our weights
-        self.l_k = Parameter( torch.zeros(len(self.z_k)).type_as(self.z_k) )
- 
+        self.l_k = Parameter(torch.zeros(len(self.z_k)).type_as(self.z_k))
+
     def weights(self):
         """Turns the l_k's into the weights of a positive probabilty measure."""
         return torch.nn.functional.softmax(self.l_k, dim=0)
-      
-    def forward(self) :
+
+    def forward(self):
         """Returns the cost to minimize."""
-        c_k  = self.weights()
-        return self.w  * self.loss(c_k, self.z_k, self.a_i, self.x_i) \
-        + (1 - self.w) * self.loss(c_k, self.z_k, self.b_j, self.y_j)
+        c_k = self.weights()
+        return self.w * self.loss(c_k, self.z_k, self.a_i, self.x_i) + (
+            1 - self.w
+        ) * self.loss(c_k, self.z_k, self.b_j, self.y_j)
 
 
 ###############################################
@@ -189,12 +201,12 @@ class EulerianBarycenter(Barycenter) :
 # with a large **scaling** coefficient - i.e. a large number of iterations
 # in the Sinkhorn loop:
 
-EulerianBarycenter( SamplesLoss("sinkhorn", blur=.001, scaling=.99) ).fit(display=True)
+EulerianBarycenter(SamplesLoss("sinkhorn", blur=0.001, scaling=0.99)).fit(display=True)
 
 #############################################
-# As evidenced here, the **Eulerian** descent fits **one by one** 
+# As evidenced here, the **Eulerian** descent fits **one by one**
 # the Fourier modes of the "true" Wasserstein barycenter:
-# we start from a Gaussian blob and progressively 
+# we start from a Gaussian blob and progressively
 # integrate the higher frequencies, slowly converging
 # towards a **sharp** step function.
 
@@ -202,7 +214,7 @@ EulerianBarycenter( SamplesLoss("sinkhorn", blur=.001, scaling=.99) ).fit(displa
 ###############################################
 # Lagrangian gradient flow
 # ------------------------------------------
-# 
+#
 # The procedure above is theoretically sound (thanks to the **convexity** of
 # Sinkhorn divergences),
 # but may be too slow for practical purposes.
@@ -210,25 +222,27 @@ EulerianBarycenter( SamplesLoss("sinkhorn", blur=.001, scaling=.99) ).fit(displa
 # using a Lagrangian, particular scheme and optimize our weighted
 # loss with respect to the **samples' positions**:
 
-class LagrangianBarycenter(Barycenter) :
-    def __init__(self, loss, w=.5) :
+
+class LagrangianBarycenter(Barycenter):
+    def __init__(self, loss, w=0.5):
         super(LagrangianBarycenter, self).__init__(loss, w)
 
         # Our parameter to optimize: the locations of the input samples
-        self.z_k = Parameter( Z_k.clone() )
-      
-    def forward(self) :
+        self.z_k = Parameter(Z_k.clone())
+
+    def forward(self):
         """Returns the cost to minimize."""
         # By default, the weights are uniform and sum up to 1:
-        return self.w  * self.loss( self.z_k, self.x_i) \
-        + (1 - self.w) * self.loss( self.z_k, self.y_j)
-    
+        return self.w * self.loss(self.z_k, self.x_i) + (1 - self.w) * self.loss(
+            self.z_k, self.y_j
+        )
+
 
 ###############################################
 # As evidenced below, this algorithm converges quickly towards
 # a decent interpolator, even for small-ish values of the scaling coefficient:
 
-LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.9) ).fit(display=True)
+LagrangianBarycenter(SamplesLoss("sinkhorn", blur=0.01, scaling=0.9)).fit(display=True)
 
 
 ###############################################
@@ -239,5 +253,7 @@ LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.9) ).fit(displa
 # The trade-off between speed and accuracy (especially with respect to oscillating artifacts)
 # can be tuned with the **tol** and **scaling** parameters:
 
-LagrangianBarycenter( SamplesLoss("sinkhorn", blur=.01, scaling=.5) ).fit(display=True, tol=1e-5)
+LagrangianBarycenter(SamplesLoss("sinkhorn", blur=0.01, scaling=0.5)).fit(
+    display=True, tol=1e-5
+)
 plt.show()
