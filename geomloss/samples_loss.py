@@ -223,7 +223,7 @@ class SamplesLoss(Module):
                              +"Using 'tensorized' instead: beware of memory overflows!")
                 backend = "tensorized"
 
-        if B == 0 and (backend == "tensorized" or backend == "online") :  # tensorized and online routines work on batched tensors
+        if B == 0 and backend in ["tensorized", "online"]:  # tensorized and online routines work on batched tensors
             α, x, β, y = α.unsqueeze(0), x.unsqueeze(0), β.unsqueeze(0), y.unsqueeze(0)
 
 
