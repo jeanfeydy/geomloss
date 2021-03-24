@@ -23,6 +23,17 @@ should allow you to get a working setup in less than twenty seconds.
 Install with git
 -------------------
 
+
+The simplest way of installing a specific version
+of GeomLoss is to use `some advanced pip syntax <https://pip.pypa.io/en/stable/reference/pip_install/#git>`_:
+
+
+.. code-block:: bash
+
+    pip install git+https://github.com/jeanfeydy/geomloss.git@master#egg=project[full]
+
+
+
 Alternatively, you may:
 
   1. Install the CUDA toolkit, including the **nvcc** compiler.
@@ -40,15 +51,9 @@ Alternatively, you may:
 Build the documentation on Google Cloud
 -----------------------------------------
 
-For each release, this website is generated on a fresh `Google Compute session <https://cloud.google.com/compute>`_,
-cloning the reference "NVidia/Pytorch" model (to get the correct drivers) on a machine with
-8 CPUs and a single V100 GPU (the default configuration - you should
-get similar levels of performance with an RTX 2080 card, which is much cheaper!).
-To reproduce our results and benchmarks, feel free to create
-a new GPE session, 
-to install CUDA and nvcc by following
-`these instructions <https://askubuntu.com/questions/1077061/how-do-i-install-nvidia-and-cuda-drivers-into-ubuntu>`_ 
-and to type the following lines in the SSH prompt::
+To generate this website on a fresh `Google Compute session <https://cloud.google.com/compute>`_, first install CUDA and nvcc by following
+`these instructions <https://askubuntu.com/questions/1077061/how-do-i-install-nvidia-and-cuda-drivers-into-ubuntu>`_.
+You should then type the following lines in the SSH prompt::
 
     # Install pip and the necessary packages to run all tutorials:
     sudo apt install python3-pip
@@ -106,7 +111,7 @@ a new Colab notebook and to type the following instructions in the first few cel
     !pip install sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme plyfile >> install.log
 
     # Download KeOps...
-    !pip install pykeops[full]  >> install.log
+    !pip install pykeops[colab]  >> install.log
 
     # Download GeomLoss
     !git clone https://github.com/jeanfeydy/geomloss.git  >> install.log
