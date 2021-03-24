@@ -219,7 +219,7 @@ class SamplesLoss(Module):
             if B == 1:
                 α, x, β, y = α.squeeze(0), x.squeeze(0), β.squeeze(0), y.squeeze(0)
             elif B > 1:
-                warnings.warn("'multiscale' backend do not support batchsize > 1. " \
+                warnings.warn("The 'multiscale' backend do not support batchsize > 1. " \
                              +"Using 'tensorized' instead: beware of memory overflows!")
                 backend = "tensorized"
 
