@@ -404,14 +404,16 @@ class SamplesLoss(Module):
                 D,
             ) = (
                 x.shape
-            )  # Batchsize, number of "i" samples, dimension of the feature space
+            )
+            # Batchsize, number of "i" samples, dimension of the feature space
             (
                 B2,
                 M,
                 _,
             ) = (
                 y.shape
-            )  # Batchsize, number of "j" samples, dimension of the feature space
+            )
+            # Batchsize, number of "j" samples, dimension of the feature space
             if B != B2:
                 raise ValueError("Samples 'x' and 'y' should have the same batchsize.")
 

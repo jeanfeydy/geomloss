@@ -56,9 +56,10 @@ def sinkhorn_tensorized(
     if cost is None:
         cost = cost_routines[p]
 
+    # (B,N,N), (B,M,M)
     C_xx, C_yy = (
         (cost(x, x.detach()), cost(y, y.detach())) if debias else (None, None)
-    )  # (B,N,N), (B,M,M)
+    )  
     C_xy, C_yx = (cost(x, y.detach()), cost(y, x.detach()))  # (B,N,M), (B,M,N)
 
     diameter, ε, ε_s, ρ = scaling_parameters(x, y, p, blur, reach, diameter, scaling)
@@ -98,9 +99,9 @@ def softmin_online_lazytensor(ε, C_xy, f_y, p=2):
     if p == 2:
         D_ij = ((x_i - y_j) ** 2).sum(-1) / 2
     elif p == 1:
-        Dis = ((x_i - y_j) ** 2).sum(-1).sqrt()
+        D_ij = ((x_i - y_j) ** 2).sum(-1).sqrt()
 
-    smin = (f_j -  D_ij /  ε).logsumexp(2).view(B,-1)
+    smin = (f_j - D_ij * torch.Tensor([1 / ε]).type_as(x)).logsumexp(2).view(B,-1)
 
     return - ε * smin
 
