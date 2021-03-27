@@ -8,7 +8,7 @@ try:  # Import the keops library, www.kernel-operations.io
     from pykeops.torch import generic_logsumexp
     from pykeops.torch.cluster import grid_cluster, cluster_ranges_centroids
     from pykeops.torch.cluster import sort_clusters, from_matrix, swap_axes
-    from pykeops.torch import LazyTensor
+    from pykeops.torch import LazyTensor, Vi, Vj, Pm
     keops_available = True
 except:
     keops_available = False
@@ -105,21 +105,37 @@ def softmin_online_lazytensor(ε, C_xy, f_y, p=2):
 
     return - ε * smin
 
+def lse_lazytensor(p, D, batchdims=(1,)):
+    """Modern LazyTensor implementation."""
+
+    x_i = Vi(0, D)
+    y_j = Vj(1, D)
+    f_j = Vj(2, 1)
+    epsinv = Pm(3, 1)
+
+    x_i.batchdims = batchdims
+    y_j.batchdims = batchdims
+    f_j.batchdims = batchdims
+    epsinv.batchdims = batchdims
+
+    if p == 2:
+        D_ij = ((x_i - y_j) ** 2).sum(-1) / 2
+    elif p == 1:
+        D_ij = ((x_i - y_j) ** 2).sum(-1).sqrt()
+
+    smin = (f_j - epsinv * D_ij).logsumexp(2)
+    return smin
+
+
     
 cost_formulas = {
     1: "Norm2(X-Y)",
     2: "(SqDist(X,Y) / IntCst(2))",
 }
 
-def softmin_online_genred(ε, C_xy, f_y, log_conv=None):
+def lse_genred(cost, D, dtype="float32"):
     """Legacy "Genred" implementation, with low-level KeOps formulas."""
-    x, y = C_xy
-    # KeOps is pretty picky on the input shapes...
-    return -ε * log_conv(x, y, f_y.view(-1, 1), torch.Tensor([1 / ε]).type_as(x)).view(
-        -1
-    )
-  
-def keops_lse(cost, D, dtype="float32"):
+
     log_conv = generic_logsumexp(
         "( B - (P * " + cost + " ) )",
         "A = Vi(1)",
@@ -130,6 +146,21 @@ def keops_lse(cost, D, dtype="float32"):
         dtype=dtype,
     )
     return log_conv
+
+
+def softmin_online(ε, C_xy, f_y, log_conv=None):
+    x, y = C_xy
+    # KeOps is pretty picky on the input shapes...
+    #print(x.requires_grad, y.requires_grad, f_y.requires_grad)
+
+    batch = x.dim() > 2
+    B = x.shape[0]
+    f = f_y.view(B, -1, 1) if batch else f_y.view(-1, 1)
+
+    out = -ε * log_conv(x, y, f, torch.Tensor([1 / ε]).type_as(x))
+    #print(out.requires_grad)
+
+    return out.view(B, -1) if batch else out.view(1, -1)
 
 
 def sinkhorn_online(
@@ -154,20 +185,29 @@ def sinkhorn_online(
     B, N, D = x.shape
     B, M, _ = y.shape
 
-    if cost is None:
-        softmin = partial(softmin_online_lazytensor, p=p)
+    if cost is None and B > 1:
+        if True:
+            raise ValueError("Not expected in this benchmark!")
+            softmin = partial(softmin_online_lazytensor, p=p)
+        else:
+            my_lse = lse_lazytensor(p, D, batchdims=(B,))
+            softmin = partial(softmin_online, log_conv=my_lse)
+
     else:
         if B > 1:
             raise ValueError("Custom cost functions are not yet supported with batches.""")
         
         x = x.squeeze(0)
         y = y.squeeze(0)
-        softmin = partial(
-            softmin_online_genred, log_conv=keops_lse(cost, D, dtype=str(x.dtype)[6:])
-        )
+
+        if cost is None:
+            cost = cost_formulas[p]
+
+        my_lse = lse_genred(cost, D, dtype=str(x.dtype)[6:])
+        softmin = partial(softmin_online, log_conv=my_lse)
     
 
-    # The "cost matrices" are implicitely encoded in the point clouds,
+    # The "cost matrices" are implicitly encoded in the point clouds,
     # and re-computed on-the-fly:
     C_xx, C_yy = ((x, x.detach()), (y, y.detach())) if debias else (None, None)
     C_xy, C_yx = ((x, y.detach()), (y, x.detach()))
@@ -185,10 +225,7 @@ def sinkhorn_online(
 # ==============================================================================
 #                          backend == "multiscale"
 # ==============================================================================
-cost_formulas = {
-    1 : "Norm2(X-Y)",
-    2 : "(SqDist(X,Y) / IntCst(2))",
-}
+
 
 def keops_lse(cost, D, dtype="float32"):
     log_conv = generic_logsumexp("( B - (P * " + cost + " ) )",

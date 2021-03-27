@@ -125,12 +125,19 @@ def bench_config(Loss, dev):
 
             times.append(elapsed)
             if (nloops * elapsed > MAXTIME) or (
-                nloops * elapsed > REDTIME / 10 and len(Nloops) > 0
+                nloops * elapsed > REDTIME and len(Nloops) > 0
             ):
                 nloops = Nloops.pop(0)
+    
+    except RuntimeError as err:
+        if str(err)[:4] != "CUDA":
+            raise err
 
-    except RuntimeError:
-        print("**\nMemory overflow !")
+        print(err)
+        print("** Runtime error!")
+
+    #except RuntimeError:
+    #    print("**\nMemory overflow !")
     except IndexError:
         print("**\nToo slow !")
 
@@ -208,6 +215,7 @@ full_bench(SamplesLoss("energy"))
 # configuration's diameter:
 
 full_bench(SamplesLoss("sinkhorn", p=2, blur=0.05, diameter=1))
+
 
 
 ##############################################
