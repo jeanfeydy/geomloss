@@ -214,7 +214,7 @@ class SamplesLoss(Module):
         Until then, please check the tutorials :-)"""
 
         l_x, α, x, l_y, β, y = self.process_args(*args)
-        B, N, M, D = self.check_shapes(l_x, α, x, l_y, β, y)
+        B, N, M, D, l_x, α, l_y, β = self.check_shapes(l_x, α, x, l_y, β, y)
 
         backend = (
             self.backend
@@ -466,4 +466,4 @@ class SamplesLoss(Module):
                 "Weights 'β' and samples 'y' should have compatible shapes."
             )
 
-        return B, N, M, D
+        return B, N, M, D, l_x, α, l_y, β
