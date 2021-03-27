@@ -1,4 +1,6 @@
 import torch
+from torch.nn.functional import conv1d, avg_pool2d, avg_pool3d, interpolate
+
 
 try:  # Import the keops library, www.kernel-operations.io
     from pykeops.torch import LazyTensor
@@ -53,3 +55,172 @@ def distances(x, y, use_keops=False):
 
     else:
         return torch.sqrt( torch.clamp_min(squared_distances(x,y), 1e-8) )
+
+
+
+
+def C_transform(G, tau = 1, p = 2) :
+    """
+    Computes the forward C-transform of an array G of shape:
+     - (Batch, Nx)         in 1D
+     - (Batch, Nx, Ny)     in 2D
+     - (Batch, Nx, Ny, Nz) in 3D
+
+    i.e.
+    F(x_i) <- max_j [G(x_j) - C(x_i, x_j)]
+
+    with:
+    C(x,y) = |x-y|^p / (p * tau)
+
+    In this first demo, we assume that:
+      - We are working with square images: Nx = Ny = Nz = N.
+      - p = 1 or 2  (Manhattan or Euclidean distance).
+      - Pixels have unit length in all dimensions. 
+    """
+    D = G.ndim - 1  # D = 1, 2 or 3
+    B, N = G.shape[0], G.shape[1]
+
+    x = torch.arange(N).type_as(G)  # [0, ..., N-1], on the same device as G.
+    if p == 1:
+        x = x / tau
+    if p == 2:
+        x = x / np.sqrt(2 * tau)
+    else:
+        raise NotImplementedError()
+
+    def lines(g) :
+        g = g.contiguous()  # Make sure that g is not "transposed" implicitely,
+                            # but stored as a contiguous array of numbers.
+        
+        g_j = LazyTensor(g.view(-1, 1, N, 1))
+        x_i = LazyTensor(x.view( 1, N, 1, 1))
+        x_j = LazyTensor(x.view( 1, 1, N, 1))
+
+        if p == 1:
+            Cg_ij = g_j - (x_i - x_j).abs()  # (B * N, N, N, 1)
+        elif p == 2:
+            Cg_ij = g_j - (x_i - x_j)**2  # (B * N, N, N, 1)
+
+        f_i = Cg_ij.max(dim=2)  # (B * N, N, 1)
+
+        if D == 1:
+            return f_i.view(B, N)
+        elif D == 2:
+            return f_i.view(B, N, N)
+        elif D == 3:
+            return f_i.view(B, N, N, N)
+
+    if D == 1:
+        G = lines(G)
+
+    if D == 2:
+        G = lines( G )  # Act on lines
+        G = lines( G.permute([0,2,1]) ).permute([0,2,1])  # Act on columns
+
+    elif D == 3:
+        G = lines( G )  # Act on dim 4
+        G = lines( G.permute([0,1,3,2]) ).permute([0,1,3,2])  # Act on dim 3
+        G = lines( G.permute([0,3,2,1]) ).permute([0,3,2,1])  # Act on dim 2
+
+    return G
+
+
+BATCH, CHANNEL, HEIGHT, WIDTH = 0,1,2,3
+
+def dimension(I) :
+    return I.dim() - 2
+
+subsample = {
+    2 : (lambda x : 4 * avg_pool2d(x, 2)),
+    3 : (lambda x : 8 * avg_pool3d(x, 2)),
+}
+
+upsample_mode = {
+    2 : "bilinear",
+    3 : "trilinear",
+}
+
+def pyramid(I) :
+    D = dimension(I)
+    I_s = [I]
+
+    for i in range( int( np.log2( I.shape[HEIGHT] ) ) ) :
+        I = subsample[D](I)
+        I_s.append(I)
+
+    I_s.reverse()
+    return I_s
+
+
+def upsample(I) :
+    D = dimension(I)
+    return interpolate(I, scale_factor=2, mode=upsample_mode[D], align_corners=False)
+
+
+def log_dens(α) :
+    α_log = α.log()
+    α_log[α <= 0] = -10000.
+    return α_log
+
+
+
+
+def logconv(A_log, *args, backend="keops", **kwargs) :
+    if backend == "keops":
+        return logconv_keops(A_log, *args, **kwargs)
+
+    if dimension(A_log) == 2:
+        return logconv_2_fourier(A_log, *args, **kwargs)
+    elif dimension(A_log) == 3:
+        return logconv_3(A_log, *args, **kwargs)
+    else: 
+        raise NotImplementedError()
+
+
+# KeOps implementation =========================================================
+
+def logconv_keops(A_log, ε, p = 2) :
+    D = dimension(A_log)
+    B, K, N = A_log.shape[BATCH], A_log.shape[CHANNEL], A_log.shape[WIDTH]
+
+    x = torch.arange(N).type_as(A_log) / N
+    if p == 1:
+        x = x / ε
+    if p == 2:
+        x = x / np.sqrt(2 * ε)
+    else:
+        raise NotImplementedError()
+
+    def softmin(a_log) :
+        a_log = a_log.contiguous()
+        #print(a_log.shape)
+        a_log_j = LazyTensor(a_log.view(-1, 1, N, 1))
+        x_i     = LazyTensor(    x.view( 1, N, 1, 1))
+        x_j     = LazyTensor(    x.view( 1, 1, N, 1))
+
+        if p == 1:
+            kA_log_ij = a_log_j - (x_i - x_j).abs()  # (B * N, N, N, 1)
+        elif p == 2:
+            kA_log_ij = a_log_j - (x_i - x_j)**2  # (B * N, N, N, 1)
+
+            # kA_log_ij =  (x_i - x_j)**2 - g_j
+
+        #print(kA_log_ij)
+        kA_log = kA_log_ij.logsumexp(dim=2)  # (B * N, N, 1)
+
+        if D == 2:
+            return kA_log.view(B,K,N,N)
+        elif D == 3:
+            return kA_log.view(B,K,N,N,N)
+
+    if D == 2:
+        A_log = softmin( A_log )  # Act on lines
+        A_log = softmin( A_log.permute([0,1,3,2]) ).permute([0,1,3,2])  # Act on columns
+
+    elif D == 3:
+        A_log = softmin( A_log )  # Act on dim 4
+        A_log = softmin( A_log.permute([0,1,2,4,3]) ).permute([0,1,2,4,3])  # Act on dim 3
+        A_log = softmin( A_log.permute([0,1,4,3,2]) ).permute([0,1,4,3,2])  # Act on dim 2
+
+    return -ε * A_log
+
