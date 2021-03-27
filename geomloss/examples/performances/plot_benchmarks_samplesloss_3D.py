@@ -117,35 +117,51 @@ def bench_config(Loss, dev):
     print("Backend : {}, Device : {} -------------".format(Loss.backend, dev))
 
     times = []
+    
+    def run_bench():
+        try:
+            Nloops = [100, 10, 1]
+            nloops = Nloops.pop(0)
+            for n in NS:
+                elapsed = benchmark(Loss, dev, n, loops=nloops)
+
+                times.append(elapsed)
+                if (nloops * elapsed > MAXTIME) or (
+                    nloops * elapsed > REDTIME and len(Nloops) > 0
+                ):
+                    nloops = Nloops.pop(0)
+
+        except IndexError:
+            print("**\nToo slow !")
+    
+                
     try:
-        Nloops = [100, 10, 1]
-        nloops = Nloops.pop(0)
-        for n in NS:
-            elapsed = benchmark(Loss, dev, n, loops=nloops)
-
-            times.append(elapsed)
-            if (nloops * elapsed > MAXTIME) or (
-                nloops * elapsed > REDTIME / 10 and len(Nloops) > 0
-            ):
-                nloops = Nloops.pop(0)
-
-    except RuntimeError:
-        print("**\nMemory overflow !")
-    except IndexError:
-        print("**\nToo slow !")
+        run_bench()
+    
+    except RuntimeError as err:
+        if str(err)[:4] == "CUDA":
+            print("**\nMemory overflow !")
+            
+        else:
+            # CUDA memory overflows semi-break the internal
+            # torch state and may cause some strange bugs.
+            # In this case, best option is simply to re-launch
+            # the benchmark.
+            run_bench()
+    
 
     return times + (len(NS) - len(times)) * [np.nan]
 
 
-def full_bench(Loss):
+def full_bench(loss, *args, **kwargs):
     """Benchmarks the varied backends of a geometric loss function."""
 
-    print("Benchmarking : {} ===============================".format(Loss.loss))
+    print("Benchmarking : ===============================")
 
     lines = [NS]
     backends = ["tensorized", "online", "multiscale"]
     for backend in backends:
-        Loss.backend = backend
+        Loss = SamplesLoss(*args, **kwargs, backend = backend)
         lines.append(bench_config(Loss, "cuda" if use_cuda else "cpu"))
 
     benches = np.array(lines).T
@@ -189,7 +205,7 @@ def full_bench(Loss):
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 
-full_bench(SamplesLoss("gaussian", blur=0.1, truncate=3))
+full_bench(SamplesLoss, "gaussian", blur=0.1, truncate=3)
 
 
 ##############################################
@@ -197,7 +213,7 @@ full_bench(SamplesLoss("gaussian", blur=0.1, truncate=3))
 # ~~~~~~~~~~~~~~~~~~~~~~
 #
 
-full_bench(SamplesLoss("energy"))
+full_bench(SamplesLoss, "energy")
 
 
 ##############################################
@@ -207,13 +223,14 @@ full_bench(SamplesLoss("energy"))
 # With a medium blurring scale, at one twentieth of the
 # configuration's diameter:
 
-full_bench(SamplesLoss("sinkhorn", p=2, blur=0.05, diameter=1))
+full_bench(SamplesLoss, "sinkhorn", p=2, blur=0.05, diameter=1)
+
 
 
 ##############################################
 # With a small blurring scale, at one hundredth of the
 # configuration's diameter:
 
-full_bench(SamplesLoss("sinkhorn", p=2, blur=0.01, diameter=1))
+full_bench(SamplesLoss, "sinkhorn", p=2, blur=0.01, diameter=1)
 
 plt.show()
