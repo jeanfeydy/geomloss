@@ -96,8 +96,10 @@ def kernel_loss(
         kernel = kernel_routines[name]
     
     # Center the point clouds just in case, to prevent numeric overflows:
-    center = (x.mean(-2, keepdim=True) + y.mean(-2, keepdim=True)) / 2
-    x, y = x - center, y - center
+    # N.B.: This may break user-provided kernels and comes at a non-negligible 
+    #       cost for small problems, so let's disable this by default.
+    # center = (x.mean(-2, keepdim=True) + y.mean(-2, keepdim=True)) / 2
+    # x, y = x - center, y - center
 
     # (B,N,N) tensor
     K_xx = kernel(double_grad(x), x.detach(), blur=blur, use_keops=use_keops, ranges=ranges_xx)  
