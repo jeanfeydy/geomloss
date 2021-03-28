@@ -1,14 +1,15 @@
+import torch
+from .utils import log_dens, pyramid, upsample, logconv
 
 
-
-def sinkhorn_barycenter(measures, weights, blur=0, p=2, scaling_N = 10):
+def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N = 10):
 
     a_k = measures  # (B, K, N, N)
-    w_k = weights   # (K,)
+    w_k = weights   # (B,K)
     if blur == 0:
         blur = 1 / measures.shape[-1]
 
-    bar = (a_k * w_k[None,:,None,None]).sum(1)
+    bar = (a_k * w_k[:,:,None,None]).sum(1)
 
     with torch.no_grad() :
         # Pre-compute a multiscale decomposition (=QuadTree)
@@ -21,7 +22,7 @@ def sinkhorn_barycenter(measures, weights, blur=0, p=2, scaling_N = 10):
         f_k, g_k = logconv(ak_log_s[0], eps, p), logconv(ak_log_s[0], eps, p)
         
         d_log = torch.ones_like(ak_log_s[0]).sum(dim=1, keepdim=True)
-        d_log -= d_log.logsumexp([2, 3])
+        d_log -= d_log.logsumexp([2, 3], keepdim=True)
         
         # Multiscale descent, with eps-scaling:
         for n, ak_log in enumerate( ak_log_s ):
@@ -30,7 +31,7 @@ def sinkhorn_barycenter(measures, weights, blur=0, p=2, scaling_N = 10):
 
                 # Update the barycenter:
                 ft_k = logconv(ak_log  + g_k / eps, eps, p) / eps
-                bar_log = d_log - (ft_k * w_k[None,:,None,None]).sum(1)
+                bar_log = d_log - (ft_k * w_k[:,:,None,None]).sum(1, keepdim=True)
 
                 # symmetric Sinkhorn updates:
                 ft_k = logconv(ak_log  + g_k / eps, eps, p)
@@ -39,7 +40,7 @@ def sinkhorn_barycenter(measures, weights, blur=0, p=2, scaling_N = 10):
 
                 # Update the barycenter:
                 ft_k = logconv(ak_log  + g_k / eps, eps, p) / eps
-                bar_log = d_log - (ft_k * w_k[None,:,None,None]).sum(1)
+                bar_log = d_log - (ft_k * w_k[:,:,None,None]).sum(1, keepdim=True)
 
                 # Update the de-biasing measure:
                 d_log = .5 * (d_log + bar_log + logconv(d_log, eps, p) / eps)

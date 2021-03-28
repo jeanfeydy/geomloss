@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from torch.nn.functional import conv1d, avg_pool2d, avg_pool3d, interpolate
 
@@ -17,6 +18,10 @@ def scal(α, f, batch=False):
     else:
         return torch.dot(α.view(-1), f.view(-1))
 
+
+#######################################
+# On point clouds
+#######################################
 
 def squared_distances(x, y, use_keops=False):
 
@@ -58,6 +63,51 @@ def distances(x, y, use_keops=False):
 
 
 
+#######################################
+# On grids
+#######################################
+
+
+BATCH, CHANNEL, HEIGHT, WIDTH, DEPTH = 0,1,2,3,4
+
+def dimension(I) :
+    """Returns 2 if we are working with 2D images and 3 for volumes."""
+    return I.dim() - 2
+
+subsample = {
+    2 : (lambda x : 4 * avg_pool2d(x, 2)),
+    3 : (lambda x : 8 * avg_pool3d(x, 2)),
+}
+
+upsample_mode = {
+    2 : "bilinear",
+    3 : "trilinear",
+}
+
+def pyramid(I) :
+    D = dimension(I)
+    I_s = [I]
+
+    for i in range( int( np.log2( I.shape[HEIGHT] ) ) ) :
+        I = subsample[D](I)
+        I_s.append(I)
+
+    I_s.reverse()
+    return I_s
+
+def upsample(I) :
+    D = dimension(I)
+    return interpolate(I, scale_factor=2, mode=upsample_mode[D], align_corners=False)
+
+def log_dens(α) :
+    α_log = α.log()
+    α_log[α <= 0] = -10000.
+    return α_log
+
+
+########################
+# "Hard" C-transform:
+#
 
 def C_transform(G, tau = 1, p = 2) :
     """
@@ -87,6 +137,10 @@ def C_transform(G, tau = 1, p = 2) :
         x = x / np.sqrt(2 * tau)
     else:
         raise NotImplementedError()
+
+    if not keops_available:
+        raise ImportError("This routine depends on the pykeops library.")
+
 
     def lines(g) :
         g = g.contiguous()  # Make sure that g is not "transposed" implicitely,
@@ -125,63 +179,18 @@ def C_transform(G, tau = 1, p = 2) :
     return G
 
 
-BATCH, CHANNEL, HEIGHT, WIDTH = 0,1,2,3
 
-def dimension(I) :
-    return I.dim() - 2
-
-subsample = {
-    2 : (lambda x : 4 * avg_pool2d(x, 2)),
-    3 : (lambda x : 8 * avg_pool3d(x, 2)),
-}
-
-upsample_mode = {
-    2 : "bilinear",
-    3 : "trilinear",
-}
-
-def pyramid(I) :
-    D = dimension(I)
-    I_s = [I]
-
-    for i in range( int( np.log2( I.shape[HEIGHT] ) ) ) :
-        I = subsample[D](I)
-        I_s.append(I)
-
-    I_s.reverse()
-    return I_s
+########################
+# "Soft" C-transform:
+#
 
 
-def upsample(I) :
-    D = dimension(I)
-    return interpolate(I, scale_factor=2, mode=upsample_mode[D], align_corners=False)
-
-
-def log_dens(α) :
-    α_log = α.log()
-    α_log[α <= 0] = -10000.
-    return α_log
-
-
-
-
-def logconv(A_log, *args, backend="keops", **kwargs) :
-    if backend == "keops":
-        return logconv_keops(A_log, *args, **kwargs)
-
-    if dimension(A_log) == 2:
-        return logconv_2_fourier(A_log, *args, **kwargs)
-    elif dimension(A_log) == 3:
-        return logconv_3(A_log, *args, **kwargs)
-    else: 
-        raise NotImplementedError()
-
-
-# KeOps implementation =========================================================
-
-def logconv_keops(A_log, ε, p = 2) :
+def logconv(A_log, ε, p = 2) :
     D = dimension(A_log)
     B, K, N = A_log.shape[BATCH], A_log.shape[CHANNEL], A_log.shape[WIDTH]
+
+    if not keops_available:
+        raise ImportError("This routine depends on the pykeops library.")
 
     x = torch.arange(N).type_as(A_log) / N
     if p == 1:
@@ -190,6 +199,7 @@ def logconv_keops(A_log, ε, p = 2) :
         x = x / np.sqrt(2 * ε)
     else:
         raise NotImplementedError()
+
 
     def softmin(a_log) :
         a_log = a_log.contiguous()
@@ -212,6 +222,7 @@ def logconv_keops(A_log, ε, p = 2) :
             return kA_log.view(B,K,N,N)
         elif D == 3:
             return kA_log.view(B,K,N,N,N)
+
 
     if D == 2:
         A_log = softmin( A_log )  # Act on lines
