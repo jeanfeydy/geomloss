@@ -102,16 +102,16 @@ cost_routines = {
     2: (lambda x, y: squared_distances(x, y) / 2),
 }
 
-def softmin_tensorized(eps, C, h):
+def softmin_tensorized(eps, C_xy, h_y):
     r"""Soft-C-transform, implemented using dense torch Tensors.
 
     This routine implements the (soft-)C-transform
     between dual vectors, which is the core computation for
     Auction- and Sinkhorn-like optimal transport solvers.
 
-    If `eps` is a float number, `C` is a (batched) cost matrix :math:`C(x_i,y_j)`
-    and `h` encodes a dual potential :math:`h_j` that is supported by the points
-    :math:`y_j`'s, then `softmin_tensorized(eps, C, g)` returns a dual potential
+    If `eps` is a float number, `C_xy` is a (batched) cost matrix :math:`C(x_i,y_j)`
+    and `h_y` encodes a dual potential :math:`h_j` that is supported by the points
+    :math:`y_j`'s, then `softmin_tensorized(eps, C_xy, h_y)` returns a dual potential
     `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
 
     .. math::
@@ -124,10 +124,10 @@ def softmin_tensorized(eps, C, h):
         eps (float, positive): Temperature :math:`\varepsilon` for the Gibbs kernel
             :math:`K_{i,j} = \exp(-C(x_i, y_j) / \varepsilon)`.
 
-        C ((B, N, M) Tensor): Cost matrix :math:`C(x_i,y_j)`, with a batch dimension.
+        C_xy ((B, N, M) Tensor): Cost matrix :math:`C(x_i,y_j)`, with a batch dimension.
 
-        g ((B, M) Tensor): Vector of logarithmic "dual" values, with a batch dimension.
-            Most often, this vector will be computed as `h = b_log + g_j / eps`, 
+        h_y ((B, M) Tensor): Vector of logarithmic "dual" values, with a batch dimension.
+            Most often, this vector will be computed as `h_y = b_log + g_j / eps`, 
             where `b_log` is a vector of log-weights :math:`\log(\beta_j)`
             for the :math:`y_j`'s and :math:`g_j` is a dual vector
             in the Sinkhorn algorithm, so that:
@@ -140,8 +140,8 @@ def softmin_tensorized(eps, C, h):
         (B, N) Tensor: Dual potential `f` of values :math:`f_i`, supported
             by the points :math:`x_i`.
     """
-    B = C.shape[0]
-    return -eps * (h.view(B, 1, -1) - C / eps).logsumexp(2).view(B, -1)
+    B = C_xy.shape[0]
+    return -eps * (h_y.view(B, 1, -1) - C_xy / eps).logsumexp(2).view(B, -1)
 
 
 def sinkhorn_tensorized(
@@ -287,26 +287,72 @@ def sinkhorn_tensorized(
 # ==============================================================================
 
 
-def softmin_online_lazytensor(eps, C_xy, f_y, p=2):
-    """Modern LazyTensor implementation."""
-    x, y = C_xy
-    B = x.shape[0]
+def softmin_online_lazytensor(eps, C_xy, h_y, p=2):
+    r"""Soft-C-transform, implemented using symbolic KeOps LazyTensors.
 
-    x_i = LazyTensor(x[:, :, None, :])
-    y_j = LazyTensor(y[:, None, :, :])
-    f_j = LazyTensor(f_y[:, None, :, None])
+    This routine implements the (soft-)C-transform
+    between dual vectors, which is the core computation for
+    Auction- and Sinkhorn-like optimal transport solvers.
+
+    If `eps` is a float number, `C_xy = (x, y)` is a pair of (batched) 
+    point clouds, encoded as (B, N, D) and (B, M, D) Tensors
+    and `h_y` encodes a dual potential :math:`h_j` that is supported by the points
+    :math:`y_j`'s, then `softmin_tensorized(eps, C_xy, h_y)` returns a dual potential
+    `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
+
+    .. math::
+        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp 
+        \big[ h_j - \|x_i - y_j\|^p / p \varepsilon \big]~.
+
+    For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
+
+    Args:
+        eps (float, positive): Temperature :math:`\varepsilon` for the Gibbs kernel
+            :math:`K_{i,j} = \exp(- \|x_i - y_j\|^p / p \varepsilon)`.
+
+        C_xy (pair of (B, N, D), (B, M, D) Tensors): Point clouds :math:`x_i`
+            and :math:`y_j`, with a batch dimension.
+
+        h_y ((B, M) Tensor): Vector of logarithmic "dual" values, with a batch dimension.
+            Most often, this vector will be computed as `h_y = b_log + g_j / eps`, 
+            where `b_log` is a vector of log-weights :math:`\log(\beta_j)`
+            for the :math:`y_j`'s and :math:`g_j` is a dual vector
+            in the Sinkhorn algorithm, so that:
+            
+            .. math::
+                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \beta_j
+                \exp \tfrac{1}{\varepsilon} \big[ g_j - \|x_i - y_j\|^p / p \big]~.
+
+    Returns:
+        (B, N) Tensor: Dual potential `f` of values :math:`f_i`, supported
+            by the points :math:`x_i`.
+    """
+    x, y = C_xy  # Retrieve our point clouds
+    B = x.shape[0]  # Batch dimension
+
+    # Encoding as batched KeOps LazyTensors:
+    x_i = LazyTensor(x[:, :, None, :])  # (B, N, 1, D)
+    y_j = LazyTensor(y[:, None, :, :])  # (B, 1, M, D)
+    h_j = LazyTensor(h_y[:, None, :, None])  # (B, 1, M, 1)
     
-    if p == 2:
-        D_ij = ((x_i - y_j) ** 2).sum(-1) / 2
-    elif p == 1:
-        D_ij = ((x_i - y_j) ** 2).sum(-1).sqrt()
+    # Cost matrix:
+    if p == 2:  # Halved, squared Euclidean distance
+        C_ij = ((x_i - y_j) ** 2).sum(-1) / 2  # (B, N, M, 1)
 
-    smin = (f_j - D_ij * torch.Tensor([1 / eps]).type_as(x)).logsumexp(2).view(B,-1)
+    elif p == 1:  # Simple Euclidean distance
+        C_ij = ((x_i - y_j) ** 2).sum(-1).sqrt()  # (B, N, M, 1)
+
+    else:
+        raise NotImplementedError()
+
+    # KeOps log-sum-exp reduction over the "M" dimension:
+    smin = (h_j - C_ij * torch.Tensor([1 / eps]).type_as(x)).logsumexp(2).view(B,-1)
 
     return - eps * smin
 
+
 def lse_lazytensor(p, D, batchdims=(1,)):
-    """Modern LazyTensor implementation."""
+    """This implementation is currently disabled."""
 
     x_i = Vi(0, D)
     y_j = Vj(1, D)
@@ -327,7 +373,7 @@ def lse_lazytensor(p, D, batchdims=(1,)):
     return smin
 
 
-    
+# Low-level KeOps formulas for the ground cost:
 cost_formulas = {
     1: "Norm2(X-Y)",
     2: "(SqDist(X,Y) / IntCst(2))",
@@ -339,8 +385,8 @@ def lse_genred(cost, D, dtype="float32"):
     log_conv = generic_logsumexp(
         "( B - (P * " + cost + " ) )",
         "A = Vi(1)",
-        "X = Vi({})".format(D),
-        "Y = Vj({})".format(D),
+        f"X = Vi({D})",
+        f"Y = Vj({D})",
         "B = Vj(1)",
         "P = Pm(1)",
         dtype=dtype,
@@ -348,17 +394,14 @@ def lse_genred(cost, D, dtype="float32"):
     return log_conv
 
 
-def softmin_online(eps, C_xy, f_y, log_conv=None):
+def softmin_online(eps, C_xy, h_y, log_conv=None):
     x, y = C_xy
     # KeOps is pretty picky on the input shapes...
-    #print(x.requires_grad, y.requires_grad, f_y.requires_grad)
-
     batch = x.dim() > 2
     B = x.shape[0]
-    f = f_y.view(B, -1, 1) if batch else f_y.view(-1, 1)
+    h = h_y.view(B, -1, 1) if batch else h_y.view(-1, 1)
 
-    out = -eps * log_conv(x, y, f, torch.Tensor([1 / eps]).type_as(x))
-    #print(out.requires_grad)
+    out = -eps * log_conv(x, y, h, torch.Tensor([1 / eps]).type_as(x))
 
     return out.view(B, -1) if batch else out.view(1, -1)
 
@@ -379,9 +422,6 @@ def sinkhorn_online(
     **kwargs
 ):
 
-    # N, D = x.shape
-    # M, _ = y.shape
-
     B, N, D = x.shape
     B, M, _ = y.shape
 
@@ -397,8 +437,8 @@ def sinkhorn_online(
         if B > 1:
             raise ValueError("Custom cost functions are not yet supported with batches.""")
         
-        x = x.squeeze(0)
-        y = y.squeeze(0)
+        x = x.squeeze(0)  # (1, N, D) -> (N, D)
+        y = y.squeeze(0)  # (1, M, D) -> (M, D)
 
         if cost is None:
             cost = cost_formulas[p]
@@ -436,7 +476,6 @@ def keops_lse(cost, D, dtype="float32"):
                                  "P = Pm(1)",
                                  dtype = dtype)
     return log_conv
-
 
 
 def softmin_multiscale(eps, C_xy, f_y, log_conv=None):
