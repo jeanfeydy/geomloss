@@ -1,5 +1,6 @@
 import torch
-from .utils import log_dens, pyramid, upsample, logconv
+from .utils import log_dens, pyramid, upsample
+from .utils import softmin_grid as softmin
 
 
 def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N = 10):
@@ -19,7 +20,7 @@ def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N = 10):
 
         # Initialize the dual variables
         sigma = 1 ; eps = sigma ** p  # sigma = blurring scale, eps = temperature
-        f_k, g_k = logconv(ak_log_s[0], eps, p), logconv(ak_log_s[0], eps, p)
+        f_k, g_k = softmin(eps, p, ak_log_s[0]), softmin(eps, p, ak_log_s[0])
         
         d_log = torch.ones_like(ak_log_s[0]).sum(dim=1, keepdim=True)
         d_log -= d_log.logsumexp([2, 3], keepdim=True)
@@ -30,20 +31,20 @@ def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N = 10):
                 eps = sigma ** p
 
                 # Update the barycenter:
-                ft_k = logconv(ak_log  + g_k / eps, eps, p) / eps
+                ft_k = softmin(eps, p, ak_log  + g_k / eps) / eps
                 bar_log = d_log - (ft_k * w_k[:,:,None,None]).sum(1, keepdim=True)
 
                 # symmetric Sinkhorn updates:
-                ft_k = logconv(ak_log  + g_k / eps, eps, p)
-                gt_k = logconv(bar_log + f_k / eps, eps, p)
+                ft_k = softmin(eps, p, ak_log  + g_k / eps)
+                gt_k = softmin(eps, p, bar_log + f_k / eps)
                 f_k += ft_k ; f_k *= .5 ; g_k += gt_k ; g_k *= .5
 
                 # Update the barycenter:
-                ft_k = logconv(ak_log  + g_k / eps, eps, p) / eps
+                ft_k = softmin(eps, p, ak_log  + g_k / eps) / eps
                 bar_log = d_log - (ft_k * w_k[:,:,None,None]).sum(1, keepdim=True)
 
                 # Update the de-biasing measure:
-                d_log = .5 * (d_log + bar_log + logconv(d_log, eps, p) / eps)
+                d_log = .5 * (d_log + bar_log + softmin(eps, p, d_log) / eps)
 
                 # Decrease the kernel radius, making sure that
                 # σ is divided by two at every scale until we reach

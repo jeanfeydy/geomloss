@@ -11,12 +11,12 @@ except:
     keops_available = False
 
 
-def scal(α, f, batch=False):
+def scal(a, f, batch=False):
     if batch:
-        B = α.shape[0]
-        return (α.view(B, -1) * f.view(B, -1)).sum(1)
+        B = a.shape[0]
+        return (a.reshape(B, -1) * f.reshape(B, -1)).sum(1)
     else:
-        return torch.dot(α.view(-1), f.view(-1))
+        return torch.dot(a.reshape(-1), f.reshape(-1))
 
 
 #######################################
@@ -184,19 +184,57 @@ def C_transform(G, tau = 1, p = 2) :
 # "Soft" C-transform:
 #
 
+def softmin_grid(eps, C_xy, h_y):
+    r"""Soft-C-transform, implemented using seperable KeOps operations.
 
-def logconv(A_log, ε, p = 2) :
-    D = dimension(A_log)
-    B, K, N = A_log.shape[BATCH], A_log.shape[CHANNEL], A_log.shape[WIDTH]
+    This routine implements the (soft-)C-transform
+    between dual vectors, which is the core computation for
+    Auction- and Sinkhorn-like optimal transport solvers.
+
+    If `eps` is a float number, `C_xy` is a tuple of axes dimensions
+    and `h_y` encodes a dual potential :math:`h_j` that is supported by the 1D/2D/3D grid 
+    points :math:`y_j`'s, then `softmin_tensorized(eps, C_xy, h_y)` returns a dual potential
+    `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
+
+    .. math::
+        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp 
+        \big[ h_j - C(x_i, y_j) / \varepsilon \big]~.
+
+    For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
+
+    Args:
+        eps (float, positive): Temperature :math:`\varepsilon` for the Gibbs kernel
+            :math:`K_{i,j} = \exp(-C(x_i, y_j) / \varepsilon)`.
+
+        C_xy (): Encodes the implicit cost matrix :math:`C(x_i,y_j)`.
+
+        h_y ((B, Nx), (B, Nx, Ny) or (B, Nx, Ny, Nz) Tensor): 
+            Grid of logarithmic "dual" values, with a batch dimension.
+            Most often, this image will be computed as `h_y = b_log + g_j / eps`, 
+            where `b_log` is an array of log-weights :math:`\log(\beta_j)`
+            for the :math:`y_j`'s and :math:`g_j` is a dual variable
+            in the Sinkhorn algorithm, so that:
+            
+            .. math::
+                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \beta_j
+                \exp \tfrac{1}{\varepsilon} \big[ g_j - C(x_i, y_j) \big]~.
+
+    Returns:
+        (B, Nx), (B, Nx, Ny) or (B, Nx, Ny, Nz) Tensor: Dual potential `f` of values 
+            :math:`f_i`, supported by the points :math:`x_i`.
+    """
+    D = dimension(h_y)
+    B, K, N = h_y.shape[BATCH], h_y.shape[CHANNEL], h_y.shape[WIDTH]
 
     if not keops_available:
         raise ImportError("This routine depends on the pykeops library.")
 
-    x = torch.arange(N).type_as(A_log) / N
+    x = torch.arange(N).type_as(h_y) / N
+    p = C_xy
     if p == 1:
-        x = x / ε
+        x = x / eps
     if p == 2:
-        x = x / np.sqrt(2 * ε)
+        x = x / np.sqrt(2 * eps)
     else:
         raise NotImplementedError()
 
@@ -225,13 +263,13 @@ def logconv(A_log, ε, p = 2) :
 
 
     if D == 2:
-        A_log = softmin( A_log )  # Act on lines
-        A_log = softmin( A_log.permute([0,1,3,2]) ).permute([0,1,3,2])  # Act on columns
+        h_y = softmin( h_y )  # Act on lines
+        h_y = softmin( h_y.permute([0,1,3,2]) ).permute([0,1,3,2])  # Act on columns
 
     elif D == 3:
-        A_log = softmin( A_log )  # Act on dim 4
-        A_log = softmin( A_log.permute([0,1,2,4,3]) ).permute([0,1,2,4,3])  # Act on dim 3
-        A_log = softmin( A_log.permute([0,1,4,3,2]) ).permute([0,1,4,3,2])  # Act on dim 2
+        h_y = softmin( h_y )  # Act on dim 4
+        h_y = softmin( h_y.permute([0,1,2,4,3]) ).permute([0,1,2,4,3])  # Act on dim 3
+        h_y = softmin( h_y.permute([0,1,4,3,2]) ).permute([0,1,4,3,2])  # Act on dim 2
 
-    return -ε * A_log
+    return -eps * h_y
 
