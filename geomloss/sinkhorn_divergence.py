@@ -175,6 +175,7 @@ def sinkhorn_loop(
             C_xxs, C_yys = [C_xxs], [C_yys]
         C_xys, C_yxs = [C_xys], [C_yxs]
 
+    prev_autograd = torch.is_grad_enabled()
     torch.autograd.set_grad_enabled(False)
 
     k = 0  # Scale index; we start at the coarsest resolution available
@@ -219,7 +220,7 @@ def sinkhorn_loop(
                 C_xy_, C_yx_ = C_xys[k + 1], C_yxs[k + 1]
 
                 last_extrapolation = False  # No need to re-extrapolate after the loop
-                torch.autograd.set_grad_enabled(True)
+                torch.autograd.set_grad_enabled(prev_autograd)
 
             else:  # It's worth investing some time on kernel truncation...
 
@@ -277,7 +278,7 @@ def sinkhorn_loop(
                 C_xx, C_yy = C_xx_, C_yy_
             C_xy, C_yx = C_xy_, C_yx_
 
-    torch.autograd.set_grad_enabled(True)
+    torch.autograd.set_grad_enabled(prev_autograd)
 
     if last_extrapolation:
         # Last extrapolation, to get the correct gradients:
