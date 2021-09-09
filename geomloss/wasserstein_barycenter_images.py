@@ -32,7 +32,7 @@ def barycenter_iteration(f_k, g_k, d_log, eps, p, ak_log, w_k):
     return f_k, g_k, d_log, bar_log
 
 
-def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10):
+def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10, backward_iterations=5):
 
     a_k = measures  # Densities, (B,K,N,N)
     w_k = weights  # Barycentric weights, (B,K)
@@ -41,7 +41,7 @@ def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10):
     if blur == 0:
         blur = 1 / measures.shape[-1]
 
-    with torch.no_grad():
+    with torch.set_grad_enabled(backward_iterations == 0):
 
         # Initialize the barycenter as a pointwise linear combination:
         bar = (a_k * w_k[:, :, None, None]).sum(1)  # (B,K,N,N) @ (B,K,1,1) -> (B,N,N)
@@ -60,7 +60,7 @@ def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10):
 
         # Logarithm of the debiasing term:
         d_log = torch.ones_like(ak_log_s[0]).sum(dim=1, keepdim=True)  # (B,1,2,2)
-        d_log -= d_log.logsumexp([2, 3], keepdim=True)  # Normalize each 2x2 image
+        d_log = d_log - d_log.logsumexp([2, 3], keepdim=True)  # Normalize each 2x2 image
 
         # Multiscale descent, with eps-scaling:
         # We iterate over sub-sampled images of shape nxn = 2x2, 4x4, ..., NxN
@@ -83,9 +83,8 @@ def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10):
                 g_k = upsample(g_k)
                 d_log = upsample(d_log)
 
-    if measures.requires_grad or weights.requires_grad:
-        print("Hi!")
-        for _ in range(4):
+    if (measures.requires_grad or weights.requires_grad) and backward_iterations > 0:
+        for _ in range(backward_iterations):
             f_k, g_k, d_log, bar_log = barycenter_iteration(
                 f_k, g_k, d_log, eps, p, ak_log, w_k
             )
