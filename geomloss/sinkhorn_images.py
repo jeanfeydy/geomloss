@@ -156,7 +156,7 @@ def sinkhorn_divergence(
     jumps = []
     for i, eps in enumerate(eps_list[1:]):
         if current_scale ** p > eps:
-            jumps.append(i+1)
+            jumps.append(i + 1)
             current_scale = pyramid_scales.pop(0)
 
     print("Temperatures: ", eps_list)

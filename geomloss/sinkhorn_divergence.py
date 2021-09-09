@@ -521,9 +521,9 @@ def sinkhorn_loop(
 
             if i == len(eps_list) - 1:  # Last iteration: just extrapolate!
 
-                C_xy_, C_yx_ = C_xys[k + 1], C_yxs[k + 1]
+                C_xy_fine, C_yx_fine = C_xys[k + 1], C_yxs[k + 1]
                 if debias:
-                    C_xx_, C_yy_ = C_xxs[k + 1], C_yys[k + 1]
+                    C_xx_fine, C_yy_fine = C_xxs[k + 1], C_yys[k + 1]
 
                 last_extrapolation = False  # No need to re-extrapolate after the loop
                 torch.autograd.set_grad_enabled(True)
@@ -544,7 +544,7 @@ def sinkhorn_loop(
                 # and rely instead on the separability of the Gaussian convolution kernel.
 
                 # Line 9: a <-> b ------------------------------------------------------
-                C_xy_, C_yx_ = kernel_truncation(
+                C_xy_fine, C_yx_fine = kernel_truncation(
                     C_xy,
                     C_yx,
                     C_xys[k + 1],
@@ -558,7 +558,7 @@ def sinkhorn_loop(
 
                 if debias:
                     # Line 10: a <-> a  ------------------------------------------------
-                    C_xx_, _ = kernel_truncation(
+                    C_xx_fine, _ = kernel_truncation(
                         C_xx,
                         C_xx,
                         C_xxs[k + 1],
@@ -570,7 +570,7 @@ def sinkhorn_loop(
                         cost=cost,
                     )
                     # Line 11: b <-> b -------------------------------------------------
-                    C_yy_, _ = kernel_truncation(
+                    C_yy_fine, _ = kernel_truncation(
                         C_yy,
                         C_yy,
                         C_yys[k + 1],
@@ -592,21 +592,21 @@ def sinkhorn_loop(
             #
             # N.B.: the cross-updates below *must* be done in parallel!
             f_ba, g_ab = (
-                extrapolate(f_ba, g_ab, eps, damping, C_xy, b_log, C_xy_),
-                extrapolate(g_ab, f_ba, eps, damping, C_yx, a_log, C_yx_),
+                extrapolate(f_ba, g_ab, eps, damping, C_xy, b_log, C_xy_fine),
+                extrapolate(g_ab, f_ba, eps, damping, C_yx, a_log, C_yx_fine),
             )
 
             # Extrapolation for the symmetric problems:
             if debias:
-                f_aa = extrapolate(f_aa, f_aa, eps, damping, C_xx, a_log, C_xx_)
-                g_bb = extrapolate(g_bb, g_bb, eps, damping, C_yy, b_log, C_yy_)
+                f_aa = extrapolate(f_aa, f_aa, eps, damping, C_xx, a_log, C_xx_fine)
+                g_bb = extrapolate(g_bb, g_bb, eps, damping, C_yy, b_log, C_yy_fine)
 
             # Line 13: update the measure weights and cost "matrices" ------------------
             k = k + 1
             a_log, b_log = a_logs[k], b_logs[k]
-            C_xy, C_yx = C_xy_, C_yx_
+            C_xy, C_yx = C_xy_fine, C_yx_fine
             if debias:
-                C_xx, C_yy = C_xx_, C_yy_
+                C_xx, C_yy = C_xx_fine, C_yy_fine
 
     # As a very last step, we perform a final "Sinkhorn" iteration.
     # As detailed above (around "torch.autograd.set_grad_enabled(False)"),
