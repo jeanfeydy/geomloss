@@ -233,7 +233,7 @@ def softmin_grid(eps, C_xy, h_y):
     p = C_xy
     if p == 1:
         x = x / eps
-    if p == 2:
+    elif p == 2:
         x = x / np.sqrt(2 * eps)
     else:
         raise NotImplementedError()
