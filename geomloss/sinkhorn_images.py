@@ -34,6 +34,7 @@ def sinkhorn_divergence(
     cost=None,
     debias=True,
     potentials=False,
+    verbose=False,
     **kwargs,
 ):
     r"""Sinkhorn divergence between measures supported on 1D/2D/3D grids.
@@ -150,7 +151,8 @@ def sinkhorn_divergence(
 
     # List of pixel widths:
     pyramid_scales = [diameter / a.shape[-1] for a in a_s]
-    print("Pyramid scales:", pyramid_scales)
+    if verbose:
+        print("Pyramid scales:", pyramid_scales)
 
     current_scale = pyramid_scales.pop(0)
     jumps = []
@@ -159,8 +161,10 @@ def sinkhorn_divergence(
             jumps.append(i + 1)
             current_scale = pyramid_scales.pop(0)
 
-    print("Temperatures: ", eps_list)
-    print("Jumps: ", jumps)
+    if verbose:
+        print("Temperatures: ", eps_list)
+        print("Jumps: ", jumps)
+
     assert (
         len(jumps) == len(a_s) - 1
     ), "There's a bug in the multicale pre-processing..."

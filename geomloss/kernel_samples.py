@@ -58,6 +58,7 @@ def double_grad(x):
 #                               All backends
 # ==============================================================================
 
+
 def gaussian_kernel(x, y, blur=0.05, use_keops=False, ranges=None):
     C2 = squared_distances(x / blur, y / blur, use_keops=use_keops)
     K = (-C2 / 2).exp()
@@ -89,37 +90,51 @@ kernel_routines = {
 
 
 def kernel_loss(
-    α, x, β, y, blur=0.05, kernel=None, name=None, potentials=False, use_keops=False, 
-    ranges_xx=None, ranges_yy=None, ranges_xy=None, **kwargs
+    α,
+    x,
+    β,
+    y,
+    blur=0.05,
+    kernel=None,
+    name=None,
+    potentials=False,
+    use_keops=False,
+    ranges_xx=None,
+    ranges_yy=None,
+    ranges_xy=None,
+    **kwargs
 ):
     if kernel is None:
         kernel = kernel_routines[name]
-    
+
     # Center the point clouds just in case, to prevent numeric overflows:
-    # N.B.: This may break user-provided kernels and comes at a non-negligible 
+    # N.B.: This may break user-provided kernels and comes at a non-negligible
     #       cost for small problems, so let's disable this by default.
     # center = (x.mean(-2, keepdim=True) + y.mean(-2, keepdim=True)) / 2
     # x, y = x - center, y - center
 
     # (B,N,N) tensor
-    K_xx = kernel(double_grad(x), x.detach(), blur=blur, use_keops=use_keops, ranges=ranges_xx)  
+    K_xx = kernel(
+        double_grad(x), x.detach(), blur=blur, use_keops=use_keops, ranges=ranges_xx
+    )
     # (B,M,M) tensor
-    K_yy = kernel(double_grad(y), y.detach(), blur=blur, use_keops=use_keops, ranges=ranges_yy)  
+    K_yy = kernel(
+        double_grad(y), y.detach(), blur=blur, use_keops=use_keops, ranges=ranges_yy
+    )
     # (B,N,M) tensor
-    K_xy = kernel(x, y, blur=blur, use_keops=use_keops, ranges=ranges_xy)  
+    K_xy = kernel(x, y, blur=blur, use_keops=use_keops, ranges=ranges_xy)
 
     # (B,N,N) @ (B,N) = (B,N)
-    a_x = (K_xx @ α.detach().unsqueeze(-1)).squeeze(-1) 
+    a_x = (K_xx @ α.detach().unsqueeze(-1)).squeeze(-1)
     # (B,M,M) @ (B,M) = (B,M)
-    b_y = (K_yy @ β.detach().unsqueeze(-1)).squeeze(-1)  
+    b_y = (K_yy @ β.detach().unsqueeze(-1)).squeeze(-1)
     # (B,N,M) @ (B,M) = (B,N)
-    b_x = (K_xy @ β.unsqueeze(-1)).squeeze(-1)  
-
+    b_x = (K_xy @ β.unsqueeze(-1)).squeeze(-1)
 
     if potentials:
         # (B,M,N) @ (B,N) = (B,M)
         Kt = K_xy.t() if use_keops else K_xy.transpose(1, 2)
-        a_y = (Kt @ α.unsqueeze(-1)).squeeze(-1)  
+        a_y = (Kt @ α.unsqueeze(-1)).squeeze(-1)
         return a_x - b_x, b_y - a_y
 
     else:  # Return the Kernel norm. N.B.: we assume that 'kernel' is symmetric:
@@ -129,6 +144,7 @@ def kernel_loss(
             + 0.5 * scal(double_grad(β), b_y, batch=batch)
             - scal(α, b_x, batch=batch)
         )
+
 
 # ==============================================================================
 #                          backend == "tensorized"
@@ -188,13 +204,12 @@ def kernel_multiscale(
             **kwargs
         )
 
-    # Renormalize our point cloud so that blur = 1:    
+    # Renormalize our point cloud so that blur = 1:
     # Center the point clouds just in case, to prevent numeric overflows:
     center = (x.mean(-2, keepdim=True) + y.mean(-2, keepdim=True)) / 2
     x, y = x - center, y - center
     x_ = x / blur
     y_ = y / blur
-
 
     # Don't forget to normalize the diameter too!
     if cluster_scale is None:

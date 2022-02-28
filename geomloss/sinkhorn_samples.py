@@ -9,6 +9,7 @@ try:  # Import the keops library, www.kernel-operations.io
     from pykeops.torch.cluster import grid_cluster, cluster_ranges_centroids
     from pykeops.torch.cluster import sort_clusters, from_matrix, swap_axes
     from pykeops.torch import LazyTensor, Vi, Vj, Pm
+
     keops_available = True
 except:
     keops_available = False
@@ -28,6 +29,7 @@ cost_routines = {
     2: (lambda x, y: squared_distances(x, y) / 2),
 }
 
+
 def softmin_tensorized(eps, C_xy, h_y):
     r"""Soft-C-transform, implemented using dense torch Tensors.
 
@@ -41,7 +43,7 @@ def softmin_tensorized(eps, C_xy, h_y):
     `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
 
     .. math::
-        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp 
+        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp
         \big[ h_j - C(x_i, y_j) / \varepsilon \big]~.
 
     For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
@@ -53,11 +55,11 @@ def softmin_tensorized(eps, C_xy, h_y):
         C_xy ((B, N, M) Tensor): Cost matrix :math:`C(x_i,y_j)`, with a batch dimension.
 
         h_y ((B, M) Tensor): Vector of logarithmic "dual" values, with a batch dimension.
-            Most often, this vector will be computed as `h_y = b_log + g_j / eps`, 
+            Most often, this vector will be computed as `h_y = b_log + g_j / eps`,
             where `b_log` is a vector of log-weights :math:`\log(\beta_j)`
             for the :math:`y_j`'s and :math:`g_j` is a dual vector
             in the Sinkhorn algorithm, so that:
-            
+
             .. math::
                 f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \beta_j
                 \exp \tfrac{1}{\varepsilon} \big[ g_j - C(x_i, y_j) \big]~.
@@ -83,7 +85,7 @@ def sinkhorn_tensorized(
     cost=None,
     debias=True,
     potentials=False,
-    **kwargs
+    **kwargs,
 ):
     r"""Vanilla PyTorch implementation of the Sinkhorn divergence.
 
@@ -103,20 +105,20 @@ def sinkhorn_tensorized(
         p (int, optional): Exponent of the ground cost function
             :math:`C(x_i,y_j)`, which is equal to
             :math:`\tfrac{1}{p}\|x_i-y_j\|^p` if it is not provided
-            explicitly through the `cost` optional argument. 
+            explicitly through the `cost` optional argument.
             Defaults to 2.
 
         blur (float, optional): Target value for the blurring scale
-            of the Gibbs kernel 
+            of the Gibbs kernel
             :math:`K_{i,j} = \exp(-C(x_i,y_j)/\varepsilon) = \exp(-\|x_i-y_j\|^p / p \text{blur}^p).
             In the Sinkhorn algorithm, the temperature :math:`\varepsilon`
-            is computed as :math:`\text{blur}^p`. 
+            is computed as :math:`\text{blur}^p`.
             Defaults to 0.05.
 
         reach (float or None (= +infty), optional): Typical scale for the
             maximum displacement between any two points :math:`x_i` and :math:`y_j`
-            in the optimal transport model. 
-            In the unbalanced Sinkhorn divergence, 
+            in the optimal transport model.
+            In the unbalanced Sinkhorn divergence,
             the strength :math:`\rho` of the soft marginal constraints
             is computed as :math:`\rho = \text{reach}^p`.
             Defaults to None.
@@ -124,18 +126,18 @@ def sinkhorn_tensorized(
         diameter (float or None, optional): Upper bound on the value
             of the distance :math:`\|x_i-y_j\|` between any two samples.
             This will be used as a first value of the `blur` radius
-            in the epsilon-scaling annealing descent.  
+            in the epsilon-scaling annealing descent.
             Defaults to None: an upper bound will be estimated on the fly.
 
         scaling (float in (0, 1), optional): Ratio between two successive
-            values of the blur radius in the epsilon-scaling annealing descent.  
+            values of the blur radius in the epsilon-scaling annealing descent.
             Defaults to 0.5.
 
-        cost (function, optional): Cost function :math:`C(x_i,y_j)`. 
+        cost (function, optional): Cost function :math:`C(x_i,y_j)`.
             It should take as input two point clouds `x` and `y`
             with a batch dimension, encoded as `(B, N, D)`, `(B, M, D)`
             torch Tensors and return a `(B, N, M)` torch Tensor.
-            Defaults to None: we use a Euclidean cost 
+            Defaults to None: we use a Euclidean cost
             :math:`C(x_i,y_j) = \tfrac{1}{p}\|x_i-y_j\|^p`.
 
         debias (bool, optional): Should we used the "de-biased" Sinkhorn divergence
@@ -148,24 +150,24 @@ def sinkhorn_tensorized(
             For a detailed discussion of the influence of this parameter,
             see e.g. Fig. 3.21 in Jean Feydy's PhD thesis.
             Defaults to True.
-            
+
         potentials (bool, optional): Should we return the optimal dual potentials
-            instead of the cost value? 
+            instead of the cost value?
             Defaults to False.
 
     Returns:
-        (B,) Tensor or pair of (B, N), (B, M) Tensors: if `potentials` is True, 
+        (B,) Tensor or pair of (B, N), (B, M) Tensors: if `potentials` is True,
             we return a pair of (B, N), (B, M) Tensors that encode the optimal dual vectors,
             respectively supported by :math:`x_i` and :math:`y_j`.
             Otherwise, we return a (B,) Tensor of values for the Sinkhorn divergence.
     """
 
-    # Retrieve the batch size B, the numbers of samples N, M 
+    # Retrieve the batch size B, the numbers of samples N, M
     # and the size of the ambient space D:
     B, N, D = x.shape
     _, M, _ = y.shape
 
-    # By default, our cost function :math:`C(x_i,y_j)` is a halved, 
+    # By default, our cost function :math:`C(x_i,y_j)` is a halved,
     # squared Euclidean distance (p=2) or a simple Euclidean distance (p=1):
     if cost is None:
         cost = cost_routines[p]
@@ -186,7 +188,9 @@ def sinkhorn_tensorized(
     # Compute the relevant values of the diameter of the configuration,
     # target temperature epsilon, temperature schedule across itereations
     # and strength of the marginal constraints:
-    diameter, eps, eps_list, rho = scaling_parameters(x, y, p, blur, reach, diameter, scaling)
+    diameter, eps, eps_list, rho = scaling_parameters(
+        x, y, p, blur, reach, diameter, scaling
+    )
 
     # Use an optimal transport solver to retrieve the dual potentials:
     f_aa, g_bb, g_ab, f_ba = sinkhorn_loop(
@@ -204,7 +208,17 @@ def sinkhorn_tensorized(
 
     # Optimal transport cost:
     return sinkhorn_cost(
-        eps, rho, a, b, f_aa, g_bb, g_ab, f_ba, batch=True, debias=debias, potentials=potentials
+        eps,
+        rho,
+        a,
+        b,
+        f_aa,
+        g_bb,
+        g_ab,
+        f_ba,
+        batch=True,
+        debias=debias,
+        potentials=potentials,
     )
 
 
@@ -220,14 +234,14 @@ def softmin_online_lazytensor(eps, C_xy, h_y, p=2):
     between dual vectors, which is the core computation for
     Auction- and Sinkhorn-like optimal transport solvers.
 
-    If `eps` is a float number, `C_xy = (x, y)` is a pair of (batched) 
+    If `eps` is a float number, `C_xy = (x, y)` is a pair of (batched)
     point clouds, encoded as (B, N, D) and (B, M, D) Tensors
     and `h_y` encodes a dual potential :math:`h_j` that is supported by the points
     :math:`y_j`'s, then `softmin_tensorized(eps, C_xy, h_y)` returns a dual potential
     `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
 
     .. math::
-        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp 
+        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp
         \big[ h_j - \|x_i - y_j\|^p / p \varepsilon \big]~.
 
     For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
@@ -240,11 +254,11 @@ def softmin_online_lazytensor(eps, C_xy, h_y, p=2):
             and :math:`y_j`, with a batch dimension.
 
         h_y ((B, M) Tensor): Vector of logarithmic "dual" values, with a batch dimension.
-            Most often, this vector will be computed as `h_y = b_log + g_j / eps`, 
+            Most often, this vector will be computed as `h_y = b_log + g_j / eps`,
             where `b_log` is a vector of log-weights :math:`\log(\beta_j)`
             for the :math:`y_j`'s and :math:`g_j` is a dual vector
             in the Sinkhorn algorithm, so that:
-            
+
             .. math::
                 f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \beta_j
                 \exp \tfrac{1}{\varepsilon} \big[ g_j - \|x_i - y_j\|^p / p \big]~.
@@ -260,7 +274,7 @@ def softmin_online_lazytensor(eps, C_xy, h_y, p=2):
     x_i = LazyTensor(x[:, :, None, :])  # (B, N, 1, D)
     y_j = LazyTensor(y[:, None, :, :])  # (B, 1, M, D)
     h_j = LazyTensor(h_y[:, None, :, None])  # (B, 1, M, 1)
-    
+
     # Cost matrix:
     if p == 2:  # Halved, squared Euclidean distance
         C_ij = ((x_i - y_j) ** 2).sum(-1) / 2  # (B, N, M, 1)
@@ -272,9 +286,9 @@ def softmin_online_lazytensor(eps, C_xy, h_y, p=2):
         raise NotImplementedError()
 
     # KeOps log-sum-exp reduction over the "M" dimension:
-    smin = (h_j - C_ij * torch.Tensor([1 / eps]).type_as(x)).logsumexp(2).view(B,-1)
+    smin = (h_j - C_ij * torch.Tensor([1 / eps]).type_as(x)).logsumexp(2).view(B, -1)
 
-    return - eps * smin
+    return -eps * smin
 
 
 def lse_lazytensor(p, D, batchdims=(1,)):
@@ -305,6 +319,7 @@ cost_formulas = {
     2: "(SqDist(X,Y) / IntCst(2))",
 }
 
+
 def lse_genred(cost, D, dtype="float32"):
     """Legacy "Genred" implementation, with low-level KeOps formulas."""
 
@@ -315,7 +330,7 @@ def lse_genred(cost, D, dtype="float32"):
         f"Y = Vj({D})",
         "B = Vj(1)",
         "P = Pm(1)",
-        dtype=dtype,
+        # dtype=dtype,
     )
     return log_conv
 
@@ -345,7 +360,7 @@ def sinkhorn_online(
     cost=None,
     debias=True,
     potentials=False,
-    **kwargs
+    **kwargs,
 ):
 
     B, N, D = x.shape
@@ -353,7 +368,7 @@ def sinkhorn_online(
 
     if cost is None and B > 1:
         if True:
-            raise ValueError("Not expected in this benchmark!")
+            # raise ValueError("Not expected in this benchmark!")
             softmin = partial(softmin_online_lazytensor, p=p)
         else:
             my_lse = lse_lazytensor(p, D, batchdims=(B,))
@@ -361,8 +376,10 @@ def sinkhorn_online(
 
     else:
         if B > 1:
-            raise ValueError("Custom cost functions are not yet supported with batches.""")
-        
+            raise ValueError(
+                "Custom cost functions are not yet supported with batches." ""
+            )
+
         x = x.squeeze(0)  # (1, N, D) -> (N, D)
         y = y.squeeze(0)  # (1, M, D) -> (M, D)
 
@@ -371,34 +388,59 @@ def sinkhorn_online(
 
         my_lse = lse_genred(cost, D, dtype=str(x.dtype)[6:])
         softmin = partial(softmin_online, log_conv=my_lse)
-    
 
     # The "cost matrices" are implicitly encoded in the point clouds,
     # and re-computed on-the-fly:
     C_xx, C_yy = ((x, x.detach()), (y, y.detach())) if debias else (None, None)
     C_xy, C_yx = ((x, y.detach()), (y, x.detach()))
 
-    diameter, eps, eps_list, rho = scaling_parameters(x, y, p, blur, reach, diameter, scaling)
+    diameter, eps, eps_list, rho = scaling_parameters(
+        x, y, p, blur, reach, diameter, scaling
+    )
 
-    f_aa, g_bb, g_ab, f_ba = sinkhorn_loop( softmin,
-                                        log_weights(a), log_weights(b), 
-                                        C_xx, C_yy, C_xy, C_yx, eps_list, rho, debias=debias )
+    f_aa, g_bb, g_ab, f_ba = sinkhorn_loop(
+        softmin,
+        log_weights(a),
+        log_weights(b),
+        C_xx,
+        C_yy,
+        C_xy,
+        C_yx,
+        eps_list,
+        rho,
+        debias=debias,
+    )
 
-    return sinkhorn_cost(eps, rho, a, b, f_aa, g_bb, g_ab, f_ba, batch=True, debias=debias, potentials=potentials)
+    return sinkhorn_cost(
+        eps,
+        rho,
+        a,
+        b,
+        f_aa,
+        g_bb,
+        g_ab,
+        f_ba,
+        batch=True,
+        debias=debias,
+        potentials=potentials,
+    )
 
 
 # ==============================================================================
 #                          backend == "multiscale"
 # ==============================================================================
 
+
 def keops_lse(cost, D, dtype="float32"):
-    log_conv = generic_logsumexp("( B - (P * " + cost + " ) )",
-                                 "A = Vi(1)",
-                                 "X = Vi({})".format(D),
-                                 "Y = Vj({})".format(D),
-                                 "B = Vj(1)",
-                                 "P = Pm(1)",
-                                 dtype = dtype)
+    log_conv = generic_logsumexp(
+        "( B - (P * " + cost + " ) )",
+        "A = Vi(1)",
+        "X = Vi({})".format(D),
+        "Y = Vj({})".format(D),
+        "B = Vj(1)",
+        "P = Pm(1)",
+        # dtype=dtype,
+    )
     return log_conv
 
 
@@ -522,7 +564,7 @@ def sinkhorn_multiscale(
     labels_x=None,
     labels_y=None,
     verbose=False,
-    **kwargs
+    **kwargs,
 ):
 
     N, D = x.shape
@@ -537,7 +579,9 @@ def sinkhorn_multiscale(
     )
     extrapolate = partial(extrapolate_samples, softmin=softmin)
 
-    diameter, eps, eps_list, rho = scaling_parameters(x, y, p, blur, reach, diameter, scaling)
+    diameter, eps, eps_list, rho = scaling_parameters(
+        x, y, p, blur, reach, diameter, scaling
+    )
 
     # Clusterize and sort our point clouds:
     if cluster_scale is None:

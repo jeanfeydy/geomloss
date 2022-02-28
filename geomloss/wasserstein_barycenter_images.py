@@ -32,7 +32,9 @@ def barycenter_iteration(f_k, g_k, d_log, eps, p, ak_log, w_k):
     return f_k, g_k, d_log, bar_log
 
 
-def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10, backward_iterations=5):
+def ImagesBarycenter(
+    measures, weights, blur=0, p=2, scaling_N=10, backward_iterations=5
+):
 
     a_k = measures  # Densities, (B,K,N,N)
     w_k = weights  # Barycentric weights, (B,K)
@@ -60,7 +62,9 @@ def ImagesBarycenter(measures, weights, blur=0, p=2, scaling_N=10, backward_iter
 
         # Logarithm of the debiasing term:
         d_log = torch.ones_like(ak_log_s[0]).sum(dim=1, keepdim=True)  # (B,1,2,2)
-        d_log = d_log - d_log.logsumexp([2, 3], keepdim=True)  # Normalize each 2x2 image
+        d_log = d_log - d_log.logsumexp(
+            [2, 3], keepdim=True
+        )  # Normalize each 2x2 image
 
         # Multiscale descent, with eps-scaling:
         # We iterate over sub-sampled images of shape nxn = 2x2, 4x4, ..., NxN

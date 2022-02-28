@@ -53,6 +53,7 @@ from .utils import scal
 #                             Utility functions
 # ==============================================================================
 
+
 def dampening(eps, rho):
     """Dampening factor for entropy+unbalanced OT with KL penalization of the marginals."""
     return 1 if rho is None else 1 / (1 + eps / rho)
@@ -91,6 +92,7 @@ class UnbalancedWeight(torch.nn.Module):
 # ==============================================================================
 #                            eps-scaling heuristic
 # ==============================================================================
+
 
 def max_diameter(x, y):
     """Returns a rough estimation of the diameter of a pair of point clouds.
@@ -162,10 +164,10 @@ def scaling_parameters(x, y, p, blur, reach, diameter, scaling):
     return diameter, eps, eps_list, rho
 
 
-
 # ==============================================================================
 #                              Sinkhorn divergence
 # ==============================================================================
+
 
 def sinkhorn_cost(
     eps, rho, a, b, f_aa, g_bb, g_ab, f_ba, batch=False, debias=True, potentials=False
@@ -249,7 +251,6 @@ def sinkhorn_cost(
                 )
 
 
-
 # ==============================================================================
 #                              Sinkhorn loop
 # ==============================================================================
@@ -297,7 +298,7 @@ def sinkhorn_loop(
             `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
 
             .. math::
-                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp 
+                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp
                 \big[ g_j - C(x_i, y_j) / \varepsilon \big]~.
 
             For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.

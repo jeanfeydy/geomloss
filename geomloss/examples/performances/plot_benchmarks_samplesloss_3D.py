@@ -117,7 +117,7 @@ def bench_config(Loss, dev):
     print("Backend : {}, Device : {} -------------".format(Loss.backend, dev))
 
     times = []
-    
+
     def run_bench():
         try:
             Nloops = [100, 10, 1]
@@ -133,22 +133,20 @@ def bench_config(Loss, dev):
 
         except IndexError:
             print("**\nToo slow !")
-    
-                
+
     try:
         run_bench()
-    
+
     except RuntimeError as err:
         if str(err)[:4] == "CUDA":
             print("**\nMemory overflow !")
-            
+
         else:
             # CUDA memory overflows semi-break the internal
             # torch state and may cause some strange bugs.
             # In this case, best option is simply to re-launch
             # the benchmark.
             run_bench()
-    
 
     return times + (len(NS) - len(times)) * [np.nan]
 
@@ -161,7 +159,7 @@ def full_bench(loss, *args, **kwargs):
     lines = [NS]
     backends = ["tensorized", "online", "multiscale"]
     for backend in backends:
-        Loss = SamplesLoss(*args, **kwargs, backend = backend)
+        Loss = SamplesLoss(*args, **kwargs, backend=backend)
         lines.append(bench_config(Loss, "cuda" if use_cuda else "cpu"))
 
     benches = np.array(lines).T
@@ -224,7 +222,6 @@ full_bench(SamplesLoss, "energy")
 # configuration's diameter:
 
 full_bench(SamplesLoss, "sinkhorn", p=2, blur=0.05, diameter=1)
-
 
 
 ##############################################
