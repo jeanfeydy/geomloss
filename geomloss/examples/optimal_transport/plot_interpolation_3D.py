@@ -77,7 +77,7 @@ def load_ply_file(fname):
 #
 
 import SimpleITK as sitk
-from skimage.measure import marching_cubes_lewiner as marching_cubes
+from skimage.measure import marching_cubes
 
 
 def load_nii_file(fname, threshold=0.5):
