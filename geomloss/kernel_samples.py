@@ -178,6 +178,10 @@ def kernel_loss(
 
     print(b_x.sum())
 
+    assert check_ranges(Nx, Nx, ranges_xx)
+    assert check_ranges(Ny, Ny, ranges_yy)
+    assert check_ranges(Nx, Ny, ranges_xy)
+    
     if potentials:
         # (B,M,N) @ (B,N) = (B,M)
         Kt = K_xy.t() if use_keops else K_xy.transpose(1, 2)
