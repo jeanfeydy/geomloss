@@ -113,6 +113,30 @@ def kernel_loss(
     # center = (x.mean(-2, keepdim=True) + y.mean(-2, keepdim=True)) / 2
     # x, y = x - center, y - center
 
+
+    def check_ranges(nx, ny, ranges):
+        if ranges is None:
+            return True
+        
+        for r in ranges:
+            assert (r >= 0).all()
+
+        assert ranges[0].max() <= nx
+        assert ranges[1].max() <= len(ranges[2])
+        assert ranges[2].max() <= ny
+        assert ranges[3].max() <= ny
+        assert ranges[4].max() <= len(ranges[5])
+        assert ranges[5].max() <= nx
+
+        return True
+    
+    Nx = len(x)
+    Ny = len(y)
+    print(Nx, Ny)
+    assert check_ranges(Nx, Nx, ranges_xx)
+    assert check_ranges(Ny, Ny, ranges_yy)
+    assert check_ranges(Nx, Ny, ranges_xy)
+
     # (B,N,N) tensor
     K_xx = kernel(
         double_grad(x), x.detach(), blur=blur, use_keops=use_keops, ranges=ranges_xx
@@ -124,12 +148,35 @@ def kernel_loss(
     # (B,N,M) tensor
     K_xy = kernel(x, y, blur=blur, use_keops=use_keops, ranges=ranges_xy)
 
+    if True:
+        print("xx", ranges_xx)
+        if ranges_xx is not None:
+            print([(s >= 0).all() for s in ranges_xx])
+            ranges_xx_cpu = [s.cpu() for s in ranges_xx]
     # (B,N,N) @ (B,N) = (B,N)
     a_x = (K_xx @ α.detach().unsqueeze(-1)).squeeze(-1)
+
+    print(a_x.sum())
+
+    if True:
+        print("yy", ranges_yy)
+        if ranges_yy is not None:
+            print([(s >= 0).all() for s in ranges_yy])
+            ranges_yy_cpu = [s.cpu() for s in ranges_yy]
     # (B,M,M) @ (B,M) = (B,M)
     b_y = (K_yy @ β.detach().unsqueeze(-1)).squeeze(-1)
+
+    print(b_y.sum())
+
+    if True:
+        print("xy", ranges_xy)
+        if ranges_xy is not None:
+            print([(s >= 0).all() for s in ranges_xy])
+            ranges_xy_cpu = [s.cpu() for s in ranges_xy]
     # (B,N,M) @ (B,M) = (B,N)
     b_x = (K_xy @ β.unsqueeze(-1)).squeeze(-1)
+
+    print(b_x.sum())
 
     if potentials:
         # (B,M,N) @ (B,N) = (B,M)
