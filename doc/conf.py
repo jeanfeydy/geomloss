@@ -23,6 +23,8 @@
 
 import sys, os
 import sphinx_gallery
+import time
+
 from recommonmark.transform import AutoStructify
 
 from geomloss import __version__
@@ -118,8 +120,8 @@ project = "GeomLoss"
 # import time
 # copyright = '2018-{}, Benjamin Charlier, Jean Feydy, Joan A. Glaunès'.format(time.strftime("%Y"))
 
-copyright = "2019-{}, Jean Feydy.".format(time.strftime("%Y"))
-author = "Jean Feydy."
+copyright = "2019-{}, Jean Feydy".format(time.strftime("%Y"))
+author = "Jean Feydy"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the

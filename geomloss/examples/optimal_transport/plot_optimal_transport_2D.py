@@ -37,7 +37,11 @@ def load_image(fname):
 
 def draw_samples(fname, n, dtype=torch.FloatTensor):
     A = load_image(fname)
-    xg, yg = np.meshgrid(np.linspace(0, 1, A.shape[0]), np.linspace(0, 1, A.shape[1]))
+    xg, yg = np.meshgrid(
+        np.linspace(0, 1, A.shape[0]),
+        np.linspace(0, 1, A.shape[1]),
+        indexing="xy",
+    )
 
     grid = list(zip(xg.ravel(), yg.ravel()))
     dens = A.ravel() / A.sum()

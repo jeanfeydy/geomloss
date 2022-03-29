@@ -194,7 +194,11 @@ def draw_samples(fname, sampling, dtype=dtype):
 
     a_i = A.ravel() / A.sum()
 
-    x, y = np.meshgrid(np.linspace(0, 1, A.shape[0]), np.linspace(0, 1, A.shape[1]))
+    x, y = np.meshgrid(
+        np.linspace(0, 1, A.shape[0]),
+        np.linspace(0, 1, A.shape[1]),
+        indexing="xy",
+    )
     x += 0.5 / A.shape[0]
     y += 0.5 / A.shape[1]
 

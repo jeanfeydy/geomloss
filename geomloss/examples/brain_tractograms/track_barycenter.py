@@ -80,6 +80,7 @@ def grid(nx, ny, nz):
         torch.arange(0.0, nx).type(dtype),
         torch.arange(0.0, ny).type(dtype),
         torch.arange(0.0, nz).type(dtype),
+        indexing="ij",
     )
     return torch.stack((x, y, z), dim=3).view(-1, 3).detach().cpu().numpy()
 

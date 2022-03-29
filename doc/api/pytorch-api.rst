@@ -9,5 +9,4 @@ with full support of PyTorch's :mod:`autograd` engine:
 
     SamplesLoss
 
-.. automodule:: geomloss
-    :members:
+.. autoclass:: SamplesLoss

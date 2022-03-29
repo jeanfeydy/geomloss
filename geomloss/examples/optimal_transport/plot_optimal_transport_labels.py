@@ -47,7 +47,11 @@ from random import choices
 
 def draw_samples(fname, n, dtype=torch.FloatTensor, labels=False):
     A = load_image(fname)
-    xg, yg = np.meshgrid(np.arange(A.shape[0]), np.arange(A.shape[1]))
+    xg, yg = np.meshgrid(
+        np.arange(A.shape[0]),
+        np.arange(A.shape[1]),
+        indexing="xy",
+    )
 
     # Draw random coordinates according to the input density:
     A_gray = (1 - A).sum(2)

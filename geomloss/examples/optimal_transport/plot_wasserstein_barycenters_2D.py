@@ -32,7 +32,7 @@ dtype = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 
 
 def grid(W):
-    y, x = torch.meshgrid([torch.arange(0.0, W).type(dtype) / W] * 2)
+    x, y = torch.meshgrid([torch.arange(0.0, W).type(dtype) / W] * 2, indexing="xy")
     return torch.stack((x, y), dim=2).view(-1, 2)
 
 
