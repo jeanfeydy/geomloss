@@ -28,7 +28,7 @@ from recommonmark.transform import AutoStructify
 from geomloss import __version__
 
 if __version__ == "???":
-    __version__ = "0.2.4"
+    __version__ = "0.2.5"
 
 # -- General configuration ------------------------------------------------
 
@@ -118,7 +118,7 @@ project = "GeomLoss"
 # import time
 # copyright = '2018-{}, Benjamin Charlier, Jean Feydy, Joan A. Glaunès'.format(time.strftime("%Y"))
 
-copyright = "2019-2021, Jean Feydy."
+copyright = "2019-{}, Jean Feydy.".format(time.strftime("%Y"))
 author = "Jean Feydy."
 
 # The version info for the project you're documenting, acts as replacement for

@@ -6,10 +6,9 @@ Install with pip (recommended)
 
 To install GeomLoss and all its (optional) dependencies, please:
 
-  1. Install the CUDA toolkit, including the **nvcc** compiler.
-  2. Install `PyTorch <https://pytorch.org/>`_.
-  3. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.
-  4. Install GeomLoss with::
+  1. Install `PyTorch <https://pytorch.org/>`_.
+  2. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.
+  3. Install GeomLoss with::
     
       pip install geomloss
 
@@ -30,20 +29,19 @@ of GeomLoss is to use `some advanced pip syntax <https://pip.pypa.io/en/stable/r
 
 .. code-block:: bash
 
-    pip install git+https://github.com/jeanfeydy/geomloss.git@master#egg=project[full]
+    pip install git+https://github.com/jeanfeydy/geomloss.git@main#egg=project[full]
 
 
 
 Alternatively, you may:
 
-  1. Install the CUDA toolkit, including the **nvcc** compiler.
-  2. Install `PyTorch <https://pytorch.org/>`_.
-  3. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.
-  4. Clone the GeomLoss repository::
+  1. Install `PyTorch <https://pytorch.org/>`_.
+  2. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.
+  3. Clone the GeomLoss repository::
     
         git clone https://github.com/jeanfeydy/geomloss.git
 
-  5. Add ``/path/to/geomloss`` to your ``$PYTHONPATH``.
+  4. Add ``/path/to/geomloss`` to your ``$PYTHONPATH``.
 
 
 
@@ -111,7 +109,7 @@ a new Colab notebook and to type the following instructions in the first few cel
     !pip install sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme plyfile >> install.log
 
     # Download KeOps...
-    !pip install pykeops[colab]  >> install.log
+    !pip install pykeops  >> install.log
 
     # Download GeomLoss
     !git clone https://github.com/jeanfeydy/geomloss.git  >> install.log

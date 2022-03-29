@@ -20,7 +20,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     author="Jean Feydy",
-    author_email="jfeydy@ic.ac.uk",
+    author_email="jean.feydy@inria.fr",
     python_requires=">=3",
     classifiers=[
         "Development Status :: 2 - Pre-Alpha",
@@ -43,8 +43,7 @@ setup(
     ],
     extras_require={
         "full": [
-            "pykeops[full]",
-            "cmake>=3.18",
+            "pykeops",
         ],
     },
 )
