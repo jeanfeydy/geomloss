@@ -244,16 +244,21 @@ class SamplesLoss(Module):
                     backend = "online"  # Play it safe, without kernel truncation
 
         # Check compatibility between the batchsize and the backend --------------------------
-        
+
         if backend in ["multiscale"]:  # multiscale routines work on single measures
             if B == 1:
                 α, x, β, y = α.squeeze(0), x.squeeze(0), β.squeeze(0), y.squeeze(0)
             elif B > 1:
-                warnings.warn("The 'multiscale' backend do not support batchsize > 1. " \
-                             +"Using 'tensorized' instead: beware of memory overflows!")
+                warnings.warn(
+                    "The 'multiscale' backend do not support batchsize > 1. "
+                    + "Using 'tensorized' instead: beware of memory overflows!"
+                )
                 backend = "tensorized"
 
-        if B == 0 and backend in ["tensorized", "online"]:  # tensorized and online routines work on batched tensors
+        if B == 0 and backend in [
+            "tensorized",
+            "online",
+        ]:  # tensorized and online routines work on batched tensors
             α, x, β, y = α.unsqueeze(0), x.unsqueeze(0), β.unsqueeze(0), y.unsqueeze(0)
 
         # Run --------------------------------------------------------------------------------
@@ -287,8 +292,12 @@ class SamplesLoss(Module):
 
         else:  # Return a scalar cost value
             if backend in ["multiscale"]:  # KeOps backends return a single scalar value
-                if B == 0: return values           # The user expects a scalar value
-                else:      return values.view(-1)  # The user expects a "batch list" of distances
+                if B == 0:
+                    return values  # The user expects a scalar value
+                else:
+                    return values.view(
+                        -1
+                    )  # The user expects a "batch list" of distances
 
             else:  # "tensorized" backend returns a "batch vector" of values
                 if B == 0:
@@ -402,17 +411,13 @@ class SamplesLoss(Module):
                 B,
                 N,
                 D,
-            ) = (
-                x.shape
-            )
+            ) = x.shape
             # Batchsize, number of "i" samples, dimension of the feature space
             (
                 B2,
                 M,
                 _,
-            ) = (
-                y.shape
-            )
+            ) = y.shape
             # Batchsize, number of "j" samples, dimension of the feature space
             if B != B2:
                 raise ValueError("Samples 'x' and 'y' should have the same batchsize.")

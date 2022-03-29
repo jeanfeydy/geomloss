@@ -121,8 +121,10 @@ for _ in range(5):  # Repeat the experiment 5 times
     x_, _ = X_i.sort(dim=0)
     y_, _ = Y_j.sort(dim=0)
     true_wass = (0.5 / len(X_i)) * ((x_ - y_) ** 2).sum()
+    true_wass = true_wass.item()
     # and when blur = +infinity:
     mean_diff = 0.5 * ((X_i.mean(0) - Y_j.mean(0)) ** 2).sum()
+    mean_diff = mean_diff.item()
 
     blurs = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0]
     sink, bwass = [], []

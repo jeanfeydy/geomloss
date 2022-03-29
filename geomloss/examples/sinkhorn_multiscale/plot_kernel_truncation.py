@@ -187,7 +187,7 @@ def load_image(fname):
     return 1 - img
 
 
-def draw_samples(fname, sampling, dtype=torch.FloatTensor):
+def draw_samples(fname, sampling, dtype=dtype):
     A = load_image(fname)
     A = A[::sampling, ::sampling]
     A[A <= 0] = 1e-8
