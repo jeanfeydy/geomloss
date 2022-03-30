@@ -1,4 +1,6 @@
-from ot_result import OTResult
+from .ot_result import OTResult
+from .check_input_output import cast_input
+
 
 
 # OT on empirical distributions
@@ -24,7 +26,25 @@ def solve_samples(
     reach=None,  # Specifies "rho" = reach^p
     # + same other params as above
 ):
-    return OTResult(potentials)
+    args, output_shapes = cast_input(
+        xa=(xa, "B,N,D"),
+        xb=(xb, "B,M,D"),
+        a=(a, "B,N"),
+        b=(b, "B,M"),
+        a_batch=(a_batch, "N"),
+        b_batch=(b_batch, "M"),
+    )
+    
+    return SinkhornSamplesOTResult(potentials)
+
+
+
+
+
+class SinkhornSamplesOTResult(OTResult):
+    pass
+
+
 
 
 # Convention:
