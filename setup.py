@@ -7,15 +7,18 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
+# Get the current version
+version = {}
+with open("geomloss/__version__.py") as fp:
+    exec(fp.read(), version)
+
 # Get the long description from the README file
 with open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
-import geomloss
-
 setup(
     name="geomloss",
-    version=geomloss.__version__,
+    version=version["__version__"],
     description="Geometric loss functions between point clouds, images and volumes.",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -40,6 +43,7 @@ setup(
     license="LICENSE.txt",
     install_requires=[
         "numpy",
+        "torch",
     ],
     extras_require={
         "full": [
