@@ -7,12 +7,9 @@ https://arxiv.org/pdf/1910.12958.pdf
 """
 
 
-
 def dampening(eps, rho):
     """Dampening factor for entropy+unbalanced OT with KL penalization of the marginals."""
     return 1 if rho is None else 1 / (1 + eps / rho)
-
-
 
 
 class UnbalancedWeight(torch.nn.Module):
@@ -36,8 +33,6 @@ class UnbalancedWeight(torch.nn.Module):
 
     def backward(self, g):
         return (self.rho + self.eps) * g
-
-
 
 
 def sinkhorn_cost(

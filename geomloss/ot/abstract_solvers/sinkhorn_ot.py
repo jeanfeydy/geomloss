@@ -34,15 +34,11 @@ https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
 
-
 def log_weights(a):
     """Returns the log of the input, with values clamped to -100k to avoid numerical bugs."""
     a_log = a.log()
     a_log[a <= 0] = -100000
     return a_log
-
-
-
 
 
 def sinkhorn_loop(

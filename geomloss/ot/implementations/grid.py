@@ -1,5 +1,3 @@
-
-
 BATCH, CHANNEL, HEIGHT, WIDTH, DEPTH = 0, 1, 2, 3, 4
 
 
@@ -211,13 +209,6 @@ def softmin_grid(eps, C_xy, h_y):
         )  # Act on dim 2
 
     return -eps * h_y
-
-
-
-
-
-
-
 
 
 # OT on grids

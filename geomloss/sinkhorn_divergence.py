@@ -140,14 +140,14 @@ def epsilon_schedule(p, diameter, blur, scaling):
         list of float: list of values for the temperature epsilon.
     """
     eps_list = (
-        [diameter ** p]
+        [diameter**p]
         + [
             np.exp(e)
             for e in np.arange(
                 p * np.log(diameter), p * np.log(blur), p * np.log(scaling)
             )
         ]
-        + [blur ** p]
+        + [blur**p]
     )
     return eps_list
 
@@ -158,8 +158,8 @@ def scaling_parameters(x, y, p, blur, reach, diameter, scaling):
         D = x.shape[-1]
         diameter = max_diameter(x.view(-1, D), y.view(-1, D))
 
-    eps = blur ** p
-    rho = None if reach is None else reach ** p
+    eps = blur**p
+    rho = None if reach is None else reach**p
     eps_list = epsilon_schedule(p, diameter, blur, scaling)
     return diameter, eps, eps_list, rho
 

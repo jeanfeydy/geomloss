@@ -245,7 +245,7 @@ transfer = generic_sum(
 # And apply it on the data (KeOps is pretty picky on the input shapes...):
 labels_i = (
     transfer(
-        torch.Tensor([blur ** 2]).type(dtype),
+        torch.Tensor([blur**2]).type(dtype),
         X_i,
         Y_j,
         F_i.view(-1, 1),
@@ -314,7 +314,7 @@ F_i, G_j = OT_solver(X_i, Y_j)
 # And apply it on the data:
 labels_i = (
     transfer(
-        torch.Tensor([blur ** 2]).type(dtype),
+        torch.Tensor([blur**2]).type(dtype),
         X_i,
         Y_j,
         F_i.view(-1, 1),

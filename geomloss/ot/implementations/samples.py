@@ -41,9 +41,6 @@ def distances(x, y, use_keops=False):
         return torch.sqrt(torch.clamp_min(squared_distances(x, y), 1e-8))
 
 
-
-
-
 # OT on empirical distributions
 def solve_samples(
     xa,  # (N, D) or (B, N, D)
@@ -75,17 +72,12 @@ def solve_samples(
         a_batch=(a_batch, "N"),
         b_batch=(b_batch, "M"),
     )
-    
+
     return SinkhornSamplesOTResult(potentials)
-
-
-
 
 
 class SinkhornSamplesOTResult(OTResult):
     pass
-
-
 
 
 # Convention:

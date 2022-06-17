@@ -368,7 +368,7 @@ GG_j = LazyTensor(G_j.view(1, M * 2, 1))
 CC_ij = ((XX_i - YY_j) ** 2).sum(-1) / 2  # (N, M * 2, 1) LazyTensor
 
 # Scaled kernel matrix:
-KK_ij = ((FF_i + GG_j - CC_ij) / blur ** 2).exp()  # (N, M * 2, 1) LazyTensor
+KK_ij = ((FF_i + GG_j - CC_ij) / blur**2).exp()  # (N, M * 2, 1) LazyTensor
 
 
 ################################################

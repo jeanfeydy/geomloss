@@ -55,7 +55,7 @@ def ImagesBarycenter(
 
         # Initialize the blur scale at 1, i.e. the full image length:
         sigma = 1  # sigma = blur scale
-        eps = sigma ** p  # eps = temperature
+        eps = sigma**p  # eps = temperature
 
         # Initialize the dual variables
         f_k, g_k = softmin(eps, p, ak_log_s[0]), softmin(eps, p, ak_log_s[0])
@@ -71,7 +71,7 @@ def ImagesBarycenter(
         for n, ak_log in enumerate(ak_log_s):
             for _ in range(scaling_N):  # Number of steps per scale
                 # Update the temperature:
-                eps = sigma ** p
+                eps = sigma**p
 
                 f_k, g_k, d_log, bar_log = barycenter_iteration(
                     f_k, g_k, d_log, eps, p, ak_log, w_k

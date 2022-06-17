@@ -228,7 +228,7 @@ class SamplesLoss(Module):
                 )
 
         elif backend == "auto":
-            if M * N <= 5000 ** 2:
+            if M * N <= 5000**2:
                 backend = (
                     "tensorized"  # Fast backend, with a quadratic memory footprint
                 )
@@ -236,7 +236,7 @@ class SamplesLoss(Module):
                 if (
                     D <= 3
                     and self.loss == "sinkhorn"
-                    and M * N > 10000 ** 2
+                    and M * N > 10000**2
                     and self.p == 2
                 ):
                     backend = "multiscale"  # Super scalable algorithm in low dimension

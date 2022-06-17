@@ -283,7 +283,7 @@ cluster_scale = 0.1 if not use_cuda else 0.05
 plt.figure(figsize=((12, ((Nits - 1) // 3 + 1) * 4)))
 
 for i in range(Nits):
-    blur = scaling ** i
+    blur = scaling**i
     Loss = SamplesLoss(
         "sinkhorn",
         p=2,

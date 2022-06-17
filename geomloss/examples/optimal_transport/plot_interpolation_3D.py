@@ -101,7 +101,7 @@ def create_sphere(n_samples=1000):
 
     indices = np.arange(0, n_samples, dtype=float) + 0.5
     phi = np.arccos(1 - 2 * indices / n_samples)
-    theta = np.pi * (1 + 5 ** 0.5) * indices
+    theta = np.pi * (1 + 5**0.5) * indices
 
     x, y, z = np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)
     points = np.vstack((x, y, z)).T
@@ -230,7 +230,7 @@ def normalize(measure, n=None):
     # Center, normalize the point cloud
     mean = (weights.view(-1, 1) * locations).sum(dim=0)
     locations -= mean
-    std = (weights.view(-1) * (locations ** 2).sum(dim=1).view(-1)).sum().sqrt()
+    std = (weights.view(-1) * (locations**2).sum(dim=1).view(-1)).sum().sqrt()
     locations /= std
 
     return weights, locations

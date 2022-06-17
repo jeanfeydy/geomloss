@@ -595,7 +595,7 @@ def sinkhorn_multiscale(
 
     jumps = [len(eps_list) - 1]
     for i, eps in enumerate(eps_list[2:]):
-        if cluster_scale ** p > eps:
+        if cluster_scale**p > eps:
             jumps = [i + 1]
             break
 
