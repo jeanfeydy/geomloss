@@ -33,8 +33,10 @@ Geometric data analysis, beyond convolutions (2020),
 https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
+from ..typing import Tensor, Optional, AnnealingParameters, SoftMin, CostMatrix, CostFunction, Extrapolator, KernelTruncation
+from .unbalanced_ot import dampening
 
-def log_weights(a):
+def log_weights(a: Tensor) -> Tensor:
     """Returns the log of the input, with values clamped to -100k to avoid numerical bugs."""
     a_log = a.log()
     a_log[a <= 0] = -100000
@@ -42,23 +44,24 @@ def log_weights(a):
 
 
 def sinkhorn_loop(
-    softmin,
-    a_logs,
-    b_logs,
-    C_xxs,
-    C_yys,
-    C_xys,
-    C_yxs,
-    eps_list,
-    rho,
-    jumps=[],
-    kernel_truncation=None,
-    truncate=5,
-    cost=None,
-    extrapolate=None,
-    debias=True,
-    last_extrapolation=True,
-):
+    *,
+    softmin: SoftMin,
+    a_logs: List[Tensor],
+    b_logs: List[Tensor],
+    C_xxs: List[CostMatrix],
+    C_yys: List[CostMatrix],
+    C_xys: List[CostMatrix],
+    C_yxs: List[CostMatrix],
+    eps_list: List[float],
+    rho: Optional[float] = None,
+    jumps: List[int] = [],
+    kernel_truncation: Optional[KernelTruncation] = None,
+    truncate: Optional[float] = 5.,
+    cost: Optional[CostFunction] = None,
+    extrapolate: Optional[Extrapolator] = None,
+    debias: bool = True,
+    last_extrapolation: bool = True,
+) -> tuple[Optional[Tensor], Optional[Tensor], Tensor, Tensor]:
     r"""Implements the (possibly multiscale) symmetric Sinkhorn loop,
     with the epsilon-scaling (annealing) heuristic.
 
@@ -130,7 +133,7 @@ def sinkhorn_loop(
         kernel_truncation (function, optional): Implements the kernel truncation trick.
             Defaults to None.
 
-        truncate (int, optional): Optional argument for `kernel_truncation`.
+        truncate (float, optional): Optional argument for `kernel_truncation`.
             Defaults to 5.
 
         cost (string or function, optional): Optional argument for `kernel_truncation`.
@@ -185,8 +188,8 @@ def sinkhorn_loop(
 
     # The multiscale algorithm may loop over several representations
     # of the input measures.
-    # In this routine, the convention is that "myvars" denotes
-    # the list of "myvar" across different scales.
+    # In this routine, the convention is that "myvars" (with an 's') 
+    # denotes the list of "myvar" across different scales.
     if type(a_logs) is not list:
         # The "single-scale" use case is simply encoded
         # using lists of length 1.
@@ -223,7 +226,7 @@ def sinkhorn_loop(
 
     # We start at the coarsest resolution available:
     k = 0  # Scale index
-    eps = eps_list[k]  # First value of the temperature (typically, = diameter**p)
+    eps = eps_list[k]  # First value of the temperature (typically, eps = diameter**p)
 
     # Damping factor: equal to 1 for balanced OT,
     # < 1 for unbalanced OT with KL penalty on the marginal constraints.
