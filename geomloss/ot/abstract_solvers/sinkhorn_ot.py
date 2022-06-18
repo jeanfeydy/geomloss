@@ -230,6 +230,7 @@ def sinkhorn_loop(
     #       "Super-efficiency of automatic differentiation for
     #       functions defined as a minimum", Ablin, Peyré, Moreau (2020)
     #       https://arxiv.org/pdf/2002.03722.pdf.
+    prev_autograd = torch.is_grad_enabled()
     torch.autograd.set_grad_enabled(False)
 
     # Line 1 (in Algorithm 3.6 from Jean Feydy's PhD thesis) ---------------------------
@@ -325,7 +326,7 @@ def sinkhorn_loop(
                     C_xx_fine, C_yy_fine = C_xxs[k + 1], C_yys[k + 1]
 
                 last_extrapolation = False  # No need to re-extrapolate after the loop
-                torch.autograd.set_grad_enabled(True)
+                torch.autograd.set_grad_enabled(prev_autograd)
 
             else:  # It's worth investing some time on kernel truncation...
                 # The lines below implement the Kernel truncation trick,
@@ -411,7 +412,7 @@ def sinkhorn_loop(
     # As detailed above (around "torch.autograd.set_grad_enabled(False)"),
     # this allows us to retrieve correct expressions for the gradient
     # without having to backprop through the whole Sinkhorn loop.
-    torch.autograd.set_grad_enabled(True)
+    torch.autograd.set_grad_enabled(prev_autograd)
 
     if last_extrapolation:
         # The cross-updates should be done in parallel!
