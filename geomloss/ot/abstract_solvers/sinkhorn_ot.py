@@ -36,7 +36,7 @@ https://www.jeanfeydy.com/geometric_data_analysis.pdf
 from ..typing import (
     Tensor,
     Optional,
-    AnnealingParameters,
+    SinkhornPotentials,
     SoftMin,
     CostMatrix,
     CostFunction,
@@ -426,6 +426,16 @@ def sinkhorn_loop(
             g_bb = damping * softmin(eps, C_yy, (b_log + g_bb / eps).detach())
 
     if debias:
-        return f_aa, g_bb, g_ab, f_ba
+        return SinkhornPotentials(
+            f_aa=f_aa,
+            g_bb=g_bb,
+            g_ab=g_ab,
+            f_ba=f_ba,
+        )
     else:
-        return None, None, g_ab, f_ba
+        return SinkhornPotentials(
+            f_aa=None,
+            g_bb=None,
+            g_ab=g_ab,
+            f_ba=f_ba,
+        )

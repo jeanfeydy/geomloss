@@ -122,3 +122,14 @@ class AnnealingParameters(NamedTuple):
     diameter: float
     blur_list: List[float]
     eps_list: List[float]
+
+
+# The Sinkhorn potentials contains the four output of the Sinkhorn loop
+#
+# Please note that the symmetric potentials are only used
+# for debiased entropic OT: biased OT uses None instead.
+class SinkhornPotentials(NamedTuple):
+    f_aa: Optional[Tensor]  # Symmetric potential f_aa(x_i)
+    g_bb: Optional[Tensor]  # Symmetric potential g_bb(y_j)
+    g_ab: Tensor  # Dual potential g_ab(y_j)
+    f_ba: Tensor  # Dual potential f_ba(x_i)
