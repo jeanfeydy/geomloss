@@ -33,8 +33,18 @@ Geometric data analysis, beyond convolutions (2020),
 https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
-from ..typing import Tensor, Optional, AnnealingParameters, SoftMin, CostMatrix, CostFunction, Extrapolator, KernelTruncation
+from ..typing import (
+    Tensor,
+    Optional,
+    AnnealingParameters,
+    SoftMin,
+    CostMatrix,
+    CostFunction,
+    Extrapolator,
+    KernelTruncation,
+)
 from .unbalanced_ot import dampening
+
 
 def log_weights(a: Tensor) -> Tensor:
     """Returns the log of the input, with values clamped to -100k to avoid numerical bugs."""
@@ -56,7 +66,7 @@ def sinkhorn_loop(
     rho: Optional[float] = None,
     jumps: List[int] = [],
     kernel_truncation: Optional[KernelTruncation] = None,
-    truncate: Optional[float] = 5.,
+    truncate: Optional[float] = 5.0,
     cost: Optional[CostFunction] = None,
     extrapolate: Optional[Extrapolator] = None,
     debias: bool = True,
@@ -188,7 +198,7 @@ def sinkhorn_loop(
 
     # The multiscale algorithm may loop over several representations
     # of the input measures.
-    # In this routine, the convention is that "myvars" (with an 's') 
+    # In this routine, the convention is that "myvars" (with an 's')
     # denotes the list of "myvar" across different scales.
     if type(a_logs) is not list:
         # The "single-scale" use case is simply encoded

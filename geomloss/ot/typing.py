@@ -33,7 +33,7 @@ SoftMin = Callable[[float, CostMatrix, Tensor], Tensor]
 # from a coarse point cloud x[i] to a finer point cloud x_fine[i].
 #
 # Depending on the context, this function may either rely on straightforward
-# bi/tri-linear interpolation or on the analytical formula for the 
+# bi/tri-linear interpolation or on the analytical formula for the
 # Sinkhorn updates between point clouds.
 #
 # It takes as input:
@@ -42,15 +42,26 @@ SoftMin = Callable[[float, CostMatrix, Tensor], Tensor]
 # - a temperature eps(ilon),
 # - a damping factor (which is equal to 1 for balanced OT),
 # - a coarse cost matrix C_xy[i,j] = C(x[i], y[j]),
-# - a coarse vector of log-weights b_log[j] = log(b(y[j])), supported by the other measure, 
-# - a fine cost matrix C_xy_fine[i,j] = C(x_fine[i], y_fine[j]). 
+# - a coarse vector of log-weights b_log[j] = log(b(y[j])), supported by the other measure,
+# - a fine cost matrix C_xy_fine[i,j] = C(x_fine[i], y_fine[j]).
 #
 # It returns a new dual potential supported on the points x_fine[i].
 #
 # In the multiscale Sinkhorn loop, we typically use calls like:
 #   f_ba = extrapolate(f_ba, g_ab, eps, damping, C_xy, b_log, C_xy_fine),
 
-Extrapolator = Callable[[Tensor, Tensor, float, float, CostMatrix, Tensor, CostMatrix,], Tensor]
+Extrapolator = Callable[
+    [
+        Tensor,
+        Tensor,
+        float,
+        float,
+        CostMatrix,
+        Tensor,
+        CostMatrix,
+    ],
+    Tensor,
+]
 
 
 # The kernel truncation function is used in the multiscale Sinkhorn scheme.
@@ -60,10 +71,10 @@ Extrapolator = Callable[[Tensor, Tensor, float, float, CostMatrix, Tensor, CostM
 #
 # It takes as input:
 # - a coarse cost matrix C_xy[i,j] = C(x[i], y[j]),
-# - a coarse cost matrix C_yx[i,j] = C(y[i], x[j]), 
+# - a coarse cost matrix C_yx[i,j] = C(y[i], x[j]),
 #   typically the transpose of C_xy,
 # - a fine cost matrix C_xy_fine[i,j] = C(x_fine[i], y_fine[j]),
-# - a fine cost matrix C_yx_fine[i,j] = C(y_fine[i], x_fine[j]), 
+# - a fine cost matrix C_yx_fine[i,j] = C(y_fine[i], x_fine[j]),
 #   typically the transpose of C_xy_fine,
 # - a coarse dual potential f_x[i] = f(x[i]),
 # - a coarse dual potential g_y[j] = g(y[j]),
@@ -88,8 +99,21 @@ Extrapolator = Callable[[Tensor, Tensor, float, float, CostMatrix, Tensor, CostM
 #                     cost=cost,
 #                     )
 
-KernelTruncation = Callable[[CostMatrix, CostMatrix, CostMatrix, CostMatrix, Tensor, Tensor, float, Optional[float], Optional[CostFunction],], tuple[CostMatrix, CostMatrix]]
-                        
+KernelTruncation = Callable[
+    [
+        CostMatrix,
+        CostMatrix,
+        CostMatrix,
+        CostMatrix,
+        Tensor,
+        Tensor,
+        float,
+        Optional[float],
+        Optional[CostFunction],
+    ],
+    tuple[CostMatrix, CostMatrix],
+]
+
 
 # The annealing parameters contains the lists of blur scales and temperatures
 # epsilon that we use in successive iterations of the Sinkhorn loop.

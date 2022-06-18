@@ -56,9 +56,9 @@ def annealing_parameters(
 
     Args:
         x (Tensor): Sample positions for the source measure.
-        
+
         y (Tensor): Sample positions for the target measure.
-        
+
         p (integer or float): The exponent of the Euclidean distance
             :math:`\|x_i-y_j\|` that defines the cost function
             :math:`\text{C}(x_i,y_j) =\tfrac{1}{p} \|x_i-y_j\|^p`.
@@ -69,13 +69,13 @@ def annealing_parameters(
         blur (float > 0): Target value for the blur scale and the
             temperature (= entropic regularization parameter)
             ":math:`\varepsilon = \text{blur}^p`".
-        
+
         reach (float > 0 or None): Strength of the marginal constraints.
             None stands for +infinity, i.e. balanced optimal transport.
-            
+
         diameter (float > 0 or None): Upper bound on the largest distance between
             points :math:`x_i` and :math:`y_j`.
-        
+
         n_iter (int >= 1 or None): Number of iterations.
 
         scaling (float in (0,1) or None): Ratio between two successive
