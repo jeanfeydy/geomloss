@@ -1,14 +1,49 @@
-from typing import List, Dict, Optional, Any
+from typing import Tuple, List, Dict, Optional, Any
 from numpy.typing import ArrayLike
 from collections.abc import Callable
 from collections import NamedTuple
 
 
-Tensor = ArrayLike
+RealTensor = ArrayLike
 CostMatrix = Any
 CostFunction = Any
 
+# A CostMatrices object encodes the full information about cost
+# values between the supports of our two distributions,
+# the source points x[i] and the target points y[j].
+class CostMatrices(NamedTuple):
+    xx: Optional[CostMatrix]  # C(x[i], x[j])
+    yy: Optional[CostMatrix]  # C(y[i], y[j])
+    xy: CostMatrix  # C(x[i], y[j])
+    yx: CostMatrix  # C(y[i], x[j])
 
+
+# The Sinkhorn potentials contains the four output of the Sinkhorn loop
+#
+# Please note that the symmetric potentials are only used
+# for debiased entropic OT: biased OT uses None instead.
+class SinkhornPotentials(NamedTuple):
+    f_aa: Optional[Tensor]  # Symmetric potential f_aa(x_i)
+    g_bb: Optional[Tensor]  # Symmetric potential g_bb(y_j)
+    g_ab: Tensor  # Dual potential g_ab(y_j)
+    f_ba: Tensor  # Dual potential f_ba(x_i)
+    
+
+
+# The descent parameters contains the lists of blur scales, temperatures
+# epsilon and strength of the marginal constraints rho
+# that we use in successive iterations of the Sinkhorn loop.
+# It also contains a rough estimation of the diameter of our configuration,
+# and a list of iteration numbers where we should "jump" from a coarse
+# description to a finer one.
+class DescentParameters(NamedTuple):
+    diameter: float
+    jumps: List[int]
+    blur_list: List[float]
+    eps_list: List[float]
+    rho_list: List[float]
+    
+    
 # =================================================================
 #             Functions used in the Sinkhorn loop
 # =================================================================
@@ -111,25 +146,7 @@ KernelTruncation = Callable[
         Optional[float],
         Optional[CostFunction],
     ],
-    tuple[CostMatrix, CostMatrix],
+    Tuple[CostMatrix, CostMatrix],
 ]
 
 
-# The annealing parameters contains the lists of blur scales and temperatures
-# epsilon that we use in successive iterations of the Sinkhorn loop.
-# It also contains a rough estimation of the diameter of our configuration.
-class AnnealingParameters(NamedTuple):
-    diameter: float
-    blur_list: List[float]
-    eps_list: List[float]
-
-
-# The Sinkhorn potentials contains the four output of the Sinkhorn loop
-#
-# Please note that the symmetric potentials are only used
-# for debiased entropic OT: biased OT uses None instead.
-class SinkhornPotentials(NamedTuple):
-    f_aa: Optional[Tensor]  # Symmetric potential f_aa(x_i)
-    g_bb: Optional[Tensor]  # Symmetric potential g_bb(y_j)
-    g_ab: Tensor  # Dual potential g_ab(y_j)
-    f_ba: Tensor  # Dual potential f_ba(x_i)

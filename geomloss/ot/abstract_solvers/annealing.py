@@ -6,7 +6,7 @@ Geometric data analysis, beyond convolutions (2020),
 https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
-from ..typing import Tensor, Optional, AnnealingParameters
+from ..typing import Tensor, Optional, DescentParameters
 
 # ==============================================================================
 #                         epsilon-scaling heuristic
@@ -157,7 +157,7 @@ def annealing_parameters(
     # Turn our scales into temperature values:
     eps_list = [b**p for b in blur_list]
 
-    return AnnealingParameters(
+    return DescentParameters(
         diameter=diameter,
         eps_list=eps_list,
         blur_list=blur_list,

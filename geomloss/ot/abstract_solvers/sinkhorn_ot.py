@@ -34,44 +34,30 @@ https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
 from ..typing import (
-    Tensor,
+    RealTensor,
     Optional,
     SinkhornPotentials,
     SoftMin,
-    CostMatrix,
-    CostFunction,
+    CostMatrices,
     Extrapolator,
     KernelTruncation,
+    DescentParameters
 )
 from .unbalanced_ot import dampening
-
-
-def log_weights(a: Tensor) -> Tensor:
-    """Returns the log of the input, with values clamped to -100k to avoid numerical bugs."""
-    a_log = a.log()
-    a_log[a <= 0] = -100000
-    return a_log
 
 
 def sinkhorn_loop(
     *,
     softmin: SoftMin,
-    a_logs: List[Tensor],
-    b_logs: List[Tensor],
-    C_xxs: List[CostMatrix],
-    C_yys: List[CostMatrix],
-    C_xys: List[CostMatrix],
-    C_yxs: List[CostMatrix],
-    eps_list: List[float],
-    rho: Optional[float] = None,
-    jumps: List[int] = [],
+    log_a_list: List[RealTensor],
+    log_b_list: List[RealTensor],
+    C_list: List[CostMatrices],
+    descent: DescentParameters,
     kernel_truncation: Optional[KernelTruncation] = None,
-    truncate: Optional[float] = 5.0,
-    cost: Optional[CostFunction] = None,
     extrapolate: Optional[Extrapolator] = None,
     debias: bool = True,
     last_extrapolation: bool = True,
-) -> tuple[Optional[Tensor], Optional[Tensor], Tensor, Tensor]:
+) -> SinkhornPotentials:
     r"""Implements the (possibly multiscale) symmetric Sinkhorn loop,
     with the epsilon-scaling (annealing) heuristic.
 
@@ -86,6 +72,8 @@ def sinkhorn_loop(
     Algorithm 3.5 corresponds to the case where `kernel_truncation` is None,
     while Algorithm 3.6 describes the full multiscale algorithm.
 
+    In the description below, we assume that S >= 1 is the number of scales.
+    
     Args:
         softmin (function): This routine must implement the (soft-)C-transform
             between dual vectors, which is the core computation for
@@ -101,118 +89,93 @@ def sinkhorn_loop(
 
             For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
 
-        a_logs (list of Tensors): List of log-weights :math:`\log(\alpha_i)`
-            for the first input measure at different resolutions.
+        log_a_list (list of S real-valued Tensors): List of log-weights 
+            :math:`\log(\alpha_i)` for the source measure, at different resolutions.
 
-        b_logs (list of Tensors): List of log-weights :math:`\log(\beta_i)`
-            for the second input measure at different resolutions.
+        log_b_list (list of S real-valued Tensors): List of log-weights 
+            :math:`\log(\beta_i)` for the target measure, at different resolutions.
 
-        C_xxs (list): List of objects that encode the cost matrices
-            :math:`C(x_i, x_j)` between the samples of the first input
-            measure at different scales.
+        C_list (list of S CostMatrices): List of NamedTuples with attributes
+            that represent the cost matrix at different scales.
             These will be passed to the `softmin` function as second arguments.
-
-        C_yys (list): List of objects that encode the cost matrices
-            :math:`C(y_i, y_j)` between the samples of the second input
-            measure at different scales.
-            These will be passed to the `softmin` function as second arguments.
-
-        C_xys (list): List of objects that encode the cost matrices
-            :math:`C(x_i, y_j)` between the samples of the first and second input
-            measures at different scales.
-            These will be passed to the `softmin` function as second arguments.
-
-        C_yxs (list): List of objects that encode the cost matrices
-            :math:`C(y_i, x_j)` between the samples of the second and first input
-            measures at different scales.
-            These will be passed to the `softmin` function as second arguments.
-
-        eps_list (list of float): List of successive values for the temperature
-            :math:`\varepsilon`. The number of iterations in the loop
-            is equal to the length of this list.
-
-        rho (float or None): Strength of the marginal constraints for unbalanced OT.
-            None stands for :math:`\rho = +\infty`, i.e. balanced OT.
-
-        jumps (list, optional): List of iteration numbers where we "jump"
-            from a coarse resolution to a finer one by looking
-            one step further in the lists `a_logs`, `b_logs`, `C_xxs`, etc.
-            Count starts at iteration 0.
-            Defaults to [] - single-scale mode without jumps.
-
+            We expect the attributes:
+            - `xx` for the cost matrix :math:`C_{xx}[i,j] = C(x_i, x_j)`.
+            - `yy` for the cost matrix :math:`C_{yy}[i,j] = C(y_i, y_j)`.
+            - `xy` for the cost matrix :math:`C_{xy}[i,j] = C(x_i, y_j)`.
+            - `yx` for the cost matrix :math:`C_{yx}[i,j] = C(y_i, x_j)`.
+            
+        descent (DescentParameters): A NamedTuple with attributes that describe
+            the evolution of our main parameters along the iterations of the
+            Sinkhorn loop.
+            We expect the attributes:
+            - eps_list (list of n_iter float > 0): List of successive values for 
+              the Sinkhorn regularization parameter, the temperature :math:`\varepsilon`. 
+              The number of iterations in the loop is equal to the length of this list.
+            
+            - rho_list (list of n_iter (float > 0 or None)): List of successive values for 
+              the strength of the marginal constraints in unbalanced OT.
+              None values stand for :math:`\rho = +\infty`, i.e. balanced OT.
+            
+            - jumps (list of S-1 int): Sorted list of iteration numbers where we "jump"
+              from a coarse resolution to a finer one by looking one step further 
+              in the lists `log_a_list`, `log_b_list` and `C_list`.
+              Each integer jump index `jump` should satisfy `0 <= jump < n_iter`.
+              For single-scale mode, use `jumps = []`.
+              
         kernel_truncation (function, optional): Implements the kernel truncation trick.
-            Defaults to None.
-
-        truncate (float, optional): Optional argument for `kernel_truncation`.
-            Defaults to 5.
-
-        cost (string or function, optional): Optional argument for `kernel_truncation`.
-            Defaults to None.
-
-        extrapolate (function, optional): Function.
-            If
-            `f_ba` is a dual potential that is supported by the :math:`x_i`'s,
-            `g_ab` is a dual potential that is supported by the :math:`y_j`'s,
-            `eps` is the current value of the temperature :math:`\varepsilon`,
-            `damping` is the current value of the damping coefficient for unbalanced OT,
-            `C_xy` encodes the cost matrix :math:`C(x_i, y_j)` at the current
-            ("coarse") resolution,
-            `b_log` denotes the log-weights :math:`\log(\beta_j)`
+            Defaults to None: this function is not needed in single-scale mode.
+            
+        extrapolate (function, optional): Coarse-to-fine extrapolation for the
+            dual potentials. If
+            `self` is a dual potential that is supported by the :math:`x_i`'s,
+            `other` is a dual potential that is supported by the :math:`y_j`'s,
+            `log_weights` denotes the log-weights :math:`\log(\beta_j)`
             that are supported by the :math:`y_j`'s at the coarse resolution,
-            and
-            `C_xy_fine` encodes the cost matrix :math:`C(x_i, y_j)` at the next
+            `C` encodes the cost matrix :math:`C(x_i, y_j)` at the current
+            ("coarse") resolution,
+            `C_fine` encodes the cost matrix :math:`C(x_i, y_j)` at the next
             ("fine") resolution,
+            `eps` is the current value of the temperature :math:`\varepsilon`,
+            `dampen` is a pointwise dampening function for unbalanced OT,
             then
-            `extrapolate(f_ba, g_ab, eps, damping, C_xy, b_log, C_xy_fine)`
+            `extrapolate(self, other, log_weights, C, C_fine, eps, dampen)`
             will be used to compute the new values of the dual potential
-            `f_ba` on the point cloud :math:`x_i` at a finer resolution.
-            Defaults to None - it is not needed in single-scale mode.
+            `self` on the point cloud :math:`x_i` at a finer resolution.
+            This function may either use a simple bi/tri-linear interpolation
+            method on the first potential (`self`), or rely on the analytic
+            expression of the dual potential that is induced by the
+            :math:`y_j`'s and :math:`\beta_j`'s.
+            Defaults to None: this function is not needed in single-scale mode.
 
         debias (bool, optional): Should we used the "de-biased" Sinkhorn divergence
             :math:`\text{S}_{\varepsilon, \rho}(\al,\be)` instead
             of the "raw" entropic OT cost
             :math:`\text{OT}_{\varepsilon, \rho}(\al,\be)`?
-            This slows down the OT solver but guarantees that our approximation
-            of the Wasserstein distance will be positive and definite
+            This slows down the OT solver by a factor 2, but guarantees that 
+            our approximation of the Wasserstein distance will be positive and definite
             - up to convergence of the Sinkhorn loop.
             For a detailed discussion of the influence of this parameter,
             see e.g. Fig. 3.21 in Jean Feydy's PhD thesis.
             Defaults to True.
 
-        last_extrapolation (bool, optional): Should we perform a last, "full"
-            Sinkhorn iteration before returning the dual potentials?
+        last_extrapolation (bool, optional): Should we perform a last, 
+            "full" Sinkhorn iteration before returning the dual potentials?
             This allows us to retrieve correct gradients without having
             to backpropagate trough the full Sinkhorn loop.
             Defaults to True.
 
     Returns:
-        4-uple of Tensors: The four optimal dual potentials
+        Named 4-uple of Tensors: The four optimal dual potentials
             `(f_aa, g_bb, g_ab, f_ba)` that are respectively
             supported by the first, second, second and first input measures
             and associated to the "a <-> a", "b <-> b",
             "a <-> b" and "a <-> b" optimal transport problems.
     """
 
-    # Number of iterations, specified by our epsilon-schedule
-    Nits = len(eps_list)
-
     # The multiscale algorithm may loop over several representations
     # of the input measures.
-    # In this routine, the convention is that "myvars" (with an 's')
+    # In this routine, the convention is that "myvar_s" (with a '_s' suffix)
     # denotes the list of "myvar" across different scales.
-    if type(a_logs) is not list:
-        # The "single-scale" use case is simply encoded
-        # using lists of length 1.
-
-        # Logarithms of the weights:
-        a_logs, b_logs = [a_logs], [b_logs]
-
-        # Cost "matrices" C(x_i, y_j) and C(y_i, x_j):
-        C_xys, C_yxs = [C_xys], [C_yxs]  # Used for the "a <-> b" problem.
-
-        # Cost "matrices" C(x_i, x_j) and C(y_i, y_j):
-        if debias:  # Only used for the "a <-> a" and "b <-> b" problems.
-            C_xxs, C_yys = [C_xxs], [C_yys]
 
     # N.B.: We don't let users backprop through the Sinkhorn iterations
     #       and branch instead on an explicit formula "at convergence"
@@ -237,20 +200,22 @@ def sinkhorn_loop(
 
     # We start at the coarsest resolution available:
     k = 0  # Scale index
-    eps = eps_list[k]  # First value of the temperature (typically, eps = diameter**p)
-
+    
+    # First value of the temperature (typically, eps = diameter**p)
+    # and of the strength of the marginal constraints (typically, rho = reach**p).
+    eps = descent.eps_list[0]
+    rho = descent.rho_list[0]
+    
     # Damping factor: equal to 1 for balanced OT,
     # < 1 for unbalanced OT with KL penalty on the marginal constraints.
     # For reference, see Table 1 in "Sinkhorn divergences for unbalanced
     # optimal transport", Sejourne et al., https://arxiv.org/abs/1910.12958.
-    damping = dampening(eps, rho)
+    dampen = dampening(eps, rho)
 
-    # Load the measures and cost matrices at the current scale:
-    a_log, b_log = a_logs[k], b_logs[k]
-    C_xy, C_yx = C_xys[k], C_yxs[k]  # C(x_i, y_j), C(y_i, x_j)
-    if debias:  # Info for the "a <-> a" and "b <-> b" problems
-        C_xx, C_yy = C_xxs[k], C_yys[k]  # C(x_i, x_j), C(y_j, y_j)
-
+    # Load the masses (more precisely, the logarithms of the point weights/densities) 
+    # and cost matrices (C(x[i], y[j]), ...) at the current scale:
+    log_a, log_b, C = log_a_list[k], log_b_list[k], C_list[k]
+    
     # Line 2 ---------------------------------------------------------------------------
     # Start with a decent initialization for the dual vectors:
     # N.B.: eps is really large here, so the log-sum-exp behaves as a sum
@@ -258,17 +223,18 @@ def sinkhorn_loop(
     #       a convolution with the cost function (i.e. the limit for eps=+infty).
     #       The algorithm was originally written with this convolution
     #       - but in this implementation, we use "softmin" for the sake of simplicity.
-    g_ab = damping * softmin(eps, C_yx, a_log)  # a -> b
-    f_ba = damping * softmin(eps, C_xy, b_log)  # b -> a
+    g_ab = dampen(softmin(eps, C.yx, log_a))  # a -> b
+    f_ba = dampen(softmin(eps, C.xy, log_b))  # b -> a
     if debias:
-        f_aa = damping * softmin(eps, C_xx, a_log)  # a -> a
-        g_bb = damping * softmin(eps, C_yy, b_log)  # a -> a
+        f_aa = dampen(softmin(eps, C.xx, log_a))  # a -> a
+        g_bb = dampen(softmin(eps, C.yy, log_b))  # a -> a
 
     # Lines 4-5: eps-scaling descent ---------------------------------------------------
-    for i, eps in enumerate(eps_list):  # See Fig. 3.25-26 in Jean Feydy's PhD thesis.
-
+    # See Fig. 3.25-26 in Jean Feydy's PhD thesis for intuitions.
+    for i, (eps, rho) in enumerate(zip(descent.eps_list, descent.rho_list)):
+        
         # Line 6: update the damping coefficient ---------------------------------------
-        damping = dampening(eps, rho)  # eps and damping change across iterations
+        dampen = dampening(eps, rho)  # eps and damping change across iterations
 
         # Line 7: "coordinate ascent" on the dual problems -----------------------------
         # N.B.: As discussed in Section 3.3.3 of Jean Feydy's PhD thesis,
@@ -278,15 +244,15 @@ def sinkhorn_loop(
         #       (for "f-tilde", "g-tilde") using the standard
         #       Sinkhorn formulas, and update both dual vectors
         #       simultaneously.
-        ft_ba = damping * softmin(eps, C_xy, b_log + g_ab / eps)  # b -> a
-        gt_ab = damping * softmin(eps, C_yx, a_log + f_ba / eps)  # a -> b
+        ft_ba = dampen(softmin(eps, C.xy, log_b + g_ab / eps))  # b -> a
+        gt_ab = dampen(softmin(eps, C.yx, log_a + f_ba / eps))  # a -> b
 
         # See Fig. 3.21 in Jean Feydy's PhD thesis to see the importance
         # of debiasing when the target "blur" or "eps**(1/p)" value is larger
         # than the average distance between samples x_i, y_j and their neighbours.
         if debias:
-            ft_aa = damping * softmin(eps, C_xx, a_log + f_aa / eps)  # a -> a
-            gt_bb = damping * softmin(eps, C_yy, b_log + g_bb / eps)  # b -> b
+            ft_aa = dampen(softmin(eps, C.xx, log_a + f_aa / eps))  # a -> a
+            gt_bb = dampen(softmin(eps, C.yy, log_b + g_bb / eps))  # b -> b
 
         # Symmetrized updates - see Fig. 3.24.b in Jean Feydy's PhD thesis:
         f_ba, g_ab = 0.5 * (f_ba + ft_ba), 0.5 * (g_ab + gt_ab)  # OT(a,b) wrt. a, b
@@ -320,11 +286,7 @@ def sinkhorn_loop(
         if i in jumps:
 
             if i == len(eps_list) - 1:  # Last iteration: just extrapolate!
-
-                C_xy_fine, C_yx_fine = C_xys[k + 1], C_yxs[k + 1]
-                if debias:
-                    C_xx_fine, C_yy_fine = C_xxs[k + 1], C_yys[k + 1]
-
+                C_fine = C_list[k+1]
                 last_extrapolation = False  # No need to re-extrapolate after the loop
                 torch.autograd.set_grad_enabled(prev_autograd)
 
@@ -344,42 +306,40 @@ def sinkhorn_loop(
                 # and rely instead on the separability of the Gaussian convolution kernel.
 
                 # Line 9: a <-> b ------------------------------------------------------
-                C_xy_fine, C_yx_fine = kernel_truncation(
-                    C_xy,
-                    C_yx,
-                    C_xys[k + 1],
-                    C_yxs[k + 1],
-                    f_ba,
-                    g_ab,
-                    eps,
-                    truncate=truncate,
-                    cost=cost,
+                C_fine_xy, C_fine_yx = kernel_truncation(
+                    C=C.xy,
+                    CT=C.yx,
+                    C_fine=C_list[k + 1].xy,
+                    CT_fine=C_list[k + 1].yx,
+                    f=f_ba,
+                    g=g_ab,
+                    eps=eps,
                 )
 
                 if debias:
                     # Line 10: a <-> a  ------------------------------------------------
                     C_xx_fine, _ = kernel_truncation(
-                        C_xx,
-                        C_xx,
-                        C_xxs[k + 1],
-                        C_xxs[k + 1],
-                        f_aa,
-                        f_aa,
-                        eps,
-                        truncate=truncate,
-                        cost=cost,
+                        C=C_xx,
+                        C_fine=C_list[k + 1].xx,
+                        f=f_aa,
+                        eps=eps,
                     )
                     # Line 11: b <-> b -------------------------------------------------
                     C_yy_fine, _ = kernel_truncation(
-                        C_yy,
-                        C_yy,
-                        C_yys[k + 1],
-                        C_yys[k + 1],
-                        g_bb,
-                        g_bb,
-                        eps,
-                        truncate=truncate,
-                        cost=cost,
+                        C=C_yy,
+                        C_fine=C_list[k + 1].yy,
+                        f=g_bb,
+                        eps=eps,
+                    )
+                else:
+                    C_fine_xx, C_fine_yy = None, None
+                    
+                # Update our cost object with the truncated matrices:
+                C_fine = CostMatrices(
+                    xx = C_fine_xx,
+                    yy = C_fine_yy,
+                    xy = C_fine_xy,
+                    yx = C_fine_yx,
                     )
 
             # Line 12: extrapolation step ----------------------------------------------
@@ -390,24 +350,55 @@ def sinkhorn_loop(
             # detailed e.g. in Eqs. (3.194-3.195) of Jean Feydy's PhD thesis.
             # On images and volumes, we simply rely on (bi/tri-)linear interpolation.
             #
-            # N.B.: the cross-updates below *must* be done in parallel!
+            # N.B.: The cross-updates below *must* be done in parallel!
+            #       Do *not* split this coupled update.
             f_ba, g_ab = (
-                extrapolate(f_ba, g_ab, eps, damping, C_xy, b_log, C_xy_fine),
-                extrapolate(g_ab, f_ba, eps, damping, C_yx, a_log, C_yx_fine),
+                extrapolate(
+                    self=f_ba, 
+                    other=g_ab, 
+                    log_weights=log_b, 
+                    C=C.xy, 
+                    C_fine=C_fine.xy, 
+                    eps=eps, 
+                    dampen=dampen,
+                    ),
+                extrapolate(
+                    self=g_ab, 
+                    other=f_ba, 
+                    lob_weights=log_a, 
+                    C=C.yx, 
+                    C_fine=C_fine.yx,
+                    eps=eps, 
+                    dampen=dampen,
+                    ),
             )
 
             # Extrapolation for the symmetric problems:
             if debias:
-                f_aa = extrapolate(f_aa, f_aa, eps, damping, C_xx, a_log, C_xx_fine)
-                g_bb = extrapolate(g_bb, g_bb, eps, damping, C_yy, b_log, C_yy_fine)
+                f_aa = extrapolate(
+                    self=f_aa, 
+                    other=f_aa,
+                    log_weights=log_a,
+                    C=C.xx,  
+                    C_fine=C_fine.xx, 
+                    eps=eps, 
+                    dampen=dampen, 
+                    )
+                g_bb = extrapolate(
+                    self=g_bb, 
+                    other=g_bb,
+                    log_weights=log_b, 
+                    C=C.yy,
+                    C_fine=C_fine.yy, 
+                    eps=eps, 
+                    dampen=dampen,
+                    )
 
             # Line 13: update the measure weights and cost "matrices" ------------------
             k = k + 1
-            a_log, b_log = a_logs[k], b_logs[k]
-            C_xy, C_yx = C_xy_fine, C_yx_fine
-            if debias:
-                C_xx, C_yy = C_xx_fine, C_yy_fine
-
+            log_a, log_b = log_a_list[k], log_b_list[k]
+            C = C_fine
+            
     # As a very last step, we perform a final "Sinkhorn" iteration.
     # As detailed above (around "torch.autograd.set_grad_enabled(False)"),
     # this allows us to retrieve correct expressions for the gradient
@@ -415,27 +406,25 @@ def sinkhorn_loop(
     torch.autograd.set_grad_enabled(prev_autograd)
 
     if last_extrapolation:
-        # The cross-updates should be done in parallel!
+        # The cross-updates *must* be done in parallel!
+        # Do *not* split this coupled update.
         f_ba, g_ab = (
-            damping * softmin(eps, C_xy, (b_log + g_ab / eps).detach()),
-            damping * softmin(eps, C_yx, (a_log + f_ba / eps).detach()),
+            dampen(softmin(eps, C.xy, (log_b + g_ab / eps).detach())),
+            dampen(softmin(eps, C.yx, (log_a + f_ba / eps).detach())),
         )
 
         if debias:
-            f_aa = damping * softmin(eps, C_xx, (a_log + f_aa / eps).detach())
-            g_bb = damping * softmin(eps, C_yy, (b_log + g_bb / eps).detach())
+            f_aa = dampen(softmin(eps, C.xx, (log_a + f_aa / eps).detach()))
+            g_bb = dampen(softmin(eps, C.yy, (log_b + g_bb / eps).detach()))
 
-    if debias:
-        return SinkhornPotentials(
-            f_aa=f_aa,
-            g_bb=g_bb,
-            g_ab=g_ab,
-            f_ba=f_ba,
-        )
-    else:
-        return SinkhornPotentials(
-            f_aa=None,
-            g_bb=None,
-            g_ab=g_ab,
-            f_ba=f_ba,
+    # If there is no de-biasing, we should define empty "self-attention"
+    # potentials.
+    if not debias:
+        f_aa, g_bb = None, None
+        
+    return SinkhornPotentials(
+        f_aa=f_aa,
+        g_bb=g_bb,
+        g_ab=g_ab,
+        f_ba=f_ba,
         )
