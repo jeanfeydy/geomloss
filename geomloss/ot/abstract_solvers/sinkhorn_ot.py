@@ -210,7 +210,7 @@ def sinkhorn_loop(
     # < 1 for unbalanced OT with KL penalty on the marginal constraints.
     # For reference, see Table 1 in "Sinkhorn divergences for unbalanced
     # optimal transport", Sejourne et al., https://arxiv.org/abs/1910.12958.
-    dampen = dampening(eps, rho)
+    dampen = dampening(eps=eps, rho=rho)
 
     # Load the masses (more precisely, the logarithms of the point weights/densities) 
     # and cost matrices (C(x[i], y[j]), ...) at the current scale:
@@ -234,7 +234,7 @@ def sinkhorn_loop(
     for i, (eps, rho) in enumerate(zip(descent.eps_list, descent.rho_list)):
         
         # Line 6: update the damping coefficient ---------------------------------------
-        dampen = dampening(eps, rho)  # eps and damping change across iterations
+        dampen = dampening(eps=eps, rho=rho)  # eps and damping change across iterations
 
         # Line 7: "coordinate ascent" on the dual problems -----------------------------
         # N.B.: As discussed in Section 3.3.3 of Jean Feydy's PhD thesis,

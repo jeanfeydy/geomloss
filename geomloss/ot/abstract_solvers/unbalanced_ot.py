@@ -6,9 +6,12 @@ Thibault Séjourné, Jean Feydy, François-Xavier Vialard, Alain Trouvé, Gabrie
 https://arxiv.org/pdf/1910.12958.pdf
 """
 
+from ..utils import dot_products
+from ..typing import Optional, RealTensor, SinkhornPotentials
 
-def dampening(eps, rho):
-    """Dampening factor for entropy+unbalanced OT with KL penalization of the marginals."""
+
+def dampening(*, eps: float, rho: Optional[float]):
+    """Dampening function for entropy+unbalanced OT with KL penalization of the marginals."""
     if rho is None:
         return lambda f: f
     else:
@@ -27,94 +30,119 @@ class UnbalancedWeight(torch.nn.Module):
     Sejourne et al., https://arxiv.org/abs/1910.12958.
     """
 
-    def __init__(self, eps, rho):
+    def __init__(self, *, eps: float, rho: float):
         super(UnbalancedWeight, self).__init__()
         self.eps, self.rho = eps, rho
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         return (self.rho + self.eps / 2) * x
 
-    def backward(self, g):
+    def backward(self, g: Tensor):
         return (self.rho + self.eps) * g
 
 
 def sinkhorn_cost(
-    eps, rho, a, b, f_aa, g_bb, g_ab, f_ba, batch=False, debias=True, potentials=False
+    *, 
+    a: Tensor, 
+    b: Tensor, 
+    potentials: SinkhornPotentials,
+    eps: float, 
+    rho: Optional[float],
+    debias: bool = True,
 ):
-    r"""Returns the required information (cost, etc.) from a set of dual potentials.
+    r"""Returns the values of  from a set of dual potentials.
 
+    This function is batched: it computes B values in parallel.
+    If you only want to compute a single value, please prefix a "dummy"
+    dimension (=1) in front of your measure weights and dual potentials. 
+    
     Args:
+        a ((B,...) real-valued Tensor >= 0): Weights for the "source" measure on the points :math:`x_i`.
+        b ((B,...) real-valued Tensor >= 0): Weights for the "target" measure on the points :math:`y_j`.
+        potentials (SinkhornPotentials): A NamedTuple with attributes:
+            - f_aa ((B,...) real-valued Tensor or None): Dual potential for the "a <-> a" problem.
+            - g_bb ((B,...) real-valued Tensor or None): Dual potential for the "b <-> b" problem.
+            - g_ab ((B,...) real-valued Tensor)): Dual potential supported by :math:`y_j` 
+              for the "a <-> b" problem.
+            - f_ba ((B,...) real-valued Tensor): Dual potential supported by :math:`x_i`
+              for the "a <-> a" problem.
+        
         eps (float): Target (i.e. final) temperature.
         rho (float or None (:math:`+\infty`)): Strength of the marginal constraints.
-
-        a ((..., N) Tensor, nonnegative): Weights for the "source" measure on the points :math:`x_i`.
-        b ((..., M) Tensor, nonnegative): Weights for the "target" measure on the points :math:`y_j`.
-        f_aa ((..., N) Tensor)): Dual potential for the "a <-> a" problem.
-        g_bb ((..., M) Tensor)): Dual potential for the "b <-> b" problem.
-        g_ab ((..., M) Tensor)): Dual potential supported by :math:`y_j` for the "a <-> b" problem.
-        f_ba ((..., N) Tensor)): Dual potential supported by :math:`x_i`  for the "a <-> a" problem.
-        batch (bool, optional): Are we working in batch mode? Defaults to False.
-        debias (bool, optional): Are we working with the "debiased" or the "raw" Sinkhorn divergence?
+        debias (bool, optional): Do we compute the "debiased" Sinkhorn divergence
+            instead of the "raw" entropic transport cost?
             Defaults to True.
-        potentials (bool, optional): Shall we return the dual vectors instead of the cost value?
-            Defaults to False.
 
     Returns:
-        Tensor or pair of Tensors: if `potentials` is True, we return a pair
-            of (..., N), (..., M) Tensors that encode the optimal dual vectors,
-            respectively supported by :math:`x_i` and :math:`y_j`.
-            Otherwise, we return a (,) or (B,) Tensor of values for the Sinkhorn divergence.
+        (B,) real-valued Tensor: 
     """
 
-    if potentials:  # Just return the dual potentials
-        if debias:  # See Eq. (3.209) in Jean Feydy's PhD thesis.
-            # N.B.: This formula does not make much sense in the unbalanced mode
-            #       (i.e. if reach is not None).
-            return f_ba - f_aa, g_ab - g_bb
-        else:  # See Eq. (3.207) in Jean Feydy's PhD thesis.
-            return f_ba, g_ab
-
-    else:  # Actually compute the Sinkhorn divergence
-        if (
-            debias
-        ):  # UNBIASED Sinkhorn divergence, S_eps(a,b) = OT_eps(a,b) - .5*OT_eps(a,a) - .5*OT_eps(b,b)
-            if rho is None:  # Balanced case:
-                # See Eq. (3.209) in Jean Feydy's PhD thesis.
-                return scal(a, f_ba - f_aa, batch=batch) + scal(
-                    b, g_ab - g_bb, batch=batch
-                )
-            else:
-                # Unbalanced case:
-                # See Proposition 12 (Dual formulas for the Sinkhorn costs)
-                # in "Sinkhorn divergences for unbalanced optimal transport",
-                # Sejourne et al., https://arxiv.org/abs/1910.12958.
-                return scal(
-                    a,
-                    UnbalancedWeight(eps, rho)(
-                        (-f_aa / rho).exp() - (-f_ba / rho).exp()
-                    ),
-                    batch=batch,
-                ) + scal(
-                    b,
-                    UnbalancedWeight(eps, rho)(
-                        (-g_bb / rho).exp() - (-g_ab / rho).exp()
-                    ),
-                    batch=batch,
-                )
-
-        else:  # Classic, BIASED entropized Optimal Transport OT_eps(a,b)
-            if rho is None:  # Balanced case:
-                # See Eq. (3.207) in Jean Feydy's PhD thesis.
-                return scal(a, f_ba, batch=batch) + scal(b, g_ab, batch=batch)
-            else:
-                # Unbalanced case:
-                # See Proposition 12 (Dual formulas for the Sinkhorn costs)
-                # in "Sinkhorn divergences for unbalanced optimal transport",
-                # Sejourne et al., https://arxiv.org/abs/1910.12958.
-                # N.B.: Even if this quantity is never used in practice,
-                #       we may want to re-check this computation...
-                return scal(
-                    a, UnbalancedWeight(eps, rho)(1 - (-f_ba / rho).exp()), batch=batch
-                ) + scal(
-                    b, UnbalancedWeight(eps, rho)(1 - (-g_ab / rho).exp()), batch=batch
-                )
+    # For the sake of convenience, unwrap the dual potentials returned by the
+    # Sinkhorn loop:
+    f_aa = potentials.f_aa  # may be None with balanced OT
+    g_bb = potentials.g_bb  # may be None with balanced OT
+    g_ab = potentials.g_ab
+    f_ba = potentials.f_ba
+    
+    if rho is None:
+        # Balanced case: the cost is linear wrt. the potentials.
+        if not debias:
+            # Classic, BIASED entropic Optimal Transport OT_eps(a,b)
+            # See Eq. (3.207) in Jean Feydy's PhD thesis.
+            F_a = f_ba
+            G_b = g_ab
+        else:
+            # DEBIASED Sinkhorn divergence, S_eps(a,b) = OT_eps(a,b) - .5*OT_eps(a,a) - .5*OT_eps(b,b)
+            # See Eq. (3.209) in Jean Feydy's PhD thesis.
+            F_a = f_ba - f_aa
+            G_b = g_ab - g_bb
+    
+    else:
+        # Unbalanced case: we must dampen the dual potentials with a function
+        # ~ rho * (1 - exp(-f/rho))  (but not exactly, hence the UnbalancedWeight...)
+        # that is ~ f when |f| << rho, and that kills the high values of f.
+       
+        # First: compute a dampened version of the update above.
+        if not debias:
+            # Classic, BIASED entropic Optimal Transport OT_eps,rho(a,b),
+            # as in the ~2016 papers by Lenaic Chizat, Bernhard Schmitzer...
+            #
+            # See Proposition 12 (Dual formulas for the Sinkhorn costs)
+            # in "Sinkhorn divergences for unbalanced optimal transport",
+            # Sejourne et al., https://arxiv.org/abs/1910.12958.
+            
+            # N.B.: Even if this quantity is never used in practice,
+            #       we may want to re-check this computation...
+            F_a = 1 - (-f_ba / rho).exp()
+            G_b = 1 - (-g_ab / rho).exp()
+        
+        else:
+            # DEBIASED Sinkhorn divergence, S_eps,rho(a,b) 
+            # = OT_eps,rho(a,b) - .5*OT_eps,rho(a,a) - .5*OT_eps,rho(b,b) 
+            #   + e/2 * | mass(a) - mass(b) |^2
+            # studied extensively in the PhD thesis of Thibault Sejourne.
+            #
+            # See Proposition 12 (Dual formulas for the Sinkhorn costs)
+            # in "Sinkhorn divergences for unbalanced optimal transport",
+            # Sejourne et al., https://arxiv.org/abs/1910.12958.
+            F_a = (-f_aa / rho).exp() - (-f_ba / rho).exp()
+            G_b = (-g_bb / rho).exp() - (-g_ab / rho).exp()
+            
+        # Second: weight it by the correct factor,
+        # in a way that is coherent for the backward pass too.
+        F_a = UnbalancedWeight(eps=eps, rho=rho)(F_a)
+        G_b = UnbalancedWeight(eps=eps, rho=rho)(G_b)
+    
+    a_costs = dot_products(a, F_a)  # (B,)
+    b_costs = dot_products(b, G_b)  # (B,)
+    return a_costs + b_costs
+                
+"""
+if potentials:  # Just return the dual potentials
+    if debias:  # See Eq. (3.209) in Jean Feydy's PhD thesis.
+        # N.B.: This formula does not make much sense in the unbalanced mode
+        #       (i.e. if reach is not None).
+        return f_ba - f_aa, g_ab - g_bb
+    else:  # See Eq. (3.207) in Jean Feydy's PhD thesis.
+        return f_ba, g_ab
+"""

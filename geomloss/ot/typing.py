@@ -23,10 +23,10 @@ class CostMatrices(NamedTuple):
 # Please note that the symmetric potentials are only used
 # for debiased entropic OT: biased OT uses None instead.
 class SinkhornPotentials(NamedTuple):
-    f_aa: Optional[Tensor]  # Symmetric potential f_aa(x_i)
-    g_bb: Optional[Tensor]  # Symmetric potential g_bb(y_j)
-    g_ab: Tensor  # Dual potential g_ab(y_j)
-    f_ba: Tensor  # Dual potential f_ba(x_i)
+    f_aa: Optional[RealTensor]  # Symmetric potential f_aa(x_i)
+    g_bb: Optional[RealTensor]  # Symmetric potential g_bb(y_j)
+    g_ab: RealTensor  # Dual potential g_ab(y_j)
+    f_ba: RealTensor  # Dual potential f_ba(x_i)
     
 
 
@@ -60,7 +60,7 @@ class DescentParameters(NamedTuple):
 # In the Sinkhorn loop, we typically use calls like:
 #   ft_ba = softmin(eps, C_xy, b_log + g_ab / eps)
 
-SoftMin = Callable[[float, CostMatrix, Tensor], Tensor]
+SoftMin = Callable[[float, CostMatrix, RealTensor], RealTensor]
 
 
 # The extrapolate function is used in the multiscale Sinkhorn scheme.
@@ -87,15 +87,15 @@ SoftMin = Callable[[float, CostMatrix, Tensor], Tensor]
 
 Extrapolator = Callable[
     [
-        Tensor,
-        Tensor,
+        RealTensor,
+        RealTensor,
         float,
         float,
         CostMatrix,
-        Tensor,
+        RealTensor,
         CostMatrix,
     ],
-    Tensor,
+    RealTensor,
 ]
 
 
@@ -140,8 +140,8 @@ KernelTruncation = Callable[
         CostMatrix,
         CostMatrix,
         CostMatrix,
-        Tensor,
-        Tensor,
+        RealTensor,
+        RealTensor,
         float,
         Optional[float],
         Optional[CostFunction],
