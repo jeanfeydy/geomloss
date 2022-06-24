@@ -50,8 +50,12 @@ def sinkhorn_cost(
     rho: Optional[float],
     debias: bool = True,
 ):
-    r"""Returns the values of  from a set of dual potentials.
+    r"""Returns the values of the Sinkhorn divergence from a set of dual potentials.
 
+    For reference, please look at Eqs. (3.207-3.209) in Jean Feydy's PhD thesis
+    (balanced case) and Proposition 12 in "Sinkhorn divergences for unbalanced
+    optimal transport" by Sejourne et al. 
+    
     This function is batched: it computes B values in parallel.
     If you only want to compute a single value, please prefix a "dummy"
     dimension (=1) in front of your measure weights and dual potentials. 
@@ -59,7 +63,9 @@ def sinkhorn_cost(
     Args:
         a ((B,...) real-valued Tensor >= 0): Weights for the "source" measure on the points :math:`x_i`.
         b ((B,...) real-valued Tensor >= 0): Weights for the "target" measure on the points :math:`y_j`.
-        potentials (SinkhornPotentials): A NamedTuple with attributes:
+        potentials (SinkhornPotentials): A NamedTuple that contains the solutions
+           of a (dual) regularized optimal transport problem.
+           We expect the attributes:
             - f_aa ((B,...) real-valued Tensor or None): Dual potential for the "a <-> a" problem.
             - g_bb ((B,...) real-valued Tensor or None): Dual potential for the "b <-> b" problem.
             - g_ab ((B,...) real-valued Tensor)): Dual potential supported by :math:`y_j` 
@@ -129,7 +135,8 @@ def sinkhorn_cost(
             G_b = (-g_bb / rho).exp() - (-g_ab / rho).exp()
             
         # Second: weight it by the correct factor,
-        # in a way that is coherent for the backward pass too.
+        # in a way that is coherent for the backward pass.
+        # TODO: make this compatible with order 2 derivatives.
         F_a = UnbalancedWeight(eps=eps, rho=rho)(F_a)
         G_b = UnbalancedWeight(eps=eps, rho=rho)(G_b)
     
