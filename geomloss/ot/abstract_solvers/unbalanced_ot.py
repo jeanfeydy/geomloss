@@ -6,6 +6,7 @@ Thibault Séjourné, Jean Feydy, François-Xavier Vialard, Alain Trouvé, Gabrie
 https://arxiv.org/pdf/1910.12958.pdf
 """
 
+import torch
 from ..utils import dot_products
 from ..typing import Optional, RealTensor, SinkhornPotentials
 
@@ -34,17 +35,17 @@ class UnbalancedWeight(torch.nn.Module):
         super(UnbalancedWeight, self).__init__()
         self.eps, self.rho = eps, rho
 
-    def forward(self, x: Tensor):
+    def forward(self, x: RealTensor):
         return (self.rho + self.eps / 2) * x
 
-    def backward(self, g: Tensor):
+    def backward(self, g: RealTensor):
         return (self.rho + self.eps) * g
 
 
 def sinkhorn_cost(
     *,
-    a: Tensor,
-    b: Tensor,
+    a: RealTensor,
+    b: RealTensor,
     potentials: SinkhornPotentials,
     eps: float,
     rho: Optional[float],

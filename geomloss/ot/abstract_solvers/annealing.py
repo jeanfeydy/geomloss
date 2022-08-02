@@ -6,6 +6,8 @@ Geometric data analysis, beyond convolutions (2020),
 https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
+import numpy as np
+import torch
 from ..typing import Tensor, Optional, DescentParameters
 
 # ==============================================================================
@@ -42,7 +44,7 @@ def annealing_parameters(
     diameter: Optional[float] = None,
     n_iter: Optional[int] = None,
     scaling: Optional[float] = None,
-) -> AnnealingParameters:
+) -> DescentParameters:
     r"""Turns high-level arguments into numerical values for the Sinkhorn loop.
 
     We use an aggressive strategy with an exponential cooling

@@ -1,7 +1,7 @@
 from typing import RealTensor
 
 
-def stable_log(a: RealTensor) -> ReakTensor:
+def stable_log(a: RealTensor) -> RealTensor:
     """Returns the log of the input, with values clamped to -100k to avoid numerical bugs."""
     a_log = a.log()
     a_log[a <= 0] = -100000

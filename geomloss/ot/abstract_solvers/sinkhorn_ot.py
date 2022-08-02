@@ -33,7 +33,9 @@ Geometric data analysis, beyond convolutions (2020),
 https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
+import torch
 from ..typing import (
+    List,
     RealTensor,
     Optional,
     SinkhornPotentials,
@@ -99,10 +101,10 @@ def sinkhorn_loop(
             that represent the cost matrix at different scales.
             These will be passed to the `softmin` function as second arguments.
             We expect the attributes:
-            - `xx` for the cost matrix :math:`C_{xx}[i,j] = C(x_i, x_j)`.
-            - `yy` for the cost matrix :math:`C_{yy}[i,j] = C(y_i, y_j)`.
-            - `xy` for the cost matrix :math:`C_{xy}[i,j] = C(x_i, y_j)`.
-            - `yx` for the cost matrix :math:`C_{yx}[i,j] = C(y_i, x_j)`.
+            - `xx` for the cost matrix :math:`C_{xx}[i,j] = C(x[i], x[j])`.
+            - `yy` for the cost matrix :math:`C_{yy}[i,j] = C(y[i], y[j])`.
+            - `xy` for the cost matrix :math:`C_{xy}[i,j] = C(x[i], y[j])`.
+            - `yx` for the cost matrix :math:`C_{yx}[i,j] = C(y[i], x[j])`.
 
         descent (DescentParameters): A NamedTuple with attributes that describe
             the evolution of our main parameters along the iterations of the
@@ -206,8 +208,9 @@ def sinkhorn_loop(
     eps = descent.eps_list[0]
     rho = descent.rho_list[0]
 
-    # Damping factor: equal to 1 for balanced OT,
-    # < 1 for unbalanced OT with KL penalty on the marginal constraints.
+    # Damping factor: contractant function on the dual potentials.
+    # Equal to the identity for balanced OT, and to a scaling by a constant < 1 
+    # for unbalanced OT with KL penalty on the marginal constraints.
     # For reference, see Table 1 in "Sinkhorn divergences for unbalanced
     # optimal transport", Sejourne et al., https://arxiv.org/abs/1910.12958.
     dampen = dampening(eps=eps, rho=rho)
@@ -283,9 +286,9 @@ def sinkhorn_loop(
         #
         # N.B.: In single-scale mode, jumps = []: the code below is never executed
         #       and we retrieve "Algorithm 3.5" from Jean Feydy's PhD thesis.
-        if i in jumps:
+        if i in descent.jumps:
 
-            if i == len(eps_list) - 1:  # Last iteration: just extrapolate!
+            if i == len(descent.eps_list) - 1:  # Last iteration: just extrapolate!
                 C_fine = C_list[k + 1]
                 last_extrapolation = False  # No need to re-extrapolate after the loop
                 torch.autograd.set_grad_enabled(prev_autograd)
@@ -318,15 +321,15 @@ def sinkhorn_loop(
 
                 if debias:
                     # Line 10: a <-> a  ------------------------------------------------
-                    C_xx_fine, _ = kernel_truncation(
-                        C=C_xx,
+                    C_fine_xx, _ = kernel_truncation(
+                        C=C.xx,
                         C_fine=C_list[k + 1].xx,
                         f=f_aa,
                         eps=eps,
                     )
                     # Line 11: b <-> b -------------------------------------------------
-                    C_yy_fine, _ = kernel_truncation(
-                        C=C_yy,
+                    C_fine_yy, _ = kernel_truncation(
+                        C=C.yy,
                         C_fine=C_list[k + 1].yy,
                         f=g_bb,
                         eps=eps,
