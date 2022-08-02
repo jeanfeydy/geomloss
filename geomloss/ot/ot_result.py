@@ -15,6 +15,8 @@ class OTResult:
         plan=None,
         log=None,
         backend=None,
+        sparse_plan=None,
+        lazy_plan=None,
     ):
 
         self._potentials = potentials
@@ -22,6 +24,18 @@ class OTResult:
         self._value_linear = value_linear
         self._plan = plan
         self._log = log
+        self._sparse_plan = sparse_plan
+        self._lazy_plan = lazy_plan
+        self._backend = backend
+
+        # I assume that other solvers may return directly
+        # some primal objects?
+        # In the code below, let's define the main quantities
+        # that may be of interest to users.
+        # An OT solver returns an object that inherits from OTResult
+        # (e.g. SinkhornOTResult) and implements the relevant
+        # methods (e.g. "plan" and "lazy_plan" but not "sparse_plan", etc.).
+        # log is a dictionary containing potential information about the solver
 
     # Dual potentials --------------------------------------------
     @property
@@ -122,15 +136,15 @@ class OTResult:
         raise NotImplementedError()
 
     # Wasserstein barycenters ----------------------
-    @property
-    def masses(self):
-        """Masses for the Wasserstein barycenter."""
-        raise NotImplementedError()
+    # @property
+    # def masses(self):
+    #     """Masses for the Wasserstein barycenter."""
+    #     raise NotImplementedError()
 
-    @property
-    def samples(self):
-        """Sample locations for the Wasserstein barycenter."""
-        raise NotImplementedError()
+    # @property
+    # def samples(self):
+    #     """Sample locations for the Wasserstein barycenter."""
+    #     raise NotImplementedError()
 
     # Miscellaneous --------------------------------
     @property

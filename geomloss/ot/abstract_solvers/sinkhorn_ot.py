@@ -41,7 +41,7 @@ from ..typing import (
     CostMatrices,
     Extrapolator,
     KernelTruncation,
-    DescentParameters
+    DescentParameters,
 )
 from .unbalanced_ot import dampening
 
@@ -73,7 +73,7 @@ def sinkhorn_loop(
     while Algorithm 3.6 describes the full multiscale algorithm.
 
     In the description below, we assume that S >= 1 is the number of scales.
-    
+
     Args:
         softmin (function): This routine must implement the (soft-)C-transform
             between dual vectors, which is the core computation for
@@ -89,10 +89,10 @@ def sinkhorn_loop(
 
             For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
 
-        log_a_list (list of S real-valued Tensors): List of log-weights 
+        log_a_list (list of S real-valued Tensors): List of log-weights
             :math:`\log(\alpha_i)` for the source measure, at different resolutions.
 
-        log_b_list (list of S real-valued Tensors): List of log-weights 
+        log_b_list (list of S real-valued Tensors): List of log-weights
             :math:`\log(\beta_i)` for the target measure, at different resolutions.
 
         C_list (list of S CostMatrices): List of NamedTuples with attributes
@@ -103,28 +103,28 @@ def sinkhorn_loop(
             - `yy` for the cost matrix :math:`C_{yy}[i,j] = C(y_i, y_j)`.
             - `xy` for the cost matrix :math:`C_{xy}[i,j] = C(x_i, y_j)`.
             - `yx` for the cost matrix :math:`C_{yx}[i,j] = C(y_i, x_j)`.
-            
+
         descent (DescentParameters): A NamedTuple with attributes that describe
             the evolution of our main parameters along the iterations of the
             Sinkhorn loop.
             We expect the attributes:
-            - eps_list (list of n_iter float > 0): List of successive values for 
-              the Sinkhorn regularization parameter, the temperature :math:`\varepsilon`. 
+            - eps_list (list of n_iter float > 0): List of successive values for
+              the Sinkhorn regularization parameter, the temperature :math:`\varepsilon`.
               The number of iterations in the loop is equal to the length of this list.
-            
-            - rho_list (list of n_iter (float > 0 or None)): List of successive values for 
+
+            - rho_list (list of n_iter (float > 0 or None)): List of successive values for
               the strength of the marginal constraints in unbalanced OT.
               None values stand for :math:`\rho = +\infty`, i.e. balanced OT.
-            
+
             - jumps (list of S-1 int): Sorted list of iteration numbers where we "jump"
-              from a coarse resolution to a finer one by looking one step further 
+              from a coarse resolution to a finer one by looking one step further
               in the lists `log_a_list`, `log_b_list` and `C_list`.
               Each integer jump index `jump` should satisfy `0 <= jump < n_iter`.
               For single-scale mode, use `jumps = []`.
-              
+
         kernel_truncation (function, optional): Implements the kernel truncation trick.
             Defaults to None: this function is not needed in single-scale mode.
-            
+
         extrapolate (function, optional): Coarse-to-fine extrapolation for the
             dual potentials. If
             `self` is a dual potential that is supported by the :math:`x_i`'s,
@@ -151,14 +151,14 @@ def sinkhorn_loop(
             :math:`\text{S}_{\varepsilon, \rho}(\al,\be)` instead
             of the "raw" entropic OT cost
             :math:`\text{OT}_{\varepsilon, \rho}(\al,\be)`?
-            This slows down the OT solver by a factor 2, but guarantees that 
+            This slows down the OT solver by a factor 2, but guarantees that
             our approximation of the Wasserstein distance will be positive and definite
             - up to convergence of the Sinkhorn loop.
             For a detailed discussion of the influence of this parameter,
             see e.g. Fig. 3.21 in Jean Feydy's PhD thesis.
             Defaults to True.
 
-        last_extrapolation (bool, optional): Should we perform a last, 
+        last_extrapolation (bool, optional): Should we perform a last,
             "full" Sinkhorn iteration before returning the dual potentials?
             This allows us to retrieve correct gradients without having
             to backpropagate trough the full Sinkhorn loop.
@@ -200,22 +200,22 @@ def sinkhorn_loop(
 
     # We start at the coarsest resolution available:
     k = 0  # Scale index
-    
+
     # First value of the temperature (typically, eps = diameter**p)
     # and of the strength of the marginal constraints (typically, rho = reach**p).
     eps = descent.eps_list[0]
     rho = descent.rho_list[0]
-    
+
     # Damping factor: equal to 1 for balanced OT,
     # < 1 for unbalanced OT with KL penalty on the marginal constraints.
     # For reference, see Table 1 in "Sinkhorn divergences for unbalanced
     # optimal transport", Sejourne et al., https://arxiv.org/abs/1910.12958.
     dampen = dampening(eps=eps, rho=rho)
 
-    # Load the masses (more precisely, the logarithms of the point weights/densities) 
+    # Load the masses (more precisely, the logarithms of the point weights/densities)
     # and cost matrices (C(x[i], y[j]), ...) at the current scale:
     log_a, log_b, C = log_a_list[k], log_b_list[k], C_list[k]
-    
+
     # Line 2 ---------------------------------------------------------------------------
     # Start with a decent initialization for the dual vectors:
     # N.B.: eps is really large here, so the log-sum-exp behaves as a sum
@@ -232,7 +232,7 @@ def sinkhorn_loop(
     # Lines 4-5: eps-scaling descent ---------------------------------------------------
     # See Fig. 3.25-26 in Jean Feydy's PhD thesis for intuitions.
     for i, (eps, rho) in enumerate(zip(descent.eps_list, descent.rho_list)):
-        
+
         # Line 6: update the damping coefficient ---------------------------------------
         dampen = dampening(eps=eps, rho=rho)  # eps and damping change across iterations
 
@@ -286,7 +286,7 @@ def sinkhorn_loop(
         if i in jumps:
 
             if i == len(eps_list) - 1:  # Last iteration: just extrapolate!
-                C_fine = C_list[k+1]
+                C_fine = C_list[k + 1]
                 last_extrapolation = False  # No need to re-extrapolate after the loop
                 torch.autograd.set_grad_enabled(prev_autograd)
 
@@ -333,14 +333,14 @@ def sinkhorn_loop(
                     )
                 else:
                     C_fine_xx, C_fine_yy = None, None
-                    
+
                 # Update our cost object with the truncated matrices:
                 C_fine = CostMatrices(
-                    xx = C_fine_xx,
-                    yy = C_fine_yy,
-                    xy = C_fine_xy,
-                    yx = C_fine_yx,
-                    )
+                    xx=C_fine_xx,
+                    yy=C_fine_yy,
+                    xy=C_fine_xy,
+                    yx=C_fine_yx,
+                )
 
             # Line 12: extrapolation step ----------------------------------------------
             # We extra/inter-polate the values of the dual potentials from
@@ -354,51 +354,51 @@ def sinkhorn_loop(
             #       Do *not* split this coupled update.
             f_ba, g_ab = (
                 extrapolate(
-                    self=f_ba, 
-                    other=g_ab, 
-                    log_weights=log_b, 
-                    C=C.xy, 
-                    C_fine=C_fine.xy, 
-                    eps=eps, 
+                    self=f_ba,
+                    other=g_ab,
+                    log_weights=log_b,
+                    C=C.xy,
+                    C_fine=C_fine.xy,
+                    eps=eps,
                     dampen=dampen,
-                    ),
+                ),
                 extrapolate(
-                    self=g_ab, 
-                    other=f_ba, 
-                    lob_weights=log_a, 
-                    C=C.yx, 
+                    self=g_ab,
+                    other=f_ba,
+                    lob_weights=log_a,
+                    C=C.yx,
                     C_fine=C_fine.yx,
-                    eps=eps, 
+                    eps=eps,
                     dampen=dampen,
-                    ),
+                ),
             )
 
             # Extrapolation for the symmetric problems:
             if debias:
                 f_aa = extrapolate(
-                    self=f_aa, 
+                    self=f_aa,
                     other=f_aa,
                     log_weights=log_a,
-                    C=C.xx,  
-                    C_fine=C_fine.xx, 
-                    eps=eps, 
-                    dampen=dampen, 
-                    )
-                g_bb = extrapolate(
-                    self=g_bb, 
-                    other=g_bb,
-                    log_weights=log_b, 
-                    C=C.yy,
-                    C_fine=C_fine.yy, 
-                    eps=eps, 
+                    C=C.xx,
+                    C_fine=C_fine.xx,
+                    eps=eps,
                     dampen=dampen,
-                    )
+                )
+                g_bb = extrapolate(
+                    self=g_bb,
+                    other=g_bb,
+                    log_weights=log_b,
+                    C=C.yy,
+                    C_fine=C_fine.yy,
+                    eps=eps,
+                    dampen=dampen,
+                )
 
             # Line 13: update the measure weights and cost "matrices" ------------------
             k = k + 1
             log_a, log_b = log_a_list[k], log_b_list[k]
             C = C_fine
-            
+
     # As a very last step, we perform a final "Sinkhorn" iteration.
     # As detailed above (around "torch.autograd.set_grad_enabled(False)"),
     # this allows us to retrieve correct expressions for the gradient
@@ -421,10 +421,10 @@ def sinkhorn_loop(
     # potentials.
     if not debias:
         f_aa, g_bb = None, None
-        
+
     return SinkhornPotentials(
         f_aa=f_aa,
         g_bb=g_bb,
         g_ab=g_ab,
         f_ba=f_ba,
-        )
+    )

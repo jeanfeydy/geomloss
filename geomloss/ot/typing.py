@@ -1,4 +1,4 @@
-from typing import Tuple, List, Dict, Optional, Any
+from typing import Tuple, List, Optional, Any
 from numpy.typing import ArrayLike
 from collections.abc import Callable
 from collections import NamedTuple
@@ -11,6 +11,11 @@ CostFunction = Any
 # A CostMatrices object encodes the full information about cost
 # values between the supports of our two distributions,
 # the source points x[i] and the target points y[j].
+# At the very least, we require the cost matrix between the points
+# x[i] and y[j] - typically, C.yx = transpose(C.xy).
+# Moreover, many objects (kernel distances, debiased Sinkhorn divergences...)
+# also require the cost matrices between points x[i] <-> x[j]
+# and y[i] <-> y[j].
 class CostMatrices(NamedTuple):
     xx: Optional[CostMatrix]  # C(x[i], x[j])
     yy: Optional[CostMatrix]  # C(y[i], y[j])
@@ -27,7 +32,6 @@ class SinkhornPotentials(NamedTuple):
     g_bb: Optional[RealTensor]  # Symmetric potential g_bb(y_j)
     g_ab: RealTensor  # Dual potential g_ab(y_j)
     f_ba: RealTensor  # Dual potential f_ba(x_i)
-    
 
 
 # The descent parameters contains the lists of blur scales, temperatures
@@ -42,8 +46,8 @@ class DescentParameters(NamedTuple):
     blur_list: List[float]
     eps_list: List[float]
     rho_list: List[float]
-    
-    
+
+
 # =================================================================
 #             Functions used in the Sinkhorn loop
 # =================================================================
@@ -60,7 +64,14 @@ class DescentParameters(NamedTuple):
 # In the Sinkhorn loop, we typically use calls like:
 #   ft_ba = softmin(eps, C_xy, b_log + g_ab / eps)
 
-SoftMin = Callable[[float, CostMatrix, RealTensor], RealTensor]
+SoftMin = Callable[
+    [
+        float,  # eps
+        CostMatrix,  # C_xy
+        RealTensor,  # G_y
+    ],
+    RealTensor,  # f_x
+]
 
 
 # The extrapolate function is used in the multiscale Sinkhorn scheme.
@@ -72,7 +83,7 @@ SoftMin = Callable[[float, CostMatrix, RealTensor], RealTensor]
 # Sinkhorn updates between point clouds.
 #
 # It takes as input:
-# - a coarse dual potential f_x[i] = f(x[i])
+# - a coarse dual potential f_x[i] = f(x[i]) that we want to refine,
 # - a coarse dual potential g_y[j] = g(y[j]), which is supported by the other measure,
 # - a temperature eps(ilon),
 # - a damping factor (which is equal to 1 for balanced OT),
@@ -87,15 +98,15 @@ SoftMin = Callable[[float, CostMatrix, RealTensor], RealTensor]
 
 Extrapolator = Callable[
     [
-        RealTensor,
-        RealTensor,
-        float,
-        float,
-        CostMatrix,
-        RealTensor,
-        CostMatrix,
+        RealTensor,  # f_x
+        RealTensor,  # g_y
+        float,  # eps
+        float,  # damping
+        CostMatrix,  # C_xy
+        RealTensor,  # b_log
+        CostMatrix,  # C_xy_fine
     ],
-    RealTensor,
+    RealTensor,  # f_x_fine
 ]
 
 
@@ -136,17 +147,15 @@ Extrapolator = Callable[
 
 KernelTruncation = Callable[
     [
-        CostMatrix,
-        CostMatrix,
-        CostMatrix,
-        CostMatrix,
-        RealTensor,
-        RealTensor,
-        float,
-        Optional[float],
-        Optional[CostFunction],
+        CostMatrix,  # C_xy
+        CostMatrix,  # C_yx
+        CostMatrix,  # C_xy_fine
+        CostMatrix,  # C_yx_fine
+        RealTensor,  # f_ba
+        RealTensor,  # g_ab
+        float,  # eps
+        Optional[float],  # truncate
+        Optional[CostFunction],  # cost
     ],
-    Tuple[CostMatrix, CostMatrix],
+    Tuple[CostMatrix, CostMatrix],  # C_xy_fine, C_yx_fine
 ]
-
-
