@@ -219,9 +219,10 @@ def sinkhorn_barycenter_loop(
         C = C_list[0]  # implicit (B,K,N,M), (B,K,N,N)... cost matrices
 
         # Initialize the dual variables:
+        # (B,K,...) tensor, supported by the barycenter points x:
         f_k = softmin(
             eps, C.xy, log_b_k
-        )  # (B,K,...), supported by the barycenter points x
+        )
         # TODO: the line below is not great...
         g_k = softmin(eps, C.yx, log_b_k)  # (B,K,...), supported by the input points y
 

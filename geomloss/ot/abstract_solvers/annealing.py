@@ -8,22 +8,22 @@ https://www.jeanfeydy.com/geometric_data_analysis.pdf
 
 import numpy as np
 import torch
-from ..typing import Tensor, Optional, DescentParameters
+from ..typing import RealTensor, Optional, List, DescentParameters
 
 # ==============================================================================
 #                         epsilon-scaling heuristic
 # ==============================================================================
 
 
-def max_diameter(x: Tensor, y: Tensor) -> float:
+def max_diameter(x: RealTensor, y: RealTensor) -> float:
     """Returns a rough estimation of the diameter of a pair of point clouds.
 
-    This quantity is used as a maximum "starting scale" in the epsilon-scaling
+    This quantity can be used as a maximum "starting scale" in the epsilon-scaling
     annealing heuristic.
 
     Args:
-        x ((N, D) Tensor): First point cloud.
-        y ((M, D) Tensor): Second point cloud.
+        x ((N, D) real-valued Tensor): First point cloud.
+        y ((M, D) real-valued Tensor): Second point cloud.
 
     Returns:
         float: Upper bound on the largest distance between points `x[i]` and `y[j]`.
@@ -33,17 +33,23 @@ def max_diameter(x: Tensor, y: Tensor) -> float:
     diameter = (maxs - mins).norm().item()
     return diameter
 
+"""
+# Compute the typical scale of our configuration:
+if diameter is None:
+    # Flatten the batch (if present)
+    D = x.shape[-1]
+    diameter = max_diameter(x.view(-1, D), y.view(-1, D))
+"""
 
 def annealing_parameters(
     *,
-    x: Tensor,
-    y: Tensor,
+    diameter: float,
     p: int,
     blur: float,
     reach: Optional[float] = None,
-    diameter: Optional[float] = None,
     n_iter: Optional[int] = None,
     scaling: Optional[float] = None,
+    scales: Optional[List[float]] = None,
 ) -> DescentParameters:
     r"""Turns high-level arguments into numerical values for the Sinkhorn loop.
 
@@ -53,13 +59,12 @@ def annealing_parameters(
     by :math:`\text{scaling}^p` at every iteration until reaching
     a minimum value of :math:`\text{blur}^p`.
 
-    The number of iterations can be specified in two different ways,
-    using either an integer number (n_iter) or a ratio between successive scales(scaling).
+    The number of iterations can be specified in two different ways, using either 
+    an integer number (n_iter) or a ratio between successive scales (scaling).
 
     Args:
-        x (Tensor): Sample positions for the source measure.
-
-        y (Tensor): Sample positions for the target measure.
+        diameter (float > 0 or None): Upper bound on the largest distance between
+            sample locations :math:`x_i` and :math:`y_j`.
 
         p (integer or float): The exponent of the Euclidean distance
             :math:`\|x_i-y_j\|` that defines the cost function
@@ -75,16 +80,47 @@ def annealing_parameters(
         reach (float > 0 or None): Strength of the marginal constraints.
             None stands for +infinity, i.e. balanced optimal transport.
 
-        diameter (float > 0 or None): Upper bound on the largest distance between
-            points :math:`x_i` and :math:`y_j`.
-
         n_iter (int >= 1 or None): Number of iterations.
 
         scaling (float in (0,1) or None): Ratio between two successive
             values of the blur scale.
 
+        scales (list of S float or None): List of successive scales at which
+            we represent the input distributions. These typically correspond
+            to sampling scales, i.e. to average distances between two nearest samples.
+            These scales should be decreasing (we always work in a coarse-to-fine
+            fashion). Note that this parameter is only relevant for multi-scale
+            implementations. If scales is None or is a list of length 1, we assume
+            that we work in single-scale mode and stick to a single representation
+            of the input measures throughout the Sinkhorn iterations.
+
     Returns:
-        list of float: list of values for the temperature epsilon.
+        descent (DescentParameters): A NamedTuple with attributes that describe
+            the evolution of the main parameters along the iterations of the
+            Sinkhorn loop.
+            We return the attributes:
+            - diameter (float): The value of the diameter that we used as an estimate
+              in the descent. Typically, it is equal to max(diameter, blur).
+            
+            - blur_list (list of n_iter float > 0): List of successive values for
+              the blur length of the Sinkhorn kernel, at which we process the samples.
+              The number of iterations in the loop is equal to the length of this list.
+
+            - eps_list (list of n_iter float > 0): List of successive values for
+              the Sinkhorn regularization parameter, the temperature :math:`\varepsilon`.
+              At every iteration, the temperature is equal to blur**p.
+              The number of iterations in the loop is equal to the length of this list.
+
+            - rho_list (list of n_iter (float > 0 or None)): List of successive values for
+              the strength of the marginal constraints in unbalanced OT.
+              None values stand for :math:`\rho = +\infty`, i.e. balanced OT.
+
+            - jumps (list of S-1 int): Sorted list of iteration numbers where we "jump"
+              from a coarse resolution to a finer one by looking one step further
+              in the lists of representations of the input distributions.
+              Each integer jump index `jump` satisfies `0 <= jump < n_iter`.
+              For single-scale mode (if scales = None or is a list of length 1), 
+              we return `jumps = []`.
     """
 
     if n_iter is not None and n_iter <= 0:
@@ -102,12 +138,6 @@ def annealing_parameters(
             "Please specify a number of iterations using either "
             "the n_iter or scaling parameters."
         )
-
-    # Compute the typical scale of our configuration:
-    if diameter is None:
-        # Flatten the batch (if present)
-        D = x.shape[-1]
-        diameter = max_diameter(x.view(-1, D), y.view(-1, D))
 
     # Make sure that the diameter is >= blur:
     diameter = max(diameter, blur)
@@ -159,8 +189,49 @@ def annealing_parameters(
     # Turn our scales into temperature values:
     eps_list = [b**p for b in blur_list]
 
+    # We use a constant value for the unbalanced parameter rho:
+    if reach is None:
+        rho = None
+    else:
+        rho = reach**p
+    rho_list = [rho] * len(blur_list)
+
+
+    # Jumps from a coarse to a finer scale should happen when 
+    # blur[next_iteration] < current scale.
+    if scales is None or len(scales) < 2:
+        # Single-scale mode
+        jumps = []
+    else:
+        k = 0  # Index for the current scale
+        # Loop over blur values "at the next iteration":
+        for (i, blur) in enumerate(blur_list[1:]):
+            if blur < scales[k]:
+                jumps.append(i)
+                k = k+1
+
+                # We break the loop when we reach the finest scale
+                if k >= len(scales):
+                    break
+
+                # The new blur value is too small: we should jump two scales
+                # instead of one. This is currently not supported, so we advise
+                # the user to increase the number of iterations.
+                if blur < scales[k]:
+                    raise ValueError("The annealing schedule for the descent is steeper "
+                        "than the granularity of the coarse-to-fine decomposition. "
+                        "Please increase the number of iterations (n_iter), "
+                        "increase the scaling coefficient (scaling) "
+                        "or reduce the number of scales in the multi-scale descent.")
+        
+        if k < len(scales):
+            raise NotImplementedError()
+                
+
     return DescentParameters(
         diameter=diameter,
+        jumps=jumps,
         eps_list=eps_list,
         blur_list=blur_list,
+        rho_list=rho_list,
     )
