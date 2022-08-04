@@ -27,4 +27,3 @@ ot.solve_samples(xa, xb, blur=0.1, reach=5).lazy_plan[0:5, 1:3]
 
 # Compute Sinkhorn divergence between empirical distributions
 ot.solve_samples(xa, xb, reg=0.1, debias=true).value
-
