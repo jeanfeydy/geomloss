@@ -49,7 +49,7 @@ def annealing_parameters(
     reach: Optional[float] = None,
     n_iter: Optional[int] = None,
     scaling: Optional[float] = None,
-    scales: Optional[List[float]] = None,
+    resolutions: Optional[List[float]] = None,
 ) -> DescentParameters:
     r"""Turns high-level arguments into numerical values for the Sinkhorn loop.
 
@@ -85,7 +85,7 @@ def annealing_parameters(
         scaling (float in (0,1) or None): Ratio between two successive
             values of the blur scale.
 
-        scales (list of S float or None): List of successive scales at which
+        resolutions (list of S float or None): List of successive scales at which
             we represent the input distributions. These typically correspond
             to sampling scales, i.e. to average distances between two nearest samples.
             These scales should be decreasing (we always work in a coarse-to-fine
@@ -115,12 +115,10 @@ def annealing_parameters(
               the strength of the marginal constraints in unbalanced OT.
               None values stand for :math:`\rho = +\infty`, i.e. balanced OT.
 
-            - jumps (list of S-1 int): Sorted list of iteration numbers where we "jump"
-              from a coarse resolution to a finer one by looking one step further
-              in the lists of representations of the input distributions.
-              Each integer jump index `jump` satisfies `0 <= jump < n_iter`.
-              For single-scale mode (if scales = None or is a list of length 1), 
-              we return `jumps = []`.
+            - scale_list (list of n_iter int): List of scale indices at which we
+              perform our iterations.
+              Each scale index should satisfy `0 <= scale < S`.
+              For single-scale mode, we return `scale_list = [0] * n_iter`.
     """
 
     if n_iter is not None and n_iter <= 0:
@@ -197,40 +195,46 @@ def annealing_parameters(
     rho_list = [rho] * len(blur_list)
 
 
-    # Jumps from a coarse to a finer scale should happen when 
+    # We perform an iteration that is associated to a precision "blur" 
+    # at the coarsest available resolution such that blur >= resolution.
+    # This means that jumps from a coarse to a finer scale will happen when 
     # blur[next_iteration] < current scale.
-    if scales is None or len(scales) < 2:
+    #
+    # More precisely, let's assume that:
+    # resolutions = [1., .5, .1]
+    # blur_list = [.7, .6, .5, .3, .2, .1, .05]
+    # then:
+    # scale_list = [1, 1, 1, 2, 2, 2, 2]
+    # This will induce a "jump" from scale 1 to scale 2 between the
+    # 3rd (blur=.5) and the 4th (blur=.3) iterations.
+    # 
+    # Note that in this example:
+    # - We don't use the first scale (resolution = 1.0), because our first iteration
+    #   is already performed at blur = 0.7.
+    # - We perform the 3rd iteration (blur = 0.5) at the 2nd scale (resolution = 0.5).
+    #   Our convention is that we only jump if the blur becomes strictly smaller
+    #   than the current resolution of our representation.
+    # - We perform the last iteration (blur = .05) at the last scale (resolution = 0.1)
+    #   because we don't have access to any finer representation of the distributions.
+
+    if resolutions is None or len(resolutions) < 2:
         # Single-scale mode
-        jumps = []
+        scale_list = [0] * len(blur_list)
     else:
-        k = 0  # Index for the current scale
-        # Loop over blur values "at the next iteration":
-        for (i, blur) in enumerate(blur_list[1:]):
-            if blur < scales[k]:
-                jumps.append(i)
-                k = k+1
+        scale_list = []
+        scale = 0  # Index for the current scale
+        for blur in blur_list:
+            while scale + 1 < len(resolutions) and blur < resolutions[scale]:
+                scale = scale + 1
+            scale_list.append(scale)
 
-                # We break the loop when we reach the finest scale
-                if k >= len(scales):
-                    break
-
-                # The new blur value is too small: we should jump two scales
-                # instead of one. This is currently not supported, so we advise
-                # the user to increase the number of iterations.
-                if blur < scales[k]:
-                    raise ValueError("The annealing schedule for the descent is steeper "
-                        "than the granularity of the coarse-to-fine decomposition. "
-                        "Please increase the number of iterations (n_iter), "
-                        "increase the scaling coefficient (scaling) "
-                        "or reduce the number of scales in the multi-scale descent.")
-        
-        if k < len(scales):
-            raise NotImplementedError()
+        # By convention, we always return a result at the finest scale available:
+        scale_list[-1] = len(resolutions) - 1
                 
 
     return DescentParameters(
         diameter=diameter,
-        jumps=jumps,
+        scale_list=scale_list,
         eps_list=eps_list,
         blur_list=blur_list,
         rho_list=rho_list,

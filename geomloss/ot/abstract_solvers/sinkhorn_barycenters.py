@@ -171,11 +171,10 @@ def sinkhorn_barycenter_loop(
               The number of iterations in the loop is equal to the length of this list
               + the number of "backward_iterations".
 
-            - jumps (list of S-1 int): Sorted list of iteration numbers where we "jump"
-              from a coarse resolution to a finer one by looking one step further
-              in the lists `log_b_k_list` and `C_list`.
-              Each integer jump index `jump` should satisfy `0 <= jump < n_iter`.
-              For single-scale mode, use `jumps = []`.
+            - scale_list (list of n_iter int): List of scale indices at which we
+              perform our iterations.
+              Each scale index should satisfy `0 <= scale < S`.
+              For single-scale mode, use `scale_list = [0] * n_iter`.
 
         extrapolate (function, optional): Coarse-to-fine extrapolation for the
             dual potentials. If
@@ -213,16 +212,17 @@ def sinkhorn_barycenter_loop(
     """
 
     with torch.set_grad_enabled(backward_iterations == 0 and torch.is_grad_enabled()):
-        # Setup the input measures at the coarsest level:
+        # We (usually) start at the coarsest resolution available:
+        scale = descent.scale_list[0]  # Scale index
+        log_b_k = log_b_k_list[scale]  # (B,K,...) log-weights for the measures
+        C = C_list[scale]  # implicit (B,K,N,M), (B,K,N,N)... cost matrices
+
+        # First value of the temperature (typically, eps = diameter**p):
         eps = descent.eps_list[0]  # eps = temperature
-        log_b_k = log_b_k_list[0]  # (B,K,...) log-weights for the input measure
-        C = C_list[0]  # implicit (B,K,N,M), (B,K,N,N)... cost matrices
 
         # Initialize the dual variables:
         # (B,K,...) tensor, supported by the barycenter points x:
-        f_k = softmin(
-            eps, C.xy, log_b_k
-        )
+        f_k = softmin(eps, C.xy, log_b_k)
         # TODO: the line below is not great...
         g_k = softmin(eps, C.yx, log_b_k)  # (B,K,...), supported by the input points y
 
@@ -232,7 +232,7 @@ def sinkhorn_barycenter_loop(
         log_d = log_d - log_d.logsumexp(log_d.shape[2:], keepdim=True)
 
         # Multiscale descent, with eps-scaling ----------------------------------
-        scale = 0  # integer counter
+
         # See Fig. 3.25-26 in Jean Feydy's PhD thesis for intuitions.
         for i, eps in enumerate(descent.eps_list):
             f_k, g_k, log_d, log_bar = barycenter_iteration(
@@ -246,9 +246,12 @@ def sinkhorn_barycenter_loop(
                 w_k=w_k,
             )
 
-            if i in descent.jumps:  # Re-fine the maps, if needed
-
-                C_fine = C_list[scale + 1]
+            # In single-scale mode, scale_list = [0, ..., 0]: we never run the code below.
+            if i + 1 < len(descent.scale_list) and scale != descent.scale_list[i+1]:
+      
+                # "Full" cost matrix at the next scale:
+                next_scale = descent.scale_list[i+1]
+                C_fine = C_list[next_scale]
 
                 # N.B.: this code does not currently support unbalanced OT
                 dampen = None
@@ -287,10 +290,11 @@ def sinkhorn_barycenter_loop(
                 )
 
                 # Update the representations and cost matrices at a finer scale:
-                scale = scale + 1
+                scale = next_scale
                 C = C_fine  # = C_list[scale]
                 eps = descent.eps_list[scale]  # eps = temperature
                 log_b_k = log_b_k_list[scale]  # (B,K,...) log-weights
+
 
     # N.B.: PyTorch autograd may be enabled here.
     for _ in range(backward_iterations):

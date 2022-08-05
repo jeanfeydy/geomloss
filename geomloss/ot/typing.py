@@ -38,11 +38,11 @@ class SinkhornPotentials(NamedTuple):
 # epsilon and strength of the marginal constraints rho
 # that we use in successive iterations of the Sinkhorn loop.
 # It also contains a rough estimation of the diameter of our configuration,
-# and a list of iteration numbers where we should "jump" from a coarse
-# description to a finer one.
+# and a list of integer indices that describe at which "scale" of a multiscale
+# representation we should perform each iteration.
 class DescentParameters(NamedTuple):
     diameter: float
-    jumps: List[int]
+    scale_list: List[int]  # = [0, ..., 0] for single-scale mode
     blur_list: List[float]
     eps_list: List[float]
     rho_list: List[float]
