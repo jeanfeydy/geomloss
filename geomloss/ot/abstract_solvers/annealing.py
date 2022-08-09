@@ -33,6 +33,7 @@ def max_diameter(x: RealTensor, y: RealTensor) -> float:
     diameter = float(bk.norm(maxs - mins))
     return diameter
 
+
 """
 # Compute the typical scale of our configuration:
 if diameter is None:
@@ -40,6 +41,7 @@ if diameter is None:
     D = x.shape[-1]
     diameter = max_diameter(x.view(-1, D), y.view(-1, D))
 """
+
 
 def annealing_parameters(
     *,
@@ -59,7 +61,7 @@ def annealing_parameters(
     by :math:`\text{scaling}^p` at every iteration until reaching
     a minimum value of :math:`\text{blur}^p`.
 
-    The number of iterations can be specified in two different ways, using either 
+    The number of iterations can be specified in two different ways, using either
     an integer number (n_iter) or a ratio between successive scales (scaling).
 
     Args:
@@ -101,7 +103,7 @@ def annealing_parameters(
             We return the attributes:
             - diameter (float): The value of the diameter that we used as an estimate
               in the descent. Typically, it is equal to max(diameter, blur).
-            
+
             - blur_list (list of n_iter float > 0): List of successive values for
               the blur length of the Sinkhorn kernel, at which we process the samples.
               The number of iterations in the loop is equal to the length of this list.
@@ -194,10 +196,9 @@ def annealing_parameters(
         rho = reach**p
     rho_list = [rho] * len(blur_list)
 
-
-    # We perform an iteration that is associated to a precision "blur" 
+    # We perform an iteration that is associated to a precision "blur"
     # at the coarsest available resolution such that blur >= resolution.
-    # This means that jumps from a coarse to a finer scale will happen when 
+    # This means that jumps from a coarse to a finer scale will happen when
     # blur[next_iteration] < current scale.
     #
     # More precisely, let's assume that:
@@ -207,7 +208,7 @@ def annealing_parameters(
     # scale_list = [1, 1, 1, 2, 2, 2, 2]
     # This will induce a "jump" from scale 1 to scale 2 between the
     # 3rd (blur=.5) and the 4th (blur=.3) iterations.
-    # 
+    #
     # Note that in this example:
     # - We don't use the first scale (resolution = 1.0), because our first iteration
     #   is already performed at blur = 0.7.
@@ -230,7 +231,6 @@ def annealing_parameters(
 
         # By convention, we always return a result at the finest scale available:
         scale_list[-1] = len(resolutions) - 1
-                
 
     return DescentParameters(
         diameter=diameter,

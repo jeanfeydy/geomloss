@@ -1,8 +1,10 @@
 import torch
 from ..typing import RealTensor
 
+
 def exp(a: RealTensor) -> RealTensor:
     return a.exp()
+
 
 def stable_log(a: RealTensor) -> RealTensor:
     """Returns the log of the input, with values clamped to -100k to avoid numerical bugs."""
@@ -10,29 +12,37 @@ def stable_log(a: RealTensor) -> RealTensor:
     a_log[a <= 0] = -100000
     return a_log
 
+
 def dot_products(a: RealTensor, f: RealTensor) -> RealTensor:
     """Performs a batchwise computation of dot products."""
     assert a.shape == f.shape
     B = a.shape[0]
     return (a.reshape(B, -1) * f.reshape(B, -1)).sum(1)
 
+
 def norm(a: RealTensor) -> RealTensor:
     return a.norm()
+
 
 def einsum(formula, *args):
     return torch.einsum(formula, *args)
 
+
 def sum(x, axis=None, keepdims=False):
     return x.sum(dim=axis, keepdim=keepdims)
+
 
 def amin(x, axis=None):
     return torch.amin(x, axis)
 
+
 def amax(x, axis=None):
     return torch.amax(x, axis)
 
+
 def stack(l):
     return torch.stack(l)
+
 
 def ones_like(x):
     return torch.ones_like(x)
@@ -41,11 +51,14 @@ def ones_like(x):
 def detach(x):
     return x.detach()
 
+
 def is_grad_enabled():
     return torch.is_grad_enabled()
 
+
 def set_grad_enabled(b):
     return torch.set_grad_enabled(b)
+
 
 class UnbalancedWeight(torch.nn.Module):
     """Applies the correct scaling to the dual variables in the Sinkhorn divergence formula.

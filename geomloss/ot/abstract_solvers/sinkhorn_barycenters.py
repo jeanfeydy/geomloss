@@ -246,10 +246,10 @@ def sinkhorn_barycenter_loop(
             )
 
             # In single-scale mode, scale_list = [0, ..., 0]: we never run the code below.
-            if i + 1 < len(descent.scale_list) and scale != descent.scale_list[i+1]:
-      
+            if i + 1 < len(descent.scale_list) and scale != descent.scale_list[i + 1]:
+
                 # "Full" cost matrix at the next scale:
-                next_scale = descent.scale_list[i+1]
+                next_scale = descent.scale_list[i + 1]
                 C_fine = C_list[next_scale]
 
                 # N.B.: this code does not currently support unbalanced OT
@@ -293,7 +293,6 @@ def sinkhorn_barycenter_loop(
                 C = C_fine  # = C_list[scale]
                 eps = descent.eps_list[scale]  # eps = temperature
                 log_b_k = log_b_k_list[scale]  # (B,K,...) log-weights
-
 
     # N.B.: PyTorch autograd may be enabled here.
     for _ in range(backward_iterations):

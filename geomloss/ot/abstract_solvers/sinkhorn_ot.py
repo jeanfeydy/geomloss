@@ -279,19 +279,19 @@ def sinkhorn_loop(
         # that is generated in conjunction with the list of temperatures "eps_list".
         # We "jump" if the scale changes, i.e. if current_scale != next_scale.
         #
-        # N.B.: In single-scale mode, scale_list = [0, ..., 0]: the code below is never 
+        # N.B.: In single-scale mode, scale_list = [0, ..., 0]: the code below is never
         #       executed and we retrieve "Algorithm 3.5" from Jean Feydy's PhD thesis.
-        if i + 1 < len(descent.scale_list) and scale != descent.scale_list[i+1]:
+        if i + 1 < len(descent.scale_list) and scale != descent.scale_list[i + 1]:
 
             # "Full" cost matrix at the next scale:
-            next_scale = descent.scale_list[i+1]
+            next_scale = descent.scale_list[i + 1]
             C_fine = C_list[next_scale]
 
             if i == len(descent.eps_list) - 1:  # Last iteration: just extrapolate!
                 last_extrapolation = False  # No need to re-extrapolate after the loop
                 bk.set_grad_enabled(prev_autograd)
 
-            elif kernel_truncation is not None:  
+            elif kernel_truncation is not None:
                 # It's worth investing some time on kernel truncation...
                 # The lines below implement the Kernel truncation trick,
                 # described in Eq. (3.222-3.224) in Jean Feydy's PhD thesis and in
