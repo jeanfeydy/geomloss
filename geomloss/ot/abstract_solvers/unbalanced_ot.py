@@ -114,8 +114,8 @@ def sinkhorn_cost(
         # Second: weight it by the correct factor,
         # in a way that is coherent for the backward pass.
         # TODO: make this compatible with order 2 derivatives.
-        F_a = bk.UnbalancedWeight(eps=eps, rho=rho)(F_a)
-        G_b = bk.UnbalancedWeight(eps=eps, rho=rho)(G_b)
+        F_a = bk.unbalanced_weight(F_a, eps=eps, rho=rho)
+        G_b = bk.unbalanced_weight(G_b, eps=eps, rho=rho)
 
     a_costs = bk.dot_products(a, F_a)  # (B,)
     b_costs = bk.dot_products(b, G_b)  # (B,)

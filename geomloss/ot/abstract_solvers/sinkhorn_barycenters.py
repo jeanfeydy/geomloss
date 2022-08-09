@@ -210,7 +210,11 @@ def sinkhorn_barycenter_loop(
             These weights correspond to the sample positions at the finest scale.
     """
 
-    with bk.set_grad_enabled(backward_iterations == 0 and bk.is_grad_enabled()):
+    typical_array = log_b_k_list[descent.scale_list[0]]
+
+    with bk.set_grad_enabled(
+        typical_array, backward_iterations == 0 and bk.is_grad_enabled(typical_array)
+    ):
         # We (usually) start at the coarsest resolution available:
         scale = descent.scale_list[0]  # Scale index
         log_b_k = log_b_k_list[scale]  # (B,K,...) log-weights for the measures

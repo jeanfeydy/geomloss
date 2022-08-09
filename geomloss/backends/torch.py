@@ -21,7 +21,7 @@ def dot_products(a: RealTensor, f: RealTensor) -> RealTensor:
 
 
 def norm(a: RealTensor) -> RealTensor:
-    return a.norm()
+    return (a**2).sum().sqrt()
 
 
 def einsum(formula, *args):
@@ -40,8 +40,8 @@ def amax(x, axis=None):
     return torch.amax(x, axis)
 
 
-def stack(l):
-    return torch.stack(l)
+def stack(*args):
+    return torch.stack(args)
 
 
 def ones_like(x):
@@ -52,11 +52,11 @@ def detach(x):
     return x.detach()
 
 
-def is_grad_enabled():
+def is_grad_enabled(typical_array):
     return torch.is_grad_enabled()
 
 
-def set_grad_enabled(b):
+def set_grad_enabled(typical_array, b):
     return torch.set_grad_enabled(b)
 
 
@@ -81,3 +81,7 @@ class UnbalancedWeight(torch.nn.Module):
 
     def backward(self, g: RealTensor):
         return (self.rho + self.eps) * g
+
+
+def unbalanced_weight(f, *, eps, rho):
+    return UnbalancedWeight(eps=eps, rho=rho)(f)

@@ -28,8 +28,8 @@ def max_diameter(x: RealTensor, y: RealTensor) -> float:
     Returns:
         float: Upper bound on the largest distance between points `x[i]` and `y[j]`.
     """
-    mins = bk.amin(bk.stack((bk.amin(x, axis=0), bk.amin(y, axis=0))), axis=0)  # (D,)
-    maxs = bk.amax(bk.stack((bk.amax(x, axis=0), bk.amax(y, axis=0))), axis=0)  # (D,)
+    mins = bk.amin(bk.stack(bk.amin(x, axis=0), bk.amin(y, axis=0)), axis=0)  # (D,)
+    maxs = bk.amax(bk.stack(bk.amax(x, axis=0), bk.amax(y, axis=0)), axis=0)  # (D,)
     diameter = float(bk.norm(maxs - mins))
     return diameter
 

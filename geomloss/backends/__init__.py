@@ -28,6 +28,6 @@ set_grad_enabled = pick(
     numpy=bk_numpy.set_grad_enabled, torch=bk_torch.set_grad_enabled
 )
 
-UnbalancedWeight = pick(
-    numpy=bk_numpy.UnbalancedWeight, torch=bk_torch.UnbalancedWeight
+unbalanced_weight = pick(
+    numpy=bk_numpy.unbalanced_weight, torch=bk_torch.unbalanced_weight
 )
