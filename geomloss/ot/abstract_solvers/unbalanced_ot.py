@@ -7,8 +7,7 @@ https://arxiv.org/pdf/1910.12958.pdf
 """
 
 from ... import backends as bk
-from ..utils import dot_products
-from ..typing import Optional, RealTensor, SinkhornPotentials
+from ...typing import Optional, RealTensor, SinkhornPotentials
 
 
 def dampening(*, eps: float, rho: Optional[float]):
@@ -118,8 +117,8 @@ def sinkhorn_cost(
         F_a = bk.UnbalancedWeight(eps=eps, rho=rho)(F_a)
         G_b = bk.UnbalancedWeight(eps=eps, rho=rho)(G_b)
 
-    a_costs = dot_products(a, F_a)  # (B,)
-    b_costs = dot_products(b, G_b)  # (B,)
+    a_costs = bk.dot_products(a, F_a)  # (B,)
+    b_costs = bk.dot_products(b, G_b)  # (B,)
     return a_costs + b_costs
 
 

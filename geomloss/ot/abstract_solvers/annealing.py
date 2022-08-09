@@ -8,7 +8,7 @@ https://www.jeanfeydy.com/geometric_data_analysis.pdf
 
 import numpy as np
 from ... import backends as bk
-from ..typing import RealTensor, Optional, List, DescentParameters
+from ...typing import RealTensor, Optional, List, DescentParameters
 
 # ==============================================================================
 #                         epsilon-scaling heuristic

@@ -1,4 +1,4 @@
-from geomloss.geomloss.backends.torch import UnbalancedWeight
+from geomloss.geomloss.backends.torch import UnbalancedWeight, dot_products, stable_log
 
 
 stack
@@ -8,7 +8,8 @@ norm
 einsum
 ones_like
 exp
-
+stable_log
+dot_products
 
 is_grad_enabled
 detach
