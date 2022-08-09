@@ -1,6 +1,10 @@
 from .common import pick
-from . import torch as bk_torch
 from . import numpy as bk_numpy
+
+try:
+    from . import torch as bk_torch
+except:
+    from . import numpy as bk_torch
 
 
 # Simple mathematical functions:
