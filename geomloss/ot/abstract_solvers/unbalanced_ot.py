@@ -6,7 +6,7 @@ Thibault Séjourné, Jean Feydy, François-Xavier Vialard, Alain Trouvé, Gabrie
 https://arxiv.org/pdf/1910.12958.pdf
 """
 
-import torch
+from ... import backends as bk
 from ..utils import dot_products
 from ..typing import Optional, RealTensor, SinkhornPotentials
 
@@ -17,29 +17,6 @@ def dampening(*, eps: float, rho: Optional[float]):
         return lambda f: f
     else:
         return lambda f: f / (1 + eps / rho)
-
-
-class UnbalancedWeight(torch.nn.Module):
-    """Applies the correct scaling to the dual variables in the Sinkhorn divergence formula.
-
-    Remarkably, the exponentiated potentials should be scaled
-    by "rho + eps/2" in the forward pass and "rho + eps" in the backward.
-    For an explanation of this surprising "inconsistency"
-    between the forward and backward formulas,
-    please refer to Proposition 12 (Dual formulas for the Sinkhorn costs)
-    in "Sinkhorn divergences for unbalanced optimal transport",
-    Sejourne et al., https://arxiv.org/abs/1910.12958.
-    """
-
-    def __init__(self, *, eps: float, rho: float):
-        super(UnbalancedWeight, self).__init__()
-        self.eps, self.rho = eps, rho
-
-    def forward(self, x: RealTensor):
-        return (self.rho + self.eps / 2) * x
-
-    def backward(self, g: RealTensor):
-        return (self.rho + self.eps) * g
 
 
 def sinkhorn_cost(
@@ -120,8 +97,8 @@ def sinkhorn_cost(
 
             # N.B.: Even if this quantity is never used in practice,
             #       we may want to re-check this computation...
-            F_a = 1 - (-f_ba / rho).exp()
-            G_b = 1 - (-g_ab / rho).exp()
+            F_a = 1 - bk.exp(-f_ba / rho)
+            G_b = 1 - bk.exp(-g_ab / rho)
 
         else:
             # DEBIASED Sinkhorn divergence, S_eps,rho(a,b)
@@ -132,14 +109,14 @@ def sinkhorn_cost(
             # See Proposition 12 (Dual formulas for the Sinkhorn costs)
             # in "Sinkhorn divergences for unbalanced optimal transport",
             # Sejourne et al., https://arxiv.org/abs/1910.12958.
-            F_a = (-f_aa / rho).exp() - (-f_ba / rho).exp()
-            G_b = (-g_bb / rho).exp() - (-g_ab / rho).exp()
+            F_a = bk.exp(-f_aa / rho) - bk.exp(-f_ba / rho)
+            G_b = bk.exp(-g_bb / rho) - bk.exp(-g_ab / rho)
 
         # Second: weight it by the correct factor,
         # in a way that is coherent for the backward pass.
         # TODO: make this compatible with order 2 derivatives.
-        F_a = UnbalancedWeight(eps=eps, rho=rho)(F_a)
-        G_b = UnbalancedWeight(eps=eps, rho=rho)(G_b)
+        F_a = bk.UnbalancedWeight(eps=eps, rho=rho)(F_a)
+        G_b = bk.UnbalancedWeight(eps=eps, rho=rho)(G_b)
 
     a_costs = dot_products(a, F_a)  # (B,)
     b_costs = dot_products(b, G_b)  # (B,)

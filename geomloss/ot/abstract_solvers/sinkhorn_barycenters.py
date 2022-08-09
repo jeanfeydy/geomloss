@@ -1,5 +1,4 @@
-import torch
-
+from ... import backends as bk
 from ..typing import (
     List,
     RealTensor,
@@ -57,7 +56,7 @@ def barycenter_iteration(
     # (B,1,...) = (B,1,...) - (B,K,...) @ (B,K,1,..,1)
     # With e.g. 2 trailing dimensions, the einsum below is equivalent to:
     # log_bar = log_d - (ft_k * w_k[:,:,None,None]).sum(1, keepdim=True) / eps
-    log_bar = log_d - torch.einsum("bk..., bk -> b...", ft_k, w_k)[:, None, ...] / eps
+    log_bar = log_d - bk.einsum("bk..., bk -> b...", ft_k, w_k)[:, None, ...] / eps
 
     # Symmetric Sinkhorn updates:
     # From the measures to the barycenter:
@@ -70,7 +69,7 @@ def barycenter_iteration(
     # Sinkhorn "pseudo-step" - from the measures to the barycenter:
     ft_k = softmin(eps, C.xy, log_b_k + g_k / eps)
     # Update the barycenter - log_bar is (B,1,...):
-    log_bar = log_d - torch.einsum("bk..., bk -> b...", ft_k, w_k)[:, None, ...] / eps
+    log_bar = log_d - bk.einsum("bk..., bk -> b...", ft_k, w_k)[:, None, ...] / eps
 
     # Update the de-biasing measure:
     # (B,1,...) = (B,1,...) + (B,1,...) + (B,1,...)
@@ -211,7 +210,7 @@ def sinkhorn_barycenter_loop(
             These weights correspond to the sample positions at the finest scale.
     """
 
-    with torch.set_grad_enabled(backward_iterations == 0 and torch.is_grad_enabled()):
+    with bk.set_grad_enabled(backward_iterations == 0 and bk.is_grad_enabled()):
         # We (usually) start at the coarsest resolution available:
         scale = descent.scale_list[0]  # Scale index
         log_b_k = log_b_k_list[scale]  # (B,K,...) log-weights for the measures
@@ -227,9 +226,9 @@ def sinkhorn_barycenter_loop(
         g_k = softmin(eps, C.yx, log_b_k)  # (B,K,...), supported by the input points y
 
         # Logarithm of the debiasing term:
-        log_d = torch.ones_like(log_b_k).sum(dim=1, keepdim=True)  # (B,1,...)
+        log_d = bk.sum(bk.ones_like(log_b_k), axis=1, keepdims=True)  # (B,1,...)
         # Normalize each of these:
-        log_d = log_d - log_d.logsumexp(log_d.shape[2:], keepdim=True)
+        log_d = log_d - bk.logsumexp(log_d, axis=log_d.shape[2:], keepdims=True)
 
         # Multiscale descent, with eps-scaling ----------------------------------
 
@@ -309,4 +308,4 @@ def sinkhorn_barycenter_loop(
             w_k=w_k,
         )
 
-    return log_bar.exp()
+    return bk.exp(log_bar)

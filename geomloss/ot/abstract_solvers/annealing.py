@@ -7,7 +7,7 @@ https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 
 import numpy as np
-import torch
+from ... import backends as bk
 from ..typing import RealTensor, Optional, List, DescentParameters
 
 # ==============================================================================
@@ -28,9 +28,9 @@ def max_diameter(x: RealTensor, y: RealTensor) -> float:
     Returns:
         float: Upper bound on the largest distance between points `x[i]` and `y[j]`.
     """
-    mins = torch.stack((x.min(dim=0)[0], y.min(dim=0)[0])).min(dim=0)[0]  # (D,)
-    maxs = torch.stack((x.max(dim=0)[0], y.max(dim=0)[0])).max(dim=0)[0]  # (D,)
-    diameter = (maxs - mins).norm().item()
+    mins = bk.amin(bk.stack((bk.amin(x, axis=0), bk.amin(y, axis=0))), axis=0)  # (D,)
+    maxs = bk.amax(bk.stack((bk.amax(x, axis=0), bk.amax(y, axis=0))), axis=0)  # (D,)
+    diameter = float(bk.norm(maxs - mins))
     return diameter
 
 """

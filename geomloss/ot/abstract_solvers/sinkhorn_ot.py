@@ -1,4 +1,4 @@
-import torch
+from ... import backends as bk
 from ..typing import (
     List,
     RealTensor,
@@ -189,8 +189,8 @@ def sinkhorn_loop(
     #       "Super-efficiency of automatic differentiation for
     #       functions defined as a minimum", Ablin, Peyré, Moreau (2020)
     #       https://arxiv.org/pdf/2002.03722.pdf.
-    prev_autograd = torch.is_grad_enabled()
-    torch.autograd.set_grad_enabled(False)
+    prev_autograd = bk.is_grad_enabled()
+    bk.set_grad_enabled(False)
 
     # Line 1 (in Algorithm 3.6 from Jean Feydy's PhD thesis) ---------------------------
 
@@ -289,7 +289,7 @@ def sinkhorn_loop(
 
             if i == len(descent.eps_list) - 1:  # Last iteration: just extrapolate!
                 last_extrapolation = False  # No need to re-extrapolate after the loop
-                torch.autograd.set_grad_enabled(prev_autograd)
+                bk.set_grad_enabled(prev_autograd)
 
             elif kernel_truncation is not None:  
                 # It's worth investing some time on kernel truncation...
@@ -405,19 +405,19 @@ def sinkhorn_loop(
     # As detailed above (around "torch.autograd.set_grad_enabled(False)"),
     # this allows us to retrieve correct expressions for the gradient
     # without having to backprop through the whole Sinkhorn loop.
-    torch.autograd.set_grad_enabled(prev_autograd)
+    bk.set_grad_enabled(prev_autograd)
 
     if last_extrapolation:
         # The cross-updates *must* be done in parallel!
         # Do *not* split this coupled update.
         f_ba, g_ab = (
-            dampen(softmin(eps, C.xy, (log_b + g_ab / eps).detach())),
-            dampen(softmin(eps, C.yx, (log_a + f_ba / eps).detach())),
+            dampen(softmin(eps, C.xy, bk.detach(log_b + g_ab / eps))),
+            dampen(softmin(eps, C.yx, bk.detach(log_a + f_ba / eps))),
         )
 
         if debias:
-            f_aa = dampen(softmin(eps, C.xx, (log_a + f_aa / eps).detach()))
-            g_bb = dampen(softmin(eps, C.yy, (log_b + g_bb / eps).detach()))
+            f_aa = dampen(softmin(eps, C.xx, bk.detach(log_a + f_aa / eps)))
+            g_bb = dampen(softmin(eps, C.yy, bk.detach(log_b + g_bb / eps)))
 
     # If there is no de-biasing, we should define empty "self-attention"
     # potentials.

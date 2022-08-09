@@ -1,6 +1,6 @@
 import sys, os.path
 
-__version__ = "0.2.5"
+__version__ = "0.3.0"
 
 from .samples_loss import SamplesLoss
 from .wasserstein_barycenter_images import ImagesBarycenter
