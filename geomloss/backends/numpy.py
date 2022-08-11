@@ -2,6 +2,10 @@ import numpy as np
 from ..typing import RealTensor
 
 
+def abs(a: RealTensor) -> RealTensor:
+    return np.abs(a)
+
+
 def exp(a: RealTensor) -> RealTensor:
     return np.exp(a)
 
@@ -30,6 +34,10 @@ def einsum(formula, *args):
 
 def sum(x, axis=None, keepdims=False):
     return np.sum(x, axis=axis, keepdims=keepdims)
+
+
+def mean(x, axis=None, keepdims=False):
+    return np.mean(x, axis=axis, keepdims=keepdims)
 
 
 def amin(x, axis=None):

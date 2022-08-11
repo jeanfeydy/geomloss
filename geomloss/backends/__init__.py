@@ -8,6 +8,7 @@ except:
 
 
 # Simple mathematical functions:
+abs = pick(numpy=bk_numpy.abs, torch=bk_torch.abs)
 exp = pick(numpy=bk_numpy.exp, torch=bk_torch.exp)
 stable_log = pick(numpy=bk_numpy.stable_log, torch=bk_torch.stable_log)
 dot_products = pick(numpy=bk_numpy.dot_products, torch=bk_torch.dot_products)
@@ -18,6 +19,7 @@ einsum = pick(numpy=bk_numpy.einsum, torch=bk_torch.einsum, main_arg=1)
 
 # Array manipulation:
 sum = pick(numpy=bk_numpy.sum, torch=bk_torch.sum)
+mean = pick(numpy=bk_numpy.mean, torch=bk_torch.mean)
 amin = pick(numpy=bk_numpy.amin, torch=bk_torch.amin)
 amax = pick(numpy=bk_numpy.amax, torch=bk_torch.amax)
 stack = pick(numpy=bk_numpy.stack, torch=bk_torch.stack)

@@ -2,6 +2,10 @@ import torch
 from ..typing import RealTensor
 
 
+def abs(a: RealTensor) -> RealTensor:
+    return a.abs()
+
+
 def exp(a: RealTensor) -> RealTensor:
     return a.exp()
 
@@ -30,6 +34,10 @@ def einsum(formula, *args):
 
 def sum(x, axis=None, keepdims=False):
     return x.sum(dim=axis, keepdim=keepdims)
+
+
+def mean(x, axis=None, keepdims=False):
+    return x.mean(dim=axis, keepdim=keepdims)
 
 
 def amin(x, axis=None):
