@@ -1,4 +1,4 @@
-from .common import pick
+from .common import pick, library
 from . import numpy as bk_numpy
 
 try:
@@ -6,6 +6,10 @@ try:
 except:
     from . import numpy as bk_torch
 
+
+# Low-level attributes:
+device = pick(numpy=bk_numpy.device, torch=bk_torch.device)
+dtype = pick(numpy=bk_numpy.dtype, torch=bk_torch.dtype)
 
 # Simple mathematical functions:
 abs = pick(numpy=bk_numpy.abs, torch=bk_torch.abs)
@@ -18,6 +22,7 @@ norm = pick(numpy=bk_numpy.norm, torch=bk_torch.norm)
 einsum = pick(numpy=bk_numpy.einsum, torch=bk_torch.einsum, main_arg=1)
 
 # Array manipulation:
+any = pick(numpy=bk_numpy.any, torch=bk_torch.any)
 sum = pick(numpy=bk_numpy.sum, torch=bk_torch.sum)
 mean = pick(numpy=bk_numpy.mean, torch=bk_torch.mean)
 amin = pick(numpy=bk_numpy.amin, torch=bk_torch.amin)

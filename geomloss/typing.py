@@ -1,7 +1,5 @@
-from typing import Tuple, List, Optional, Any
+from typing import Tuple, List, Optional, Any, NamedTuple, Callable
 from numpy.typing import ArrayLike
-from collections.abc import Callable
-from collections import NamedTuple
 
 
 RealTensor = ArrayLike

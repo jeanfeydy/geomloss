@@ -2,6 +2,14 @@ import numpy as np
 from ..typing import RealTensor
 
 
+def device(a: RealTensor):
+    return "cpu"
+
+
+def dtype(a: RealTensor):
+    return a.dtype
+
+
 def abs(a: RealTensor) -> RealTensor:
     return np.abs(a)
 
@@ -30,6 +38,10 @@ def norm(a: RealTensor) -> RealTensor:
 
 def einsum(formula, *args):
     return np.einsum(formula, *args)
+
+
+def any(x, axis=None, keepdims=False):
+    return np.any(x, axis=axis, keepdims=keepdims)
 
 
 def sum(x, axis=None, keepdims=False):

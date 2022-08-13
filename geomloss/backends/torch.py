@@ -2,6 +2,14 @@ import torch
 from ..typing import RealTensor
 
 
+def device(a: RealTensor):
+    return a.device
+
+
+def dtype(a: RealTensor):
+    return a.dtype
+
+
 def abs(a: RealTensor) -> RealTensor:
     return a.abs()
 
@@ -30,6 +38,10 @@ def norm(a: RealTensor) -> RealTensor:
 
 def einsum(formula, *args):
     return torch.einsum(formula, *args)
+
+
+def any(x, axis=None, keepdims=False):
+    return x.any(dim=axis, keepdim=keepdims)
 
 
 def sum(x, axis=None, keepdims=False):
