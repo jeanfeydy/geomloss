@@ -60,8 +60,20 @@ def amax(x, axis=None):
     return torch.amax(x, axis)
 
 
+def logsumexp(x, axis=None, keepdims=False):
+    return x.logsumexp(dim=axis, keepdim=keepdims)
+
+
+def transpose(x, *, axes):
+    return x.permute(axes)
+
+
 def stack(*args):
     return torch.stack(args)
+
+
+def ascontiguousarray(x):
+    return x.contiguous()
 
 
 def ones_like(x):

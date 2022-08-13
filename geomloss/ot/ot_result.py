@@ -1,3 +1,7 @@
+from .. import backends as bk
+from .abstract_solvers.unbalanced_ot import sinkhorn_cost
+
+
 class OTResult:
     """Abstract class for optimal transport results.
 
@@ -9,7 +13,17 @@ class OTResult:
 
     def __init__(
         self,
-        potentials=None,
+        *,
+        a,
+        b,
+        potentials,
+        array_properties,
+        reg,
+        reg_type,
+        unbalanced,
+        unbalanced_type,
+        debias,
+        C=None,
         value=None,
         value_linear=None,
         plan=None,
@@ -19,7 +33,18 @@ class OTResult:
         lazy_plan=None,
     ):
 
+        self._a = a
+        self._b = b
+        self._C = C
         self._potentials = potentials
+        self._array_properties = array_properties
+
+        self._reg = reg
+        self._reg_type = reg_type
+        self._unbalanced = unbalanced
+        self._unbalanced_type = unbalanced_type
+        self._debias = debias
+
         self._value = value
         self._value_linear = value_linear
         self._plan = plan
@@ -37,46 +62,81 @@ class OTResult:
         # methods (e.g. "plan" and "lazy_plan" but not "sparse_plan", etc.).
         # log is a dictionary containing potential information about the solver
 
-    # Dual potentials --------------------------------------------
-    @property
-    def potentials(self):
-        """Dual potentials, i.e. Lagrange multipliers for the marginal constraints.
+    def cast(self, x, shape):
+        return bk.cast(
+            x,
+            shape=self._shapes[shape],
+            dtype=self._array_properties.dtype,
+            device=self._array_properties.device,
+            library=self._array_properties.library,
+        )
 
-        This pair of arrays has the same shape, numerical type
-        and properties as the input weights "a" and "b".
-        """
-        if self._potentials is not None:
-            return self._potentials
-        else:
-            raise NotImplementedError()
-
+    # Dual potentials ====================================================================
     @property
     def potential_a(self):
-        """First dual potential, associated to the "source" measure "a"."""
-        if self._potentials is not None:
-            return self._potentials[0]
-        else:
-            raise NotImplementedError()
+        """First dual potential, associated to the source measure `a`.
+
+        This real-valued Tensor has the same shape and numerical dtype as the
+        Tensor of source weights `a` that was provided as input to the OT solver.
+        It is also hosted on the same device (RAM, GPU memory...), using the same
+        tensor computing library (NumPy, PyTorch...).
+        """
+        return self.cast(self._potentials.f_ba, "a")
 
     @property
     def potential_b(self):
-        """Second dual potential, associated to the "target" measure "b"."""
-        if self._potentials is not None:
-            return self._potentials[1]
-        else:
-            raise NotImplementedError()
+        """Second dual potential, associated to the target measure `b`.
 
-    # Transport plan -------------------------------------------
+        This real-valued Tensor has the same shape and numerical dtype as the
+        Tensor of target weights `b` that was provided as input to the OT solver.
+        It is also hosted on the same device (RAM, GPU memory...), using the same
+        tensor computing library (NumPy, PyTorch...).
+        """
+        return self.cast(self._potentials.g_ab, "b")
+
+    @property
+    def potential_aa(self):
+        """Dual potential associated to the self-interaction of the source measure `a`.
+
+        This potential is only defined when using a debiased Sinkhorn solver.
+        This real-valued Tensor has the same shape and numerical dtype as the
+        Tensor of source weights `a` that was provided as input to the OT solver.
+        It is also hosted on the same device (RAM, GPU memory...), using the same
+        tensor computing library (NumPy, PyTorch...).
+        """
+        if self._potentials.f_aa is None:
+            raise ValueError(
+                "The self-interaction potential `f_aa` is not defined. "
+                "To fix this issue, run your OT solver with `debias = True`."
+            )
+
+        return self.cast(self._potentials.f_aa, "a")
+
+    @property
+    def potential_bb(self):
+        """Dual potential associated to the self-interaction of the target measure `b`.
+
+        This potential is only defined when using a debiased Sinkhorn solver.
+        This real-valued Tensor has the same shape and numerical dtype as the
+        Tensor of target weights `b` that was provided as input to the OT solver.
+        It is also hosted on the same device (RAM, GPU memory...), using the same
+        tensor computing library (NumPy, PyTorch...).
+        """
+        if self._potentials.g_bb is None:
+            raise ValueError(
+                "The self-interaction potential `g_bb` is not defined. "
+                "To fix this issue, run your OT solver with `debias = True`."
+            )
+
+        return self.cast(self._potentials.g_bb, "b")
+
+    # Transport plan =====================================================================
     @property
     def plan(self):
         """Transport plan, encoded as a dense array."""
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
-
-        if self._plan is not None:
-            return self._plan
-        else:
-            raise NotImplementedError()
+        raise NotImplementedError()
 
     @property
     def sparse_plan(self):
@@ -88,40 +148,51 @@ class OTResult:
         """Transport plan, encoded as a symbolic KeOps LazyTensor."""
         raise NotImplementedError()
 
-    # Loss values --------------------------------
+    # Loss values ========================================================================
     @property
     def value(self):
         """Full transport cost, including possible regularization terms."""
-        if self._value is not None:
-            return self._value
-        else:
-            raise NotImplementedError()
+        if self._reg_type != "relative entropy":
+            raise NotImplementedError(
+                "Currently, we only support 'relative entropy' "
+                "as regularization for the OT problem."
+            )
+
+        if self._unbalanced_type != "relative entropy":
+            raise NotImplementedError(
+                "Currently, we only support 'relative entropy' "
+                "as regularization for the marginal constraints."
+            )
+
+        # sinkhorn_cost assumes that the potentials in self._potentials have the same
+        # shapes as self._a, self._b:
+        values = sinkhorn_cost(
+            a=self._a,
+            b=self._b,
+            potentials=self._potentials,
+            eps=self._reg,
+            rho=self._unbalanced,
+            debias=self._debias,
+        )
+        return self.cast(values, "B")
 
     @property
     def value_linear(self):
-        """The "minimal" transport cost, i.e. the product between the transport plan and the cost."""
-        if self._value_linear is not None:
-            return self._value_linear
-        else:
-            raise NotImplementedError()
-
-    # Marginal constraints -------------------------
-    @property
-    def marginals(self):
-        """Marginals of the transport plan: should be very close to "a" and "b" for balanced OT."""
+        """The "bare bones" transport cost, i.e. the product between the transport plan and the cost."""
         raise NotImplementedError()
 
+    # Marginal constraints ===============================================================
     @property
     def marginal_a(self):
-        """First marginal of the transport plan, with the same shape as "a"."""
+        """First marginal of the transport plan, with the same shape as the source weights `a`."""
         raise NotImplementedError()
 
     @property
     def marginal_b(self):
-        """Second marginal of the transport plan, with the same shape as "b"."""
+        """Second marginal of the transport plan, with the same shape as the target weights `b`."""
         raise NotImplementedError()
 
-    # Barycentric mappings -------------------------
+    # Barycentric mappings ===============================================================
     # Return the displacement vectors as an array
     # that has the same shape as "xa"/"xb" (for samples)
     # or "a"/"b" * D (for images)?
@@ -135,7 +206,7 @@ class OTResult:
         """Displacement vectors from the second to the first measure."""
         raise NotImplementedError()
 
-    # Wasserstein barycenters ----------------------
+    # Wasserstein barycenters ============================================================
     # @property
     # def masses(self):
     #     """Masses for the Wasserstein barycenter."""
@@ -146,7 +217,7 @@ class OTResult:
     #     """Sample locations for the Wasserstein barycenter."""
     #     raise NotImplementedError()
 
-    # Miscellaneous --------------------------------
+    # Miscellaneous ======================================================================
     @property
     def citation(self):
         """Appropriate citation(s) for this result, in plain text and BibTex formats."""

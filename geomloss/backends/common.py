@@ -37,3 +37,7 @@ def pick(*, numpy, torch, main_arg=0):
             )
 
     return out_fn
+
+
+def cast(x, *, shape, dtype, device, library):
+    pass

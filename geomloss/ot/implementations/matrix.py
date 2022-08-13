@@ -2,7 +2,7 @@
 from ... import backends as bk
 
 # Typing annotations:
-from ...typing import RealTensor, CostMatrix
+from ...typing import RealTensor, CostMatrices
 
 # Abstract class for our results:
 from ..ot_result import OTResult
@@ -24,8 +24,18 @@ from ...arguments import (
 )
 
 
+# ========================================================================================
+#                          High-level public interface
+# ========================================================================================
+
+# ----------------------------------------------------------------------------------------
+#                                 Standard OT solver
+# ----------------------------------------------------------------------------------------
+
+
 def solve(
-    cost,  # (N, M) or (B, N, M)  (B is the batch dimension)
+    C,  # (N, M) or (B, N, M)  (B is the batch dimension)
+    *,
     a=None,  # (N,) or (B, N)
     b=None,  # (M,) or (B, M)
     # Regularization:
@@ -37,6 +47,7 @@ def solve(
     # ((N,), (M,)) and ((B, N), (B, M)) point-dependent penalties.
     unbalanced_type="relative entropy",  # ="KL", "TV", etc.
     # Partial OT?
+    debias=False,  # Use debiasing? This also requires C_aa, C_bb
     # Optim parameters, following SciPy convention:
     method="auto",  # We can match keywords in this
     # string to activate some options such as
@@ -57,17 +68,28 @@ def solve(
 ):
     # Basic checks on the parameters =====================================================
     if reg < 0:
-        raise ValueError("Parameter 'reg' should be >= 0. " f"Received {reg}.")
+        raise ValueError(f"Parameter 'reg' should be >= 0. Received {reg}.")
     elif reg == 0:
         raise NotImplementedError("Currently, we require that reg > 0.")
 
     if reg_type != "relative entropy":
         raise NotImplementedError("Currently, we only support a Sinkhorn solver.")
 
+    if unbalanced is not None and unbalanced <= 0:
+        raise ValueError(
+            "Parameter 'unbalanced' should be None (= +infty) "
+            f"or > 0. Received {unbalanced}."
+        )
+
     if unbalanced_type != "relative entropy":
         raise NotImplementedError(
             "Currently, we only support unbalanced OT with "
             "a 'relative entropy' penalty on the marginal constraints."
+        )
+
+    if debias:
+        raise NotImplementedError(
+            "Currently, we do not support debiasing " "for the matrix-mode OT solver."
         )
 
     if method != "auto":
@@ -81,9 +103,7 @@ def solve(
     # Check the parameters ===============================================================
 
     # Cost matrix ------------------------------------------------------------------------
-    C = cost
-
-    # Check the shapes:
+    # Check the shape:
     if len(C.shape) == 2:
         C = C[None, :, :]  # Add an extra, dummy batch dimension
         B = 0  # No batch size
@@ -114,7 +134,7 @@ def solve(
 
             if a.shape[0] != N:
                 raise ValueError(
-                    f"The dimension of 'cost' {cost.shape} "
+                    f"The dimension of 'cost' ({N},{M}) "
                     f"is not compatible with that of the first marginal 'a' {a.shape}. "
                     f"We expect a vector of shape ({N},)."
                 )
@@ -132,7 +152,7 @@ def solve(
 
             if a.shape[0] != B or a.shape[1] != N:
                 raise ValueError(
-                    f"The dimension of 'cost' {cost.shape} "
+                    f"The dimension of 'cost' ({B},{N},{M}) "
                     f"is not compatible with that of the first marginal 'a' {a.shape}. "
                     f"We expect an array of shape ({B},{N})."
                 )
@@ -162,7 +182,7 @@ def solve(
 
             if b.shape[0] != M:
                 raise ValueError(
-                    f"The dimension of 'cost' {cost.shape} "
+                    f"The dimension of 'cost' ({N},{M}) "
                     f"is not compatible with that of the second marginal 'b' {b.shape}. "
                     f"We expect a vector of shape ({M},)."
                 )
@@ -180,7 +200,7 @@ def solve(
 
             if b.shape[0] != B or b.shape[1] != M:
                 raise ValueError(
-                    f"The dimension of 'cost' {cost.shape} "
+                    f"The dimension of 'cost' ({B},{N},{M}) "
                     f"is not compatible with that of the second marginal 'b' {b.shape}. "
                     f"We expect an array of shape ({B},{M})."
                 )
@@ -209,7 +229,7 @@ def solve(
     # Check that every array is on the same device:
     device = check_device(a, b, C)
 
-    arrays = ArrayProperties(
+    array_properties = ArrayProperties(
         B=B,
         N=N,
         M=M,
@@ -227,11 +247,17 @@ def solve(
         n_iter=maxiter,
     )
 
+    # N.B.: With a fixed cost matrix, there is no debiasing.
     potentials = sinkhorn_loop(
         softmin=softmin_dense,
         log_a_list=[bk.stable_log(a)],
         log_b_list=[bk.stable_log(b)],
-        C_list=[C],
+        C_list=[
+            CostMatrices(
+                xy=C,
+                yx=bk.ascontiguousarray(bk.transpose(C, (0, 2, 1))),
+            )
+        ],
         descent=descent,
         debias=False,
         last_extrapolation=True,
@@ -244,9 +270,132 @@ def solve(
         a=a,
         b=b,
         C=C,
-        arrays=arrays,
         potentials=potentials,
+        array_properties=array_properties,
+        reg=reg,
+        reg_type=reg_type,
+        unbalanced=unbalanced,
+        unbalanced_type=unbalanced_type,
+        debias=debias,
     )
+
+
+class OTResultMatrix(OTResult):
+    def __init__(
+        self,
+        *,
+        a,
+        b,
+        C,
+        potentials,
+        array_properties,
+        reg,
+        reg_type,
+        unbalanced,
+        unbalanced_type,
+        debias,
+    ):
+        super().__init__(
+            a=a,
+            b=b,
+            C=C,
+            potentials=potentials,
+            array_properties=array_properties,
+            reg=reg,
+            reg_type=reg_type,
+            unbalanced=unbalanced,
+            unbalanced_type=unbalanced_type,
+            debias=debias,
+        )
+
+        # Fill the dictionary of "expected shapes", that will be used to format the
+        # result as expected by the user:
+        ap = self._array_properties
+
+        if ap.B == 0:
+            batchdim = ()  # No batch dimension
+        else:
+            batchdim = (ap.B,)  # One batch dimension
+
+        self._shapes = {
+            "a": batchdim + (ap.N,),
+            "b": batchdim + (ap.M,),
+            "C": batchdim + (ap.N, ap.M),
+            "B": batchdim,
+        }
+
+    @property
+    def _exp_fg_C(self):
+        """Computes the pseudo transport plan exp((f[i] + g[j] - C[i,j]) / eps)."""
+        # Load the relevant quantities:
+        f = self._potentials.f_ba  # (B, N)
+        g = self._potentials.g_ab  # (B, M)
+        C = self._C  # (B, N, M)
+        eps = self._reg  # float, > 0
+
+        # Make sure that everyone has the expected shape:
+        ap = self._array_properties
+        # If ap.B == 0 (no batch mode), we still use B = 1:
+        B, N, M = max(1, ap.B), ap.N, ap.M
+
+        assert f.shape == (B, N)
+        assert g.shape == (B, M)
+        assert C.shape == (B, N, M)
+        assert eps > 0
+
+        # Compute the main term in the expression of the optimal plan:
+        return bk.exp((f[:, :, None] + g[:, None, :] - C) / eps)  # (B,N,M)
+
+    @property
+    def plan(self):
+        # Load the relevant quantities:
+        a = self._a  # (B, N)
+        b = self._b  # (B, M)
+        plan = self._exp_fg_C  # (B, N, M)
+
+        # Make sure that everyone has the expected shape:
+        ap = self._array_properties
+        # If ap.B == 0 (no batch mode), we still use B = 1:
+        B, N, M = max(1, ap.B), ap.N, ap.M
+
+        assert a.shape == (B, N)
+        assert b.shape == (B, M)
+        assert plan.shape == (B, N, M)
+
+        # Actual computation:
+        if self._reg_type == "relative entropy":
+            # Multiply by the reference product measure:
+            plan = a[:, :, None] * b[:, None, :] * plan  # (B,N,1) * (B,1,M) * (B,N,M)
+        else:
+            raise NotImplementedError(
+                "Currently, we only support the computation "
+                "of transport plans when `reg_type = 'relative entropy'`."
+            )
+
+        return self.cast(plan, "C")  # Cast as a (N,M) or (B,N,M) Tensor
+
+    @property
+    def marginal_a(self):
+        """First marginal of the transport plan, with the same shape as the source weights `a`."""
+        # Compute a[i] * sum_j ( b[j] * exp( (f[i] + g[j] - C[i,j]) / eps) )
+        marginal = self._a * bk.sum(
+            self._b[:, None, :] * self._exp_fg_C, axis=2
+        )  # (B, N)
+        return self.cast(marginal, "a")
+
+    @property
+    def marginal_b(self):
+        """Second marginal of the transport plan, with the same shape as the target weights `b`."""
+        # Compute b[j] * sum_i ( a[i] * exp( (f[i] + g[j] - C[i,j]) / eps) )
+        marginal = self._b * bk.sum(
+            self._a[:, :, None] * self._exp_fg_C, axis=1
+        )  # (B, M)
+        return self.cast(marginal, "b")
+
+
+# ----------------------------------------------------------------------------------------
+#                              Wasserstein barycenters
+# ----------------------------------------------------------------------------------------
 
 
 # Convention:
@@ -262,3 +411,42 @@ def barycenter(
 ):
     # masses will be a (M,) or (B, M) array of weights
     return OTResult(potentials=potentials, masses=masses)
+
+
+# ========================================================================================
+#                                 Low-level routines
+# ========================================================================================
+
+
+def softmin_dense(eps: float, C_xy: RealTensor, G_y: RealTensor) -> RealTensor:
+    """Softmin function implemented on dense arrays, without using KeOps.
+
+    The softmin function is at the heart of any (stable) implementation
+    of the Sinkhorn algorithm. It takes as input:
+    - a temperature eps(ilon),
+    - a cost matrix C_xy[i,j] = C(x[i],y[j]),
+    - a weighted dual potential G_y[j] = log(b(y[j])) + g_ab(y[j]) / eps.
+
+    It returns a new dual potential supported on the points x[i]:
+    f_x[i] = - eps * log(sum_j(exp( G_y[j]  -  C_xy[i,j] / eps )))
+
+    In the Sinkhorn loop, we typically use calls like:
+        ft_ba = softmin(eps, C_xy, b_log + g_ab / eps)
+
+    Args:
+        eps (float > 0): Positive temperature eps(ilon), the main regularization parameter
+            of the Sinkhorn algorithm.
+        C_xy ((B,N,M) real-valued Tensor): Batch of B cost matrices of shape (N,M).
+        G_y ((B,M) real-valued Tensor): Batch of B vectors of shape (M,).
+
+    Returns:
+        (B,N) real-valued Tensor:
+    """
+    assert eps > 0, "We only support positive temperatures (eps > 0)."
+    assert len(C_xy.shape) == 3, "C_xy should be a (B,N,M) Tensor."
+    assert len(G_y.shape) == 2, "G_y should be a (B,M) Tensor."
+    assert C_xy.shape[0] == G_y.shape[0], "Batch dimensions 'B' are incompatible."
+    assert C_xy.shape[2] == G_y.shape[1], "Numbers of columns 'M' are incompatible."
+
+    scores_xy = G_y[:, None, :] - C_xy / eps  # (B,N,M)
+    return -eps * bk.logsumexp(scores_xy, axis=2)

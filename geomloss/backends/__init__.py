@@ -21,13 +21,19 @@ norm = pick(numpy=bk_numpy.norm, torch=bk_torch.norm)
 # Einstein summation: the first arg is a string:
 einsum = pick(numpy=bk_numpy.einsum, torch=bk_torch.einsum, main_arg=1)
 
-# Array manipulation:
+# Array manipulations and reductions:
 any = pick(numpy=bk_numpy.any, torch=bk_torch.any)
 sum = pick(numpy=bk_numpy.sum, torch=bk_torch.sum)
 mean = pick(numpy=bk_numpy.mean, torch=bk_torch.mean)
 amin = pick(numpy=bk_numpy.amin, torch=bk_torch.amin)
 amax = pick(numpy=bk_numpy.amax, torch=bk_torch.amax)
+logsumexp = pick(numpy=bk_numpy.logsumexp, torch=bk_torch.logsumexp)
+
+transpose = pick(numpy=bk_numpy.transpose, torch=bk_torch.transpose)
 stack = pick(numpy=bk_numpy.stack, torch=bk_torch.stack)
+ascontiguousarray = pick(
+    numpy=bk_numpy.ascontiguousarray, torch=bk_torch.ascontiguousarray
+)
 
 # Array creation:
 ones_like = pick(numpy=bk_numpy.ones_like, torch=bk_torch.ones_like)

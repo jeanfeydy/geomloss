@@ -67,6 +67,20 @@ def sinkhorn_cost(
     g_ab = potentials.g_ab
     f_ba = potentials.f_ba
 
+    # Make sure that every Tensor has the expected shape:
+    assert f_ba.shape == a.shape
+    assert g_ab.shape == b.shape
+
+    if f_aa is not None:
+        assert f_aa.shape == a.shape
+    if g_bb is not None:
+        assert g_bb.shape == b.shape
+
+    # Make sure that eps and rho are None or > 0:
+    assert eps > 0
+    assert rho is None or rho > 0
+
+    # Actual formulas:
     if rho is None:
         # Balanced case: the cost is linear wrt. the potentials.
         if not debias:

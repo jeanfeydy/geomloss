@@ -1,4 +1,6 @@
 import numpy as np
+from scipy import special
+
 from ..typing import RealTensor
 
 
@@ -60,8 +62,20 @@ def amax(x, axis=None):
     return np.amax(x, axis)
 
 
+def logsumexp(x, axis=None, keepdims=False):
+    return special.logsumexp(x, axis=axis, keepdims=keepdims)
+
+
+def transpose(x, axes):
+    return np.transpose(x, axes=axes)
+
+
 def stack(*args):
     return np.stack(args)
+
+
+def ascontiguousarray(x):
+    return np.ascontiguousarray(x)
 
 
 def ones_like(x):
