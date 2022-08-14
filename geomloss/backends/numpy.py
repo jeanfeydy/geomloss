@@ -82,7 +82,6 @@ def ones_like(x):
     return np.ones_like(x)
 
 
-
 def to(x, *, shape, dtype, device):
     # N.B.: NumPy only supports the main CPU/RAM device, not GPUs.
     return x.reshape(*shape).astype(dtype=dtype)

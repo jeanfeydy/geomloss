@@ -24,7 +24,7 @@ def check_ot_result(us, gt, atol=1e-3):
     check_approx_equal(us.value, gt.value, atol=atol)
 
     # Check that the "linear" value is correct:
-    check_approx_equal(us.value, gt.value_linear, atol=atol)
+    check_approx_equal(us.value_linear, gt.value_linear, atol=atol)
 
     # Check that the transport plans are correct:
     check_approx_equal(us.plan, gt.plan, atol=atol)

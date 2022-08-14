@@ -50,7 +50,7 @@ def cast(x, *, shape, dtype, device, library):
         if source == "torch":
             x = bk_torch.to_numpy(x)
         return bk_numpy.to(x, shape=shape, dtype=dtype, device=device)
-    
+
     elif library == "torch":
         if source == "numpy":
             x = bk_torch.from_numpy(x)

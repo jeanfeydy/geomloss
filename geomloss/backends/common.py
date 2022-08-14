@@ -37,5 +37,3 @@ def pick(*, numpy, torch, main_arg=0):
             )
 
     return out_fn
-
-
