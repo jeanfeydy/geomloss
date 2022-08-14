@@ -220,7 +220,7 @@ class OTResult:
     # Miscellaneous ======================================================================
     @property
     def citation(self):
-        """Appropriate citation(s) for this result, in plain text and BibTex formats."""
+        r"""Appropriate citation(s) for this result, in plain text and BibTex formats."""
 
         # The string below refers to the GeomLoss library:
         # successor methods may concatenate the relevant references

@@ -41,7 +41,11 @@ def einsum(formula, *args):
 
 
 def any(x, axis=None, keepdims=False):
-    return x.any(dim=axis, keepdim=keepdims)
+    if axis is None:
+        assert keepdims == False
+        return x.any()
+    else:
+        return x.any(dim=axis, keepdim=keepdims)
 
 
 def sum(x, axis=None, keepdims=False):
@@ -64,7 +68,7 @@ def logsumexp(x, axis=None, keepdims=False):
     return x.logsumexp(dim=axis, keepdim=keepdims)
 
 
-def transpose(x, *, axes):
+def transpose(x, axes):
     return x.permute(axes)
 
 
@@ -89,7 +93,7 @@ def to_numpy(x):
 
 
 def to(x, *, shape, dtype, device):
-    return x.view(*shape).to(dtype=dtype, device=device)
+    return x.view(shape).to(dtype=dtype, device=device)
 
 
 def detach(x):

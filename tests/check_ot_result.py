@@ -24,7 +24,8 @@ def check_ot_result(us, gt, atol=1e-3):
     check_approx_equal(us.value, gt.value, atol=atol)
 
     # Check that the "linear" value is correct:
-    check_approx_equal(us.value_linear, gt.value_linear, atol=atol)
+    if gt.value_linear is not None:
+        check_approx_equal(us.value_linear, gt.value_linear, atol=atol)
 
     # Check that the transport plans are correct:
     check_approx_equal(us.plan, gt.plan, atol=atol)
@@ -63,5 +64,6 @@ def check_ot_result(us, gt, atol=1e-3):
     check_approx_equal(us.marginal_b, gt.marginal_b, atol=atol)
 
     # Check that the barycentric mappings are correct:
-    check_approx_equal(us.a_to_b, gt.a_to_b, atol=atol)
-    check_approx_equal(us.b_to_a, gt.b_to_a, atol=atol)
+    if gt.a_to_b is not None:
+        check_approx_equal(us.a_to_b, gt.a_to_b, atol=atol)
+        check_approx_equal(us.b_to_a, gt.b_to_a, atol=atol)

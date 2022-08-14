@@ -1,5 +1,5 @@
-from .ot_result import OTResult
-from .check_input_output import cast_input
+from ..ot_result import OTResult
+from ..check_input_output import cast_input
 
 
 def squared_distances(x, y, use_keops=False):

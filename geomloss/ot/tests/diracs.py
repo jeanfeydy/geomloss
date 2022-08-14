@@ -15,8 +15,8 @@ def diracs_matrix(
     # We use a simple configuration with one source point and one target point:
     B, N, M = max(1, batchsize), 1, 1
 
-    a = np.ones(B, N)
-    b = np.ones(B, M)
+    a = np.ones((B, N))
+    b = np.ones((B, M))
     C = 200 * (np.random.rand(B, N, M) - .5)  # Random values in [-100,100)
     value = C.reshape(B)
     plan = np.ones((B, N, M))

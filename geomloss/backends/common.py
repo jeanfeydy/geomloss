@@ -10,7 +10,7 @@ except:
 
 
 def get_library(x):
-    if isinstance(x, np.array):
+    if isinstance(x, np.ndarray):
         return "numpy"
     elif torch_available and isinstance(x, tensor):
         return "torch"
@@ -25,7 +25,7 @@ def get_library(x):
 def pick(*, numpy, torch, main_arg=0):
     def out_fn(*args, **kwargs):
         arg = args[main_arg]
-        if isinstance(arg, np.array):
+        if isinstance(arg, np.ndarray) or isinstance(arg, np.ScalarType):
             return numpy(*args, **kwargs)
         elif torch_available and isinstance(arg, tensor):
             return torch(*args, **kwargs)
