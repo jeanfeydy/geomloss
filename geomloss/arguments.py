@@ -14,7 +14,7 @@ class ArrayProperties(NamedTuple):
 def check_library(*args):
     """Checks that all input arrays come from the same library (numpy, torch...)."""
 
-    libraries = set([bk.library(a) for a in args])
+    libraries = set([bk.get_library(a) for a in args])
     if len(libraries) > 1:
         raise ValueError(
             "The input arrays do not come from the same tensor library: "

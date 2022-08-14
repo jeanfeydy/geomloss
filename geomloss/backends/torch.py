@@ -80,6 +80,18 @@ def ones_like(x):
     return torch.ones_like(x)
 
 
+def from_numpy(x):
+    return torch.from_numpy(x)
+
+
+def to_numpy(x):
+    return x.detach().cpu().numpy()
+
+
+def to(x, *, shape, dtype, device):
+    return x.view(*shape).to(dtype=dtype, device=device)
+
+
 def detach(x):
     return x.detach()
 

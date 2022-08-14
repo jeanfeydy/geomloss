@@ -1,4 +1,4 @@
-from .common import pick, library
+from .common import pick, get_library
 from . import numpy as bk_numpy
 
 try:
@@ -37,6 +37,25 @@ ascontiguousarray = pick(
 
 # Array creation:
 ones_like = pick(numpy=bk_numpy.ones_like, torch=bk_torch.ones_like)
+
+# Conversion between NumPy arrays, PyTorch tensors...:
+def cast(x, *, shape, dtype, device, library):
+    # `library` denotes the target library.
+    source = get_library(x)
+
+    assert source in ["numpy", "torch"]
+    assert library in ["numpy", "torch"]
+
+    if library == "numpy":
+        if source == "torch":
+            x = bk_torch.to_numpy(x)
+        return bk_numpy.to(x, shape=shape, dtype=dtype, device=device)
+    
+    elif library == "torch":
+        if source == "numpy":
+            x = bk_torch.from_numpy(x)
+        return bk_torch.to(x, shape=shape, dtype=dtype, device=device)
+
 
 # Autograd magic:
 detach = pick(numpy=bk_numpy.detach, torch=bk_torch.detach)

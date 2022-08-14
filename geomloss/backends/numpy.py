@@ -82,6 +82,12 @@ def ones_like(x):
     return np.ones_like(x)
 
 
+
+def to(x, *, shape, dtype, device):
+    # N.B.: NumPy only supports the main CPU/RAM device, not GPUs.
+    return x.reshape(*shape).astype(dtype=dtype)
+
+
 # Numpy does not support autograd, so the functions below are trivial:
 def detach(x):
     return x
