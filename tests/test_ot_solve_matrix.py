@@ -50,6 +50,19 @@ def test_correct_values_diracs(method, **kwargs):
     N=st.integers(min_value=1, max_value=10),
     **all_configs,
 )
+def test_correct_values_permutations(N, method, **kwargs):
+    """Checks correctness on permutation matrices."""
+
+    # Load our test case:
+    ex = ot.tests.permutations_matrix(N=N, **kwargs)
+    # Run it and check correctness:
+    check_solve_correct_values(ex, method=method)
+
+
+@given(
+    N=st.integers(min_value=1, max_value=10),
+    **all_configs,
+)
 def test_correct_values_random(N, method, **kwargs):
     """Checks correctness on random (N,N) cost matrices (ground truth = scipy)."""
 

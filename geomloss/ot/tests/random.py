@@ -15,7 +15,6 @@ def random_matrix(
     """
 
     # Generate some random data ----------------------------------------------------------
-    # We use a simple configuration with one source point and one target point:
     B, M = max(1, batchsize), N  # M = N, since we are dealing with square matrices
 
     # The marginals sum up to N:
