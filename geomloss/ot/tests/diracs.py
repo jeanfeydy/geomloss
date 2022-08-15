@@ -30,15 +30,15 @@ def diracs_matrix(
         a, b, C, value, plan = a[0], b[0], C[0], value[0], plan[0]
         potential_a, potential_b = potential_a[0], potential_b[0]
 
-    return {
-        "cost": cast(C, **kwargs),
-        "a": None,
-        "b": None,
-        "maxiter": 100,
-        "reg": 1e-4,
-        "atol": 1e-2,
-        "result": cast(
-            ExpectedOTResult(
+    return cast(
+        {
+            "a": None,
+            "b": None,
+            "C": C,
+            "maxiter": 100,
+            "reg": 1e-4,
+            "atol": 1e-2,
+            "result": ExpectedOTResult(
                 value=value,
                 # value_linear=value,
                 plan=plan,
@@ -47,6 +47,6 @@ def diracs_matrix(
                 marginal_a=a,
                 marginal_b=b,
             ),
-            **kwargs,
-        ),
-    }
+        },
+        **kwargs,
+    )

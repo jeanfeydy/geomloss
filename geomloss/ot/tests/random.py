@@ -36,23 +36,23 @@ def random_matrix(
         # (B,) -> (), (B,N) -> (N,), (B,M) -> (M,), (B,N,M) -> (N,M)
         a, b, C, value, plan = a[0], b[0], C[0], value[0], plan[0]
 
-    # N.B.: Sinkhorn multiscale really isn't very good for this type of unstructured 
+    # N.B.: Sinkhorn multiscale really isn't very good for this type of unstructured
     #       problem, so we have to use a lot of iterations to ensure correctness.
-    return {
-        "cost": cast(C, **kwargs),
-        "a": cast(a, **kwargs),
-        "b": cast(b, **kwargs),
-        "maxiter": 1000,
-        "reg": 1e-4,
-        "atol": 1e-2,
-        "result": cast(
-            ExpectedOTResult(
+    return cast(
+        {
+            "a": a,
+            "b": b,
+            "C": C,
+            "maxiter": 1000,
+            "reg": 1e-4,
+            "atol": 1e-2,
+            "result": ExpectedOTResult(
                 value=value,
                 # value_linear=value,
                 plan=plan,
                 marginal_a=a,
                 marginal_b=b,
             ),
-            **kwargs,
-        ),
-    }
+        },
+        **kwargs,
+    )

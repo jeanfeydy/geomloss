@@ -35,7 +35,10 @@ class ExpectedOTResult(NamedTuple):
 
 
 def cast(x, *, library, dtype, device):
-    """Casts a NumPy array to the expected Tensor type."""
+    """Casts a NumPy array to the expected Tensor type.
+
+    Containers (dict and ExpectedOTResult) are handled recursively.
+    """
 
     if library == "torch" and not torch_available:
         raise ImportError(
@@ -46,7 +49,10 @@ def cast(x, *, library, dtype, device):
     if not cuda_available:
         device = "cpu"
 
-    if isinstance(x, np.ndarray):
+    if type(x) in [int, float, str]:
+        return x
+
+    elif isinstance(x, np.ndarray):
         x = x.astype(dtype)
         if library == "torch":
             x = torch_from_numpy(x).to(device=device)
@@ -61,6 +67,12 @@ def cast(x, *, library, dtype, device):
     elif x is None:
         return None
 
+    elif isinstance(x, dict):
+        return {
+            key: cast(val, library=library, dtype=dtype, device=device)
+            for (key, val) in x.items()
+        }
+
     elif isinstance(x, ExpectedOTResult):
         return ExpectedOTResult(
             **{
@@ -70,4 +82,6 @@ def cast(x, *, library, dtype, device):
         )
 
     else:
-        raise ValueError("Expected a NumPy array, None or an ExpectedOTResult object.")
+        raise ValueError(
+            "Expected a NumPy array, int, float, None or an ExpectedOTResult object."
+        )
