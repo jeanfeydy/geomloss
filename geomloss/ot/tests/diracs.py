@@ -17,7 +17,7 @@ def diracs_matrix(
 
     a = np.ones((B, N))
     b = np.ones((B, M))
-    C = 200 * (np.random.rand(B, N, M) - .5)  # Random values in [-100,100)
+    C = 200 * (np.random.rand(B, N, M) - 0.5)  # Random values in [-100,100)
     value = C.reshape(B)
     plan = np.ones((B, N, M))
     potential_a = C.reshape(B, N) / 2

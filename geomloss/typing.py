@@ -17,8 +17,8 @@ CostFunction = Any
 class CostMatrices(NamedTuple):
     xy: CostMatrix  # C(x[i], y[j])
     yx: CostMatrix  # C(y[i], x[j])
-    xx: Optional[CostMatrix] = None # C(x[i], x[j])
-    yy: Optional[CostMatrix] = None # C(y[i], y[j])
+    xx: Optional[CostMatrix] = None  # C(x[i], x[j])
+    yy: Optional[CostMatrix] = None  # C(y[i], y[j])
 
 
 # The Sinkhorn potentials contains the four output of the Sinkhorn loop
@@ -29,7 +29,7 @@ class SinkhornPotentials(NamedTuple):
     g_ab: RealTensor  # Dual potential g_ab(y_j)
     f_ba: RealTensor  # Dual potential f_ba(x_i)
     f_aa: Optional[RealTensor] = None  # Symmetric potential f_aa(x_i)
-    g_bb: Optional[RealTensor] = None # Symmetric potential g_bb(y_j)
+    g_bb: Optional[RealTensor] = None  # Symmetric potential g_bb(y_j)
 
 
 # The descent parameters contains the lists of blur scales, temperatures

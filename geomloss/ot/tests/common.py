@@ -3,11 +3,12 @@ from typing import NamedTuple, Any
 
 try:
     import torch
+
     torch_from_numpy = torch.from_numpy
     torch_from_numpy_scalar = torch.tensor
     torch_available = True
     cuda_available = torch.cuda.is_available()
-    
+
 except:
     torch_from_numpy = None
     torch_from_numpy_scalar = None
@@ -41,7 +42,7 @@ def cast(x, *, library, dtype, device):
             "Could not load PyTorch, so could not create a test case "
             "with torch Tensors."
         )
-    
+
     if not cuda_available:
         device = "cpu"
 
@@ -50,7 +51,7 @@ def cast(x, *, library, dtype, device):
         if library == "torch":
             x = torch_from_numpy(x).to(device=device)
         return x
-    
+
     elif isinstance(x, np.ScalarType):  # Typically, ot_result.value in no batch mode
         x = x.astype(dtype)
         if library == "torch":
