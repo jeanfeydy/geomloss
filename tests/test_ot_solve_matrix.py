@@ -51,7 +51,7 @@ def test_correct_values_diracs(method, **kwargs):
     **all_configs,
 )
 def test_correct_values_permutations(N, method, **kwargs):
-    """Checks correctness on permutation matrices."""
+    """Checks correctness on (N,N) cost matrix whose associated transport plan is a permutation matrix."""
 
     # Load our test case:
     ex = ot.tests.permutations_matrix(N=N, **kwargs)
@@ -86,5 +86,30 @@ def test_correct_values_convex_gradients(N, D, method, **kwargs):
 
     # Load our test case:
     ex = ot.tests.convex_gradients_matrix(N=N, D=D, **kwargs)
+    # Run it and check correctness:
+    check_solve_correct_values(ex, method=method)
+
+
+# In the test below, we use 100**D samples per distribution.
+# To keep run times reasonable, it's best to stick to D=1.
+@given(
+    D=st.integers(min_value=1, max_value=1),
+    debias=st.sampled_from([False, True]),
+    reg=st.floats(min_value=1e-4, max_value=1.0),
+    unbalanced=st.one_of(st.none(), st.floats(min_value=1e-4, max_value=100.0)),
+    **all_configs,
+)
+def test_correct_values_gaussians(D, debias, reg, unbalanced, method, **kwargs):
+    """Checks correctness on Gaussian distributions, sampled on a regular grid.
+
+    This test relies on the formulas found in:
+    "Entropic optimal transport between unbalanced Gaussian measures has a closed form"
+    by Janati, Muzellec, Peyré and Cuturi, NeurIPS 2020.
+    """
+
+    # Load our test case:
+    ex = ot.tests.gaussians_matrix(
+        N=100, D=D, debias=debias, reg=reg, unbalanced=unbalanced, **kwargs
+    )
     # Run it and check correctness:
     check_solve_correct_values(ex, method=method)

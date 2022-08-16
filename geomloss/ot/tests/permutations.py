@@ -30,7 +30,7 @@ def permutations_matrix(
         row_ind = np.arange(N)
         col_ind = np.random.permutation(N)
         # Put N small coefficients in [0,1) in C[i, sigma[i]]:
-        C[k,row_ind,col_ind] = np.random.rand(N)
+        C[k, row_ind, col_ind] = np.random.rand(N)
         # This ensures that the "correct" result corresponds to sigma:
         value[k] = C[k, row_ind, col_ind].sum()
         plan[k, row_ind, col_ind] = 1
