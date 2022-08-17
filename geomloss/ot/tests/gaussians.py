@@ -4,8 +4,10 @@ from .common import ExpectedOTResult, cast
 from numpy import log, eye, trace, allclose, block, concatenate, tile
 from scipy.linalg import inv, det, sqrtm
 
+
 def sqdist(x, y):
-    return np.sum((x-y) ** 2)
+    return np.sum((x - y) ** 2)
+
 
 # ========================================================================================
 #                                Mathematical formulas
@@ -14,6 +16,7 @@ def sqdist(x, y):
 # The code below implements the formulas found in
 # "Entropic optimal transport between unbalanced Gaussian measures has a closed form"
 # by Janati, Muzellec, Peyré and Cuturi, NeurIPS 2020.
+
 
 def gaussian(*, mean, cov):
     """Creates a Gaussian density function on regular grids.
@@ -36,7 +39,7 @@ def gaussian(*, mean, cov):
         assert x.shape == (N, D)
         dev = x - mean  # (N, D)
         sqnorms = np.sum((dev @ sens) * dev, axis=1)  # (N,)
-        weights = np.exp(-.5 * sqnorms)
+        weights = np.exp(-0.5 * sqnorms)
         return weights / np.sum(weights)  # (N,)
 
     return density
@@ -45,6 +48,7 @@ def gaussian(*, mean, cov):
 # ----------------------------------------------------------------------------------------
 #                                      Section 2
 # ----------------------------------------------------------------------------------------
+
 
 def Wasserstein_Bures_distance(*, a, A, b, B):
     """Implements Eq. (3).
@@ -72,7 +76,7 @@ def Bures_distance(*, A, B):
         float: The squared Bures distance between A and B.
     """
     A_12 = sqrtm(A)
-    return trace(A) + trace(B) - 2 * trace( sqrtm(A_12 @ B @ A_12) )
+    return trace(A) + trace(B) - 2 * trace(sqrtm(A_12 @ B @ A_12))
 
 
 def Monge_map_gaussians(*, a, A, b, B):
@@ -101,13 +105,14 @@ def Monge_map_gaussians(*, a, A, b, B):
 
     def T_star(x):
         return T_AB @ (x - a) + b
-    
+
     return T_star
 
 
 # ----------------------------------------------------------------------------------------
 #                                      Section 3
 # ----------------------------------------------------------------------------------------
+
 
 def OT_sigma(*, a, A, b, B, sigma):
     """Implements Eq. (13).
@@ -120,7 +125,7 @@ def OT_sigma(*, a, A, b, B, sigma):
         sigma (float > 0): Entropic blur.
 
     Returns:
-        float: The entropy-regularized squared Wasserstein distance 
+        float: The entropy-regularized squared Wasserstein distance
             between N(a,A) and N(b,B).
     """
     return sqdist(a, b) + Bures_sigma_distance(A=A, B=B, sigma=sigma)
@@ -138,12 +143,16 @@ def Bures_sigma_distance(*, A, B, sigma):
         float: The entropy-regularized squared Bures distance between A and B.
     """
     d = len(A)
-    s2 = sigma ** 2
+    s2 = sigma**2
     D_s = D_sigma(A=A, B=B, sigma=sigma)
 
-    return trace(A) + trace(B) - trace(D_s) \
-        + d * s2 * (1 - log(2 * s2)) \
+    return (
+        trace(A)
+        + trace(B)
+        - trace(D_s)
+        + d * s2 * (1 - log(2 * s2))
         + s2 * log(det(D_s + s2 * eye(d)))
+    )
 
 
 def D_sigma(*, A, B, sigma):
@@ -171,14 +180,15 @@ def C_sigma(*, A, B, sigma):
         sigma (float > 0): Entropic blur.
 
     Returns:
-        (D,D) array: The off_diagonal factor in the covariance 
+        (D,D) array: The off_diagonal factor in the covariance
             of the entropy-regularized transport plan between N(a,A) and N(b,B).
     """
     d = len(A)
     A_12 = sqrtm(A)
     A_m12 = inv(A_12)
-    return .5 * A_12 @ D_sigma(A=A, B=B, sigma=sigma) @ A_m12 \
-        - .5 * sigma**2 * eye(d)
+    return 0.5 * A_12 @ D_sigma(A=A, B=B, sigma=sigma) @ A_m12 - 0.5 * sigma**2 * eye(
+        d
+    )
 
 
 def pi_sigma(*, a, A, b, B, sigma):
@@ -204,8 +214,8 @@ def pi_sigma(*, a, A, b, B, sigma):
 
     def pi_star(*, x, y):
         N, M, D = x.shape[0], y.shape[0], y.shape[1]
-        x_i = tile(x.reshape(N, 1, D), (1, M, 1)).reshape(N*M, D)
-        y_j = tile(y.reshape(1, M, D), (N, 1, 1)).reshape(N*M, D)
+        x_i = tile(x.reshape(N, 1, D), (1, M, 1)).reshape(N * M, D)
+        y_j = tile(y.reshape(1, M, D), (N, 1, 1)).reshape(N * M, D)
         xy_ij = concatenate((x_i, y_j), axis=1)  # (N*M, D+D)
         return gaussian(mean=mean, cov=cov)(xy_ij).reshape(N, M)
 
@@ -223,7 +233,7 @@ def Q(X):
             and returns a (N,) array of values.
     """
     D = X.shape[0]
-    assert X.shape == (D,D)
+    assert X.shape == (D, D)
 
     def q(x):
         N = x.shape[0]
@@ -240,9 +250,8 @@ def OT_sigma_potentials(*, a, A, b, B, sigma):
     if np.sum(np.abs(b)) != 0:
         raise NotImplementedError()
 
-
     d = A.shape[0]
-    s2 = sigma ** 2
+    s2 = sigma**2
     C_s = C_sigma(A=A, B=B, sigma=sigma)
 
     # Eq. (23), multiplied by sigma ** 2:
@@ -256,12 +265,12 @@ def OT_sigma_potentials(*, a, A, b, B, sigma):
 
 
 def Sinkhorn_barycenters(*, w, a, A, sigma):
-    """Implements Eq. (31).
-    
+    r"""Implements Eq. (31).
+
     Returns the parameters of the Gaussian distribution, solution of Eq. (30):
     beta = argmin_{beta} \sum_{k=1}^K w[k] * S_sigma(N(a[k], A[k]), beta) .
 
-    where S_sigma is the debiased Sinkhorn divergence with blur sigma. 
+    where S_sigma is the debiased Sinkhorn divergence with blur sigma.
 
     Args:
         w ((K,) array): Non-negative weights that sum up to 1.
@@ -271,12 +280,11 @@ def Sinkhorn_barycenters(*, w, a, A, sigma):
     Returns:
         (D,) array, (D, D) array: Mean and covariance of the barycenter.
     """
-    
+
     K, D = a.shape
     assert w.shape == (K,)
     assert A.shape == (K, D, D)
-    assert np.sum(w) == 1.
-
+    assert np.sum(w) == 1.0
 
     if sigma != 0:
         raise NotImplementedError()
@@ -290,6 +298,16 @@ def Sinkhorn_barycenters(*, w, a, A, sigma):
 #                                      Section 4
 # ----------------------------------------------------------------------------------------
 
+
+def UOT_cost_masses(*, m_a, m_b, m_pi, sigma, gamma):
+    """Implements Eq. (37)."""
+    return (
+        gamma * (m_a + m_b)
+        + 2 * sigma**2 * m_a * m_b
+        - 2 * (sigma**2 + gamma) * m_pi
+    )
+
+
 def UOT_tau(*, sigma, gamma):
     """Implements the formula above Eq. (39)."""
     return gamma / (2 * sigma**2 + gamma)
@@ -297,13 +315,7 @@ def UOT_tau(*, sigma, gamma):
 
 def UOT_lambda(*, sigma, gamma):
     """Implements the formula above Eq. (39)."""
-    return sigma ** 2 + gamma / 2
-
-
-def UOT_cost_masses(*, m_a, m_b, m_pi, sigma, gamma):
-    """Implements Eq. (37)."""
-    return gamma * (m_a + m_b) + 2 * sigma**2 * m_a * m_b \
-        - 2 * (sigma**2 + gamma) * m_pi
+    return sigma**2 + gamma / 2
 
 
 def UOT_mu(*, a, A, b, B, sigma, gamma):
@@ -322,23 +334,24 @@ def UOT_H(*, A, B, sigma, gamma):
     C = UOT_C(A=A, B=B, sigma=sigma, gamma=gamma)
     Id = eye(A.shape[0])
 
-    return block([
+    return block(
         [
-            (Id + C / l) @ (A - A @ inv_X @ A),
-            C + (Id + C / l) @ A @ inv_X @ B,
-        ],
-        [
-            C.T + (Id + C.T / l) @ B @ inv_X @ A,
-            (Id + C.T / l) @ (B - B @ inv_X @ B)
+            [
+                (Id + C / l) @ (A - A @ inv_X @ A),
+                C + (Id + C / l) @ A @ inv_X @ B,
+            ],
+            [
+                C.T + (Id + C.T / l) @ B @ inv_X @ A,
+                (Id + C.T / l) @ (B - B @ inv_X @ B),
+            ],
         ]
-    ])
+    )
 
 
 def UOT_m_pi(*, m_a, a, A, m_b, b, B, sigma, gamma):
     """Implements Eq. (41)."""
 
     d = A.shape[0]
-    l = UOT_lambda(sigma=sigma, gamma=gamma)
     tau = UOT_tau(sigma=sigma, gamma=gamma)
     A_t = A_tilde(A=A, sigma=sigma, gamma=gamma)
     B_t = B_tilde(B=B, sigma=sigma, gamma=gamma)
@@ -346,16 +359,16 @@ def UOT_m_pi(*, m_a, a, A, m_b, b, B, sigma, gamma):
     C = UOT_C(A=A, B=B, sigma=sigma, gamma=gamma)
 
     term_1 = sigma ** ((d * sigma**2) / (gamma + sigma**2))
-    
-    term_2 = m_a * m_b * det(C) * np.sqrt( (det(A_t @ B_t) ** tau) / det(A @ B) )
-    term_2 = term_2 ** (1 / (1 + tau))
+
+    term_2 = m_a * m_b * det(C) * np.sqrt((det(A_t @ B_t) ** tau) / det(A @ B))
+    term_2 = term_2 ** (1 / (tau + 1))
 
     term_3 = 1 / np.sqrt(det(C - (2 / gamma) * A_t @ B_t))
 
     term_4 = np.sum((a - b).reshape(-1) * (inv_X @ (a - b)).reshape(-1))
-    term_4 = np.exp(- term_4 / (2 * (1 + tau)))
+    term_4 = np.exp(-term_4 / (2 * (tau + 1)))
 
-    return term_1 * term_2 * term_3 * term_4 
+    return term_1 * term_2 * term_3 * term_4
 
 
 def UOT_X(*, A, B, sigma, gamma):
@@ -368,14 +381,14 @@ def A_tilde(*, A, sigma, gamma):
     """Implements the formula below Eq. (41)."""
     Id = eye(A.shape[0])
     l = UOT_lambda(sigma=sigma, gamma=gamma)
-    return .5 * gamma * (Id - l * inv(A + l * Id))
+    return 0.5 * gamma * (Id - l * inv(A + l * Id))
 
 
 def B_tilde(*, B, sigma, gamma):
     """Implements the formula below Eq. (41)."""
     d = B.shape[0]
     l = UOT_lambda(sigma=sigma, gamma=gamma)
-    return .5 * gamma * (eye(d) - l * inv(B + l * eye(d)))
+    return 0.5 * gamma * (eye(d) - l * inv(B + l * eye(d)))
 
 
 def UOT_C(*, A, B, sigma, gamma):
@@ -413,8 +426,8 @@ def pi_sigma_gamma(*, m_a, a, A, m_b, b, B, sigma, gamma):
 
     def pi_star(*, x, y):
         N, M, D = x.shape[0], y.shape[0], y.shape[1]
-        x_i = tile(x.reshape(N, 1, D), (1, M, 1)).reshape(N*M, D)
-        y_j = tile(y.reshape(1, M, D), (N, 1, 1)).reshape(N*M, D)
+        x_i = tile(x.reshape(N, 1, D), (1, M, 1)).reshape(N * M, D)
+        y_j = tile(y.reshape(1, M, D), (N, 1, 1)).reshape(N * M, D)
         xy_ij = concatenate((x_i, y_j), axis=1)  # (N*M, D+D)
         return m_pi * gaussian(mean=mean, cov=cov)(xy_ij).reshape(N, M)
 
@@ -434,31 +447,30 @@ def OT_sigma_gamma(*, m_a, a, A, m_b, b, B, sigma, gamma):
         sigma (float > 0): Entropic blur.
 
     Returns:
-        float: The unbalanced, entropy-regularized squared Wasserstein distance 
+        float: The unbalanced, entropy-regularized squared Wasserstein distance
             between m_a * N(a,A) and m_b * N(b,B).
     """
     m_pi = UOT_m_pi(m_a=m_a, a=a, A=A, m_b=m_b, b=b, B=B, sigma=sigma, gamma=gamma)
     return UOT_cost_masses(m_a=m_a, m_b=m_b, m_pi=m_pi, sigma=sigma, gamma=gamma)
 
 
-
-
-
-
-
+#
 
 
 # ========================================================================================
 #                             Test cases for the OT solvers
 # ========================================================================================
 
+
 def gaussians_matrix(
     *,
     N,
+    M,
     D,
     debias,
-    reg,
-    unbalanced,
+    blur,
+    reach,
+    cov_type,
     batchsize,
     **kwargs,
 ):
@@ -468,49 +480,152 @@ def gaussians_matrix(
     """
 
     # Generate some random data ----------------------------------------------------------
-    B, M = max(1, batchsize), N  # M = N, since we keep a fixed grid.
+    B = max(1, batchsize)
 
-    # Generate a random configuration, encoded using (B,N,D) arrays:
-    points = random_points(B=B, N=N, D=D)
+    # Geometry:
+    # We sample the two distributions on regular grids on [-1,2]^D:
+    x_i = np.linspace(-1, 2, N)
+    x_i = np.stack(np.meshgrid(*((x_i,) * D), indexing="ij"), axis=-1).reshape(
+        N**D, D
+    )
 
-    # Turn this data into "matrix" format:
-    a = points["weights"]  # (B,N)
-    b = points["weights"]  # (B,M)
+    y_j = np.linspace(-1, 2, M)
+    y_j = np.stack(np.meshgrid(*((y_j,) * D), indexing="ij"), axis=-1).reshape(
+        M**D, D
+    )
 
-    x_i = points["x"].reshape(B, N, 1, D)
-    y_j = points["y"].reshape(B, 1, M, D)
-    C = np.sum(0.5 * (x_i - y_j) ** 2, axis=3)  # (B,N,M)
+    # Matrix of squared distances (not halved), following the convention of Janati et al.:
+    C = np.sum((x_i.reshape(N**D, 1, D) - y_j.reshape(1, M**D, D)) ** 2, axis=-1)
+    C = np.tile(C, (B, 1, 1))
+    assert C.shape == (B, N**D, M**D)
 
-    value = points["value"]  # (B,)
+    # Gaussian distributions:
+    # Means for the sources and the targets are in [0,1]:
+    if True:
+        means = np.random.rand(2, B, D)
+    else:
+        means = np.array([[[0.]], [[1.]]])
+    min_std = 3 * 3 / min(N, M)  # Typical distance between samples in 3/N
+    # Make sure that the support of our Gaussians at +-5*sigma is in [-1,1]:
+    max_std = 0.2
+    assert max_std > min_std
 
-    # The transport plan is a diagonal matrix with entries that correspond to the weights:
-    plan = np.zeros((B, N, M))
+    # Total mass for the unbalanced case, in [0, 2):
+    if True:
+        total_mass = 2 * np.random.rand(2, B)  # (2, B)
+    else:
+        total_mass = np.ones((2, B))
+
+    # TODO: Add non-diagonal test cases
+    if cov_type == "diagonal":
+        stds = np.random.rand(2, B, D)  # Standard deviations = cov^1/2
+        stds = min_std + (max_std - min_std) * stds
+        covs = np.zeros((2, B, D, D))
+        covs[:, :, np.arange(D), np.arange(D)] = stds**2
+    else:
+        raise NotImplementedError()
+
+    # Compute the densities for the source and target distributions:
+    source_weights = np.zeros((B, N))
+    target_weights = np.zeros((B, M))
     for k in range(B):
-        plan[k, np.arange(N), np.arange(N)] = points["weights"][k, :]
+        source_weights[k, :] = gaussian(mean=means[0, k, :], cov=covs[0, k, :, :])(x_i)
+        target_weights[k, :] = gaussian(mean=means[1, k, :], cov=covs[1, k, :, :])(y_j)
+
+        if reach is not None:
+            source_weights[k, :] *= total_mass[0, k]
+            target_weights[k, :] *= total_mass[1, k]
+
+    # Apply our formulas -----------------------------------------------------------------
+    value = np.zeros((B,))  # (B,)
+    plan = np.zeros_like(C)  # (B,N**D,M**D)
+    marginal_a = np.copy(source_weights)  # (B,N**D)
+    marginal_b = np.copy(target_weights)  # (B,M**D)
+
+    def source_target(k):
+        means_cov = {
+            "a": means[0, k, :],
+            "A": covs[0, k, :, :],
+            "b": means[1, k, :],
+            "B": covs[1, k, :, :],
+        }
+
+        if reach is None:
+            # Balanced case
+            return means_cov
+        else:
+            # Unbalanced case
+            return {"m_a": total_mass[0, k], "m_b": total_mass[1, k], **means_cov}
+
+    if blur == 0 and reach is None:
+        # Balanced case, i.e. the Bures metric
+        for k in range(B):
+            value[k] = Wasserstein_Bures_distance(**source_target(k))
+
+        # We approximate this solution with a small blur value at .01.
+        eps = 1e-4
+        rho = None
+
+        # The true transport plan is singular, so we'd rather not check its correctness
+        # against a sampled array:
+        plan = None
+
+    elif reach is None:
+
+        eps = 2 * blur**2
+        rho = None
+        # Entropy-regularized and balanced case
+        for k in range(B):
+            value[k] = OT_sigma(sigma=blur, **source_target(k))
+            plan_k = pi_sigma(sigma=blur, **source_target(k))
+            plan[k, :, :] = plan_k(x=x_i, y=y_j)  # (N**D, M**D)
+
+    else:
+        # Entropy-regularized and unbalanced case
+        if blur == 0:
+            blur = 1e-3
+
+        eps = 2 * blur**2
+        rho = reach**2
+
+        for k in range(B):
+            value[k] = OT_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
+            plan_k = pi_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
+            plan[k, :, :] = plan_k(x=x_i, y=y_j)  # (N**D, M**D)
+        
+        marginal_a = np.sum(plan, axis=2)
+        marginal_b = np.sum(plan, axis=1)
 
     # Convert to match the expected signatures and return the result ---------------------
     if batchsize == 0:  # No batch mode:
         # (B,) -> (), (B,N) -> (N,), (B,M) -> (M,), (B,N,M) -> (N,M)
-        a, b, C, value, plan = a[0], b[0], C[0], value[0], plan[0]
+        source_weights, target_weights = source_weights[0], target_weights[0]
+        marginal_a, marginal_b = marginal_a[0], marginal_b[0]
+        C, value = C[0], value[0]
+        if plan is not None:
+            plan = plan[0]
 
     return cast(
         {
-            "a": a,
-            "b": b,
+            "a": source_weights,
+            "b": target_weights,
             "C": C,
-            "x": points["x"],
-            "y": points["y"],
+            "x": x_i,
+            "y": y_j,
+            "means": means,
+            "covs": covs,
+            "total_mass": total_mass,
             "maxiter": 1000,
-            "reg": 1e-4,
-            "atol": 1e-2,
+            "reg": eps,
+            "unbalanced": rho,
+            "atol": 0.01,
             "result": ExpectedOTResult(
                 value=value,
                 # value_linear=value,
                 plan=plan,
-                marginal_a=a,
-                marginal_b=b,
+                marginal_a=marginal_a,
+                marginal_b=marginal_b,
             ),
         },
         **kwargs,
     )
-
