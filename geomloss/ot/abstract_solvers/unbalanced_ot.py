@@ -107,11 +107,36 @@ def sinkhorn_cost(
             # See Proposition 12 (Dual formulas for the Sinkhorn costs)
             # in "Sinkhorn divergences for unbalanced optimal transport",
             # Sejourne et al., https://arxiv.org/abs/1910.12958.
+            F_a = -bk.exp(-f_ba / rho)
+            G_b = -bk.exp(-g_ab / rho)
 
-            # N.B.: Even if this quantity is never used in practice,
-            #       we may want to re-check this computation...
-            F_a = 1 - bk.exp(-f_ba / rho)
-            G_b = 1 - bk.exp(-g_ab / rho)
+            # TODO: make this compatible with order 2 derivatives.
+            # Total masses:
+            m_a = bk.sum(a, axis=tuple(range(1, len(a.shape))), keepdims=True)
+            m_b = bk.sum(b, axis=tuple(range(1, len(b.shape))), keepdims=True)
+
+            # Constant terms that disappear in the debiased divergence:
+            Cst_a = bk.scale(
+                bk.ones_like(F_a),
+                forward=rho + (eps / 2) * m_b,
+                backward=rho + eps * m_b,
+            )
+            Cst_b = bk.scale(
+                bk.ones_like(G_b),
+                forward=rho + (eps / 2) * m_a,
+                backward=rho + eps * m_a,
+            )
+
+            F_a = Cst_a + bk.scale(
+                F_a,
+                forward=rho + eps / 2,
+                backward=rho + eps,
+            )
+            G_b = Cst_b + bk.scale(
+                G_b,
+                forward=rho + eps / 2,
+                backward=rho + eps,
+            )
 
         else:
             # DEBIASED Sinkhorn divergence, S_eps,rho(a,b)
@@ -125,11 +150,11 @@ def sinkhorn_cost(
             F_a = bk.exp(-f_aa / rho) - bk.exp(-f_ba / rho)
             G_b = bk.exp(-g_bb / rho) - bk.exp(-g_ab / rho)
 
-        # Second: weight it by the correct factor,
-        # in a way that is coherent for the backward pass.
-        # TODO: make this compatible with order 2 derivatives.
-        F_a = bk.unbalanced_weight(F_a, eps=eps, rho=rho)
-        G_b = bk.unbalanced_weight(G_b, eps=eps, rho=rho)
+            # Second: weight it by the correct factor,
+            # in a way that is coherent for the backward pass.
+            # TODO: make this compatible with order 2 derivatives.
+            F_a = bk.scale(F_a, forward=rho + eps / 2, backward=rho + eps)
+            G_b = bk.scale(G_b, forward=rho + eps / 2, backward=rho + eps)
 
     a_costs = bk.dot_products(a, F_a)  # (B,)
     b_costs = bk.dot_products(b, G_b)  # (B,)

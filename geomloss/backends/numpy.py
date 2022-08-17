@@ -100,5 +100,5 @@ def set_grad_enabled(typical_array, b):
     return None
 
 
-def unbalanced_weight(f, *, eps, rho):
-    return (rho + eps / 2) * f
+def scale(f, *, forward, backward):
+    return forward * f

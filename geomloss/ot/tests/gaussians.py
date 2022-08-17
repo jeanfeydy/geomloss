@@ -504,7 +504,7 @@ def gaussians_matrix(
     if True:
         means = np.random.rand(2, B, D)
     else:
-        means = np.array([[[0.]], [[1.]]])
+        means = np.array([[[0.0]], [[1.0]]])
     min_std = 3 * 3 / min(N, M)  # Typical distance between samples in 3/N
     # Make sure that the support of our Gaussians at +-5*sigma is in [-1,1]:
     max_std = 0.2
@@ -514,7 +514,7 @@ def gaussians_matrix(
     if True:
         total_mass = 2 * np.random.rand(2, B)  # (2, B)
     else:
-        total_mass = np.ones((2, B))
+        total_mass = 0.5 * np.ones((2, B))
 
     # TODO: Add non-diagonal test cases
     if cov_type == "diagonal":
@@ -592,7 +592,7 @@ def gaussians_matrix(
             value[k] = OT_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
             plan_k = pi_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
             plan[k, :, :] = plan_k(x=x_i, y=y_j)  # (N**D, M**D)
-        
+
         marginal_a = np.sum(plan, axis=2)
         marginal_b = np.sum(plan, axis=1)
 
