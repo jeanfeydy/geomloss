@@ -583,7 +583,8 @@ def gaussians_matrix(
     else:
         # Entropy-regularized and unbalanced case
         if blur == 0:
-            blur = 1e-3
+            # The true transport plan is singular, so we use a smoother value instead:
+            blur = 0.1
 
         eps = 2 * blur**2
         rho = reach**2
@@ -592,6 +593,7 @@ def gaussians_matrix(
             value[k] = OT_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
             plan_k = pi_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
             plan[k, :, :] = plan_k(x=x_i, y=y_j)  # (N**D, M**D)
+
 
         marginal_a = np.sum(plan, axis=2)
         marginal_b = np.sum(plan, axis=1)

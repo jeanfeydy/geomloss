@@ -1,5 +1,5 @@
 import torch
-from ..typing import RealTensor
+from ..typing import RealTensor, Any
 
 
 def device(a: RealTensor):
