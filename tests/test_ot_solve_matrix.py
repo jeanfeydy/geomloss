@@ -7,7 +7,11 @@ from hypothesis import strategies as st
 from geomloss import ot
 from geomloss import backends as bk
 from geomloss.ot.tests.common import cast
-from .check_ot_result import check_ot_result, check_ot_result_symmetric
+from .check_ot_result import (
+    check_ot_result,
+    check_ot_result_symmetric,
+    check_ot_result_cost_linearity,
+)
 
 # Generic parameters:
 generic_parameters = {
@@ -17,6 +21,9 @@ generic_parameters = {
     "debias": st.sampled_from([False]),
     "reg": st.floats(min_value=1e-2, max_value=10.0),
     "reg_type": st.sampled_from(["relative entropy"]),
+}
+
+unbalanced_parameters = {
     "unbalanced": st.one_of(st.none(), st.floats(min_value=1e-2, max_value=10.0)),
     "unbalanced_type": st.sampled_from(["relative entropy"]),
 }
@@ -36,7 +43,7 @@ all_configs = {
 # ========================================================================================
 
 
-def basic_example(*, N, M, batchsize, unbalanced, library, dtype, device):
+def basic_example(*, N, M, batchsize, unbalanced, library, dtype, device, probability=False):
     """Generates a minimal input configuration for ot.solve(...)."""
 
     B = max(1, batchsize)
@@ -47,7 +54,11 @@ def basic_example(*, N, M, batchsize, unbalanced, library, dtype, device):
     b = np.random.rand(B, M)  # (B,N)
 
     # If we use balanced OT, the measures must have the same mass:
-    if unbalanced is None:
+    if probability:
+        a = a / bk.sum(a, axis=1, keepdims=True)
+        b = b / bk.sum(b, axis=1, keepdims=True)
+
+    elif unbalanced is None:
         total_mass = np.random.rand(B, 1)
         a = total_mass * (a / bk.sum(a, axis=1, keepdims=True))
         b = total_mass * (b / bk.sum(b, axis=1, keepdims=True))
@@ -71,6 +82,7 @@ def basic_example(*, N, M, batchsize, unbalanced, library, dtype, device):
 # final computation of the OT cost: we disable this known warning by hand.
 @given(
     **generic_parameters,
+    **unbalanced_parameters,
     **all_configs,
 )
 @pytest.mark.filterwarnings("ignore:overflow encountered in exp")
@@ -103,6 +115,55 @@ def test_symmetry(
     dims = (1, 0) if batchsize == 0 else (0, 2, 1)
     transpose = lambda plan: bk.transpose(plan, dims)
     check_ot_result_symmetric(a_to_b, b_to_a, transpose=transpose)
+
+
+@given(
+    **generic_parameters,
+    **unbalanced_parameters,
+    **all_configs,
+)
+@pytest.mark.filterwarnings("ignore:overflow encountered in exp")
+def test_cost_linearity(
+    N,
+    M,
+    batchsize,
+    library,
+    dtype,
+    device,
+    reg,
+    unbalanced,
+    **params,
+):
+    """Checks that OT_{scaling * C}(a,b) = scaling * OT(a,b) if scaling > 0."""
+    ex = basic_example(
+        N=N,
+        M=M,
+        batchsize=batchsize,
+        # probability=(unbalanced is None),
+        unbalanced=unbalanced,
+        library=library,
+        dtype=dtype,
+        device=device,
+    )
+
+    # N.B.: scaling must be > 0, and we must be sure that it is of the correct dtype
+    scaling = (0.01 + np.random.rand(1)).astype(dtype)[0]
+    # TODO: Augment this test with an offset, only for the balanced case
+    # This will require a "translation-invariant" initialization of the dual potentials.
+    use_offset = 0  # 1 if unbalanced is None else 0
+    offset = (use_offset * np.random.randn(1)).astype(dtype)[0]
+
+    # Compute a direct solution:
+    normal = ot.solve(ex["C"], a=ex["a"], b=ex["b"], reg=reg, unbalanced=unbalanced, **params)
+    # Compute a reverse solution:
+    s_C = scaling * ex["C"] + offset
+    s_reg = scaling * reg
+    s_unbalanced = None if unbalanced is None else scaling * unbalanced
+
+    scaled = ot.solve(s_C, a=ex["a"], b=ex["b"], reg=s_reg, unbalanced=s_unbalanced, **params)
+
+    # Check that all the attributes coincide as expected:
+    check_ot_result_cost_linearity(normal, scaled, scaling=scaling, offset=offset)
 
 
 # ========================================================================================
