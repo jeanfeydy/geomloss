@@ -66,6 +66,10 @@ def logsumexp(x, axis=None, keepdims=False):
     return special.logsumexp(x, axis=axis, keepdims=keepdims)
 
 
+def allclose(*args, **kwargs):
+    return np.allclose(*args, **kwargs)
+
+
 def transpose(x, axes):
     return np.transpose(x, axes=axes)
 

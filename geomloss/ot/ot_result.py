@@ -136,17 +136,17 @@ class OTResult:
         """Transport plan, encoded as a dense array."""
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
-        raise NotImplementedError()
+        return None
 
     @property
     def sparse_plan(self):
         """Transport plan, encoded as a sparse array."""
-        raise NotImplementedError()
+        return None
 
     @property
     def lazy_plan(self):
         """Transport plan, encoded as a symbolic KeOps LazyTensor."""
-        raise NotImplementedError()
+        return None
 
     # Loss values ========================================================================
     @property
@@ -179,18 +179,18 @@ class OTResult:
     @property
     def value_linear(self):
         """The "bare bones" transport cost, i.e. the product between the transport plan and the cost."""
-        raise NotImplementedError()
+        return None
 
     # Marginal constraints ===============================================================
     @property
     def marginal_a(self):
         """First marginal of the transport plan, with the same shape as the source weights `a`."""
-        raise NotImplementedError()
+        return None
 
     @property
     def marginal_b(self):
         """Second marginal of the transport plan, with the same shape as the target weights `b`."""
-        raise NotImplementedError()
+        return None
 
     # Barycentric mappings ===============================================================
     # Return the displacement vectors as an array
@@ -199,12 +199,12 @@ class OTResult:
     @property
     def a_to_b(self):
         """Displacement vectors from the first to the second measure."""
-        raise NotImplementedError()
+        return None
 
     @property
     def b_to_a(self):
         """Displacement vectors from the second to the first measure."""
-        raise NotImplementedError()
+        return None
 
     # Wasserstein barycenters ============================================================
     # @property

@@ -29,6 +29,8 @@ amin = pick(numpy=bk_numpy.amin, torch=bk_torch.amin)
 amax = pick(numpy=bk_numpy.amax, torch=bk_torch.amax)
 logsumexp = pick(numpy=bk_numpy.logsumexp, torch=bk_torch.logsumexp)
 
+allclose = pick(numpy=bk_numpy.allclose, torch=bk_torch.allclose)
+
 transpose = pick(numpy=bk_numpy.transpose, torch=bk_torch.transpose)
 stack = pick(numpy=bk_numpy.stack, torch=bk_torch.stack)
 ascontiguousarray = pick(

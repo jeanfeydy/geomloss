@@ -594,7 +594,6 @@ def gaussians_matrix(
             plan_k = pi_sigma_gamma(sigma=blur, gamma=reach**2, **source_target(k))
             plan[k, :, :] = plan_k(x=x_i, y=y_j)  # (N**D, M**D)
 
-
         marginal_a = np.sum(plan, axis=2)
         marginal_b = np.sum(plan, axis=1)
 

@@ -68,6 +68,10 @@ def logsumexp(x, axis=None, keepdims=False):
     return x.logsumexp(dim=axis, keepdim=keepdims)
 
 
+def allclose(*args, **kwargs):
+    return torch.allclose(*args, **kwargs)
+
+
 def transpose(x, axes):
     return x.permute(axes)
 

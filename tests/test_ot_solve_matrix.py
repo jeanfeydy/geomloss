@@ -1,9 +1,25 @@
+import numpy as np
+
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from geomloss import ot
-from .check_ot_result import check_ot_result
+from geomloss import backends as bk
+from geomloss.ot.tests.common import cast
+from .check_ot_result import check_ot_result, check_ot_result_symmetric
 
+# Generic parameters:
+generic_parameters = {
+    "N": st.integers(min_value=1, max_value=10),
+    "M": st.integers(min_value=1, max_value=10),
+    "maxiter": st.integers(min_value=1, max_value=100),
+    "debias": st.sampled_from([False]),
+    "reg": st.floats(min_value=1e-2, max_value=10.0),
+    "reg_type": st.sampled_from(["relative entropy"]),
+    "unbalanced": st.one_of(st.none(), st.floats(min_value=1e-2, max_value=10.0)),
+    "unbalanced_type": st.sampled_from(["relative entropy"]),
+}
 
 # Supported configurations:
 all_configs = {
@@ -13,6 +29,80 @@ all_configs = {
     "dtype": st.sampled_from(["float32", "float64"]),
     "device": st.sampled_from(["cpu", "cuda"]),
 }
+
+
+# ========================================================================================
+#           Check that the main properties of OT are respected by ot.solve(...)
+# ========================================================================================
+
+
+def basic_example(*, N, M, batchsize, unbalanced, library, dtype, device):
+    """Generates a minimal input configuration for ot.solve(...)."""
+
+    B = max(1, batchsize)
+
+    C = np.random.randn(B, N, M)  # (B,N,M)
+    CT = np.transpose(C, (0, 2, 1))  # (B,M,N)
+    a = np.random.rand(B, N)  # (B,N)
+    b = np.random.rand(B, M)  # (B,N)
+
+    # If we use balanced OT, the measures must have the same mass:
+    if unbalanced is None:
+        total_mass = np.random.rand(B, 1)
+        a = total_mass * (a / bk.sum(a, axis=1, keepdims=True))
+        b = total_mass * (b / bk.sum(b, axis=1, keepdims=True))
+
+    # Cast the arrays as expected:
+    C, CT, a, b = [
+        cast(x, library=library, dtype=dtype, device=device) for x in [C, CT, a, b]
+    ]
+    if batchsize == 0:  # No batch mode
+        C, CT, a, b = C[0], CT[0], a[0], b[0]
+
+    return {
+        "C": C,
+        "CT": CT,
+        "a": a,
+        "b": b,
+    }
+
+
+# Running solvers with very low reg and maxiter may produce +-inf and then NaN in the
+# final computation of the OT cost: we disable this known warning by hand.
+@given(
+    **generic_parameters,
+    **all_configs,
+)
+@pytest.mark.filterwarnings("ignore:overflow encountered in exp")
+def test_symmetry(
+    N,
+    M,
+    batchsize,
+    library,
+    dtype,
+    device,
+    **params,
+):
+    """Checks that OT(a,b) = OT(b,a)."""
+    ex = basic_example(
+        N=N,
+        M=M,
+        batchsize=batchsize,
+        unbalanced=params["unbalanced"],
+        library=library,
+        dtype=dtype,
+        device=device,
+    )
+
+    # Compute a direct solution:
+    a_to_b = ot.solve(ex["C"], a=ex["a"], b=ex["b"], **params)
+    # Compute a reverse solution:
+    b_to_a = ot.solve(ex["CT"], a=ex["b"], b=ex["a"], **params)
+
+    # Check that all the attributes coincide as expected:
+    dims = (1, 0) if batchsize == 0 else (0, 2, 1)
+    transpose = lambda plan: bk.transpose(plan, dims)
+    check_ot_result_symmetric(a_to_b, b_to_a, transpose=transpose)
 
 
 # ========================================================================================
@@ -102,7 +192,7 @@ def test_correct_values_convex_gradients(N, D, method, **kwargs):
     debias=st.sampled_from([False]),
     # We generate Gaussian distributions on [0,1]:
     blur=st.one_of(st.sampled_from([0]), st.floats(min_value=0.1, max_value=1.0)),
-    #blur=st.floats(min_value=0.1, max_value=1.0),
+    # blur=st.floats(min_value=0.1, max_value=1.0),
     # N.B.: If rho is too large, the cost is dominated by the marginal constraints
     #       and we cannot satisfy |error| < atol = 1e-2.
     reach=st.one_of(st.none(), st.floats(min_value=1e-2, max_value=10.0)),

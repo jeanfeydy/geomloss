@@ -13,9 +13,11 @@ def check_approx_equal(a, b, atol=1e-3, name=""):
         check.equal(a.dtype, b.dtype, f"The dtype of `{name}` is not correct.")
         check.equal(a.shape, b.shape, f"The shape of `{name}` is not correct.")
 
-        # We compute the maximum deviation:
-        error = bk.amax(bk.abs(a - b))
-        check.less(error, atol, f"The values of `{name}` are not correct.")
+        # Also check values, including +-inf and NaN:
+        check.is_true(
+            bk.allclose(a, b, atol=atol, equal_nan=True),
+            f"The values of `{name}` are not correct.",
+        )
 
 
 def check_ot_result(us, gt, atol=1e-3):
@@ -78,3 +80,38 @@ def check_ot_result(us, gt, atol=1e-3):
     if gt.a_to_b is not None:
         check_approx_equal(us.a_to_b, gt.a_to_b, atol=atol, name="a_to_b")
         check_approx_equal(us.b_to_a, gt.b_to_a, atol=atol, name="b_to_a")
+
+
+def check_ot_result_symmetric(a_to_b, b_to_a, *, transpose, atol=1e-4):
+    # Values:
+    check_approx_equal(a_to_b.value, b_to_a.value, atol=atol, name="value")
+
+    if a_to_b.value_linear is not None:
+        check_approx_equal(
+            a_to_b.value_linear, b_to_a.value_linear, atol=atol, name="value_linear"
+        )
+
+    # Transport plan:
+    check_approx_equal(a_to_b.plan, transpose(b_to_a.plan), atol=atol, name="plan")
+
+    # Dual potentials:
+    if a_to_b.potential_a is not None:
+        check_approx_equal(
+            a_to_b.potential_a, b_to_a.potential_b, atol=atol, name="potential_a"
+        )
+        check_approx_equal(
+            a_to_b.potential_b, b_to_a.potential_a, atol=atol, name="potential_b"
+        )
+
+    # Two marginals:
+    check_approx_equal(
+        a_to_b.marginal_a, b_to_a.marginal_b, atol=atol, name="marginal_a"
+    )
+    check_approx_equal(
+        a_to_b.marginal_b, b_to_a.marginal_a, atol=atol, name="marginal_b"
+    )
+
+    # Check that the barycentric mappings are correct:
+    if a_to_b.a_to_b is not None:
+        check_approx_equal(a_to_b.a_to_b, b_to_a.b_to_a, atol=atol, name="a_to_b")
+        check_approx_equal(a_to_b.b_to_a, b_to_a.a_to_b, atol=atol, name="b_to_a")
