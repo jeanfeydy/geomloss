@@ -52,7 +52,7 @@ N, M = (100, 100) if not use_cuda else (50000, 50000)
 # Generate some kind of 4d-helix:
 t = torch.linspace(0, 2 * np.pi, N).type(dtype)
 X_i = (
-    torch.stack((t * (2 * t).cos() / 7, t * (2 * t).sin() / 7, t / 7, t ** 2 / 50))
+    torch.stack((t * (2 * t).cos() / 7, t * (2 * t).sin() / 7, t / 7, t**2 / 50))
     .t()
     .contiguous()
 )

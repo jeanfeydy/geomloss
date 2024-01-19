@@ -101,7 +101,7 @@ def create_sphere(n_samples=1000):
 
     indices = np.arange(0, n_samples, dtype=float) + 0.5
     phi = np.arccos(1 - 2 * indices / n_samples)
-    theta = np.pi * (1 + 5 ** 0.5) * indices
+    theta = np.pi * (1 + 5**0.5) * indices
 
     x, y, z = np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)
     points = np.vstack((x, y, z)).T
@@ -116,7 +116,6 @@ def create_sphere(n_samples=1000):
 
 
 def display_cloud(ax, measure, color):
-
     w_i, x_i = numpy(measure[0]), numpy(measure[1])
 
     ax.view_init(elev=110, azim=-90)
@@ -137,6 +136,7 @@ folder = "output/wasserstein_3D/"
 os.makedirs(os.path.dirname("output/wasserstein_3D/"), exist_ok=True)
 
 import pyvista as pv
+
 
 def save_vtk(fname, points, colors):
     """N.B.: Paraview is a good VTK viewer, which supports ray-tracing."""
@@ -228,7 +228,7 @@ def normalize(measure, n=None):
     # Center, normalize the point cloud
     mean = (weights.view(-1, 1) * locations).sum(dim=0)
     locations -= mean
-    std = (weights.view(-1) * (locations ** 2).sum(dim=1).view(-1)).sum().sqrt()
+    std = (weights.view(-1) * (locations**2).sum(dim=1).view(-1)).sum().sqrt()
     locations /= std
 
     return weights, locations
@@ -297,8 +297,7 @@ matchings = [
 #################################################################
 # Display our matchings:
 
-for (i, (matching, target)) in enumerate(zip(matchings, targets)):
-
+for i, (matching, target) in enumerate(zip(matchings, targets)):
     fig = plt.figure(figsize=(6, 6))
     plt.set_cmap("hsv")
 
@@ -337,7 +336,7 @@ pairs = [
 frame = 0
 
 print("Save as a VTK movie...", end="", flush=True)
-for (A, B) in pairs:
+for A, B in pairs:
     A, B = numpy(A), numpy(B)
     for t in np.linspace(0, 1, FPS):
         save_vtk(f"frame_{frame}.vtk", (1 - t) * A + t * B, colors)

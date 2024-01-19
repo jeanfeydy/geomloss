@@ -25,7 +25,6 @@ def scal(a, f, batch=False):
 
 
 def squared_distances(x, y, use_keops=False):
-
     if use_keops and keops_available:
         if x.dim() == 2:
             x_i = LazyTensor(x[:, None, :])  # (N,1,D)

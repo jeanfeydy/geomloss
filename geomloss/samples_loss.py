@@ -190,7 +190,6 @@ class SamplesLoss(Module):
         verbose=False,
         backend="auto",
     ):
-
         super(SamplesLoss, self).__init__()
         self.loss = loss
         self.backend = backend
@@ -228,7 +227,7 @@ class SamplesLoss(Module):
                 )
 
         elif backend == "auto":
-            if M * N <= 5000 ** 2:
+            if M * N <= 5000**2:
                 backend = (
                     "tensorized"  # Fast backend, with a quadratic memory footprint
                 )
@@ -236,7 +235,7 @@ class SamplesLoss(Module):
                 if (
                     D <= 3
                     and self.loss == "sinkhorn"
-                    and M * N > 10000 ** 2
+                    and M * N > 10000**2
                     and self.p == 2
                 ):
                     backend = "multiscale"  # Super scalable algorithm in low dimension
@@ -334,7 +333,6 @@ class SamplesLoss(Module):
             )
 
     def check_shapes(self, l_x, α, x, l_y, β, y):
-
         if α.dim() != β.dim():
             raise ValueError(
                 "Input weights 'α' and 'β' should have the same number of dimensions."

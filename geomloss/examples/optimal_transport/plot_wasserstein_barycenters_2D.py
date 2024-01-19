@@ -131,7 +131,7 @@ def display_samples(ax, x, weights=None):
 
 Loss = SamplesLoss("sinkhorn", blur=0.01, scaling=0.9)
 models = []
-for (b_j, y_j) in [A, B, C, D]:
+for b_j, y_j in [A, B, C, D]:
     L_ab = Loss(a_i, x_i, b_j, y_j)
     [g_i] = torch.autograd.grad(L_ab, [x_i])
     models.append(x_i - g_i / a_i.view(-1, 1))

@@ -108,7 +108,7 @@ def rweight():
     return torch.rand(1).type(dtype)
 
 
-N = 100 if not use_cuda else 10 ** 3  # Number of samples per measure
+N = 100 if not use_cuda else 10**3  # Number of samples per measure
 C = 100 if not use_cuda else 10000  # number of copies for the Gaussian blur
 
 for _ in range(5):  # Repeat the experiment 5 times
@@ -150,7 +150,7 @@ for _ in range(5):  # Repeat the experiment 5 times
     # Fancy display:
     plt.figure(figsize=(12, 5))
 
-    if N < 10 ** 5:
+    if N < 10**5:
         ax = plt.subplot(1, 2, 1)
         display_samples(ax, X_i, (1.0, 0, 0, 0.5), label="$\\alpha$")
         display_samples(ax, Y_j, (0, 0, 1.0, 0.5), label="$\\beta$")

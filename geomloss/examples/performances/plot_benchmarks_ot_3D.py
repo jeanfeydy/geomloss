@@ -97,15 +97,15 @@ def sinkhorn_loop(a_i, x_i, b_j, y_j, blur=0.01, nits=100, backend="keops"):
         # N.B.: The separable implementation below is slightly more efficient than:
         # C_ij = ((x_i[:,None,:] - y_j[None,:,:]) ** 2).sum(-1) / 2
 
-        D_xx = (x_i ** 2).sum(-1)[:, None]  # (N,1)
+        D_xx = (x_i**2).sum(-1)[:, None]  # (N,1)
         D_xy = x_i @ y_j.t()  # (N,D)@(D,M) = (N,M)
-        D_yy = (y_j ** 2).sum(-1)[None, :]  # (1,M)
+        D_yy = (y_j**2).sum(-1)[None, :]  # (1,M)
         C_ij = (D_xx + D_yy) / 2 - D_xy  # (N,M) matrix of halved squared distances
 
         C_ij = C_ij[:, :, None]  # reshape as a (N,M,1) Tensor
 
     # Setup the dual variables -------------------------------------------------
-    eps = blur ** 2  # "Temperature" epsilon associated to our blurring scale
+    eps = blur**2  # "Temperature" epsilon associated to our blurring scale
     F_i, G_j = torch.zeros_like(loga_i), torch.zeros_like(
         logb_j
     )  # (scaled) dual vectors
@@ -153,7 +153,6 @@ from geomloss.examples.performances.benchmarks_ot_solvers import (
 
 
 def full_benchmark(source, target, blur, maxtime=None):
-
     # Compute a suitable "ground truth" ----------------------------------------
     OT_solver = SamplesLoss(
         "sinkhorn",

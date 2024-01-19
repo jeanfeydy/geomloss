@@ -140,14 +140,14 @@ def epsilon_schedule(p, diameter, blur, scaling):
         list of float: list of values for the temperature epsilon.
     """
     eps_list = (
-        [diameter ** p]
+        [diameter**p]
         + [
             np.exp(e)
             for e in np.arange(
                 p * np.log(diameter), p * np.log(blur), p * np.log(scaling)
             )
         ]
-        + [blur ** p]
+        + [blur**p]
     )
     return eps_list
 
@@ -158,8 +158,8 @@ def scaling_parameters(x, y, p, blur, reach, diameter, scaling):
         D = x.shape[-1]
         diameter = max_diameter(x.view(-1, D), y.view(-1, D))
 
-    eps = blur ** p
-    rho = None if reach is None else reach ** p
+    eps = blur**p
+    rho = None if reach is None else reach**p
     eps_list = epsilon_schedule(p, diameter, blur, scaling)
     return diameter, eps, eps_list, rho
 
@@ -467,7 +467,6 @@ def sinkhorn_loop(
 
     # Lines 4-5: eps-scaling descent ---------------------------------------------------
     for i, eps in enumerate(eps_list):  # See Fig. 3.25-26 in Jean Feydy's PhD thesis.
-
         # Line 6: update the damping coefficient ---------------------------------------
         damping = dampening(eps, rho)  # eps and damping change across iterations
 
@@ -519,9 +518,7 @@ def sinkhorn_loop(
         # N.B.: In single-scale mode, jumps = []: the code below is never executed
         #       and we retrieve "Algorithm 3.5" from Jean Feydy's PhD thesis.
         if i in jumps:
-
             if i == len(eps_list) - 1:  # Last iteration: just extrapolate!
-
                 C_xy_fine, C_yx_fine = C_xys[k + 1], C_yxs[k + 1]
                 if debias:
                     C_xx_fine, C_yy_fine = C_xxs[k + 1], C_yys[k + 1]

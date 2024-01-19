@@ -60,7 +60,7 @@ def create_sphere(n_samples=1000):
 
     indices = np.arange(0, n_samples, dtype=float) + 0.5
     phi = np.arccos(1 - 2 * indices / n_samples)
-    theta = np.pi * (1 + 5 ** 0.5) * indices
+    theta = np.pi * (1 + 5**0.5) * indices
 
     x, y, z = np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)
     points = np.vstack((x, y, z)).T
@@ -74,7 +74,6 @@ def create_sphere(n_samples=1000):
 
 
 def display_cloud(ax, measure, color):
-
     w_i, x_i = numpy(measure[0]), numpy(measure[1])
 
     ax.view_init(elev=110, azim=-90)
@@ -116,7 +115,7 @@ def plan_marginals(blur, a_i, x_i, b_j, y_j, F_i, G_j):
     C_ij = ((x_i - y_j) ** 2).sum(-1) / 2
 
     # Scaled kernel matrix:
-    K_ij = ((F_i + G_j - C_ij) / blur ** 2).exp()
+    K_ij = ((F_i + G_j - C_ij) / blur**2).exp()
 
     A_i = a_i * (K_ij @ b_j)  # First marginal
     B_j = b_j * (K_ij.t() @ a_i)  # Second marginal
@@ -142,7 +141,7 @@ def blurred_relative_error(blur, x_i, a_i, A_i):
     x_i = LazyTensor(x_i[:, None, :])
 
     C_ij = ((x_i - x_j) ** 2).sum(-1) / 2
-    K_ij = (-C_ij / blur ** 2).exp()
+    K_ij = (-C_ij / blur**2).exp()
 
     squared_error = (A_i - a_i).dot(K_ij @ (A_i - a_i))
     squared_norm = a_i.dot(K_ij @ a_i)
@@ -251,7 +250,6 @@ def benchmark_solvers(
     display=False,
     maxtime=None,
 ):
-
     timings, errors, costs = [], [], []
     break_loop = False
     print(
@@ -260,7 +258,6 @@ def benchmark_solvers(
         )
     )
     for i, OT_solver in enumerate(OT_solvers):
-
         try:
             timing, error, cost = benchmark_solver(OT_solver, blur, source, target)
 

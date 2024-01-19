@@ -138,7 +138,6 @@ def fit_model(
             fit_model.breakloop = True
 
         if display:
-
             Model.plot(nit=fit_model.nit, cost=cost.item())
             # print("{}: {:2.4f}".format(fit_model.nit, cost.item()))
         return cost

@@ -64,6 +64,7 @@ for i in range(5):
 
 affine_transform = nib.load("data/manual_ifof1.nii").affine
 
+
 # load data in the nii format to a 3D, normalized array.
 def load_data_nii(fname):
     img = nib.load(fname)

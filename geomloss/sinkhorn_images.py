@@ -122,9 +122,9 @@ def sinkhorn_divergence(
     # Diameter of the configuration:
     diameter = 1
     # Target temperature epsilon:
-    eps = blur ** p
+    eps = blur**p
     # Strength of the marginal constraints:
-    rho = None if reach is None else reach ** p
+    rho = None if reach is None else reach**p
 
     # Schedule for the multiscale descent, with ε-scaling:
     """
@@ -157,7 +157,7 @@ def sinkhorn_divergence(
     current_scale = pyramid_scales.pop(0)
     jumps = []
     for i, eps in enumerate(eps_list[1:]):
-        if current_scale ** p > eps:
+        if current_scale**p > eps:
             jumps.append(i + 1)
             current_scale = pyramid_scales.pop(0)
 
