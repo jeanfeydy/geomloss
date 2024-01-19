@@ -127,3 +127,4 @@ geomloss/examples/optimal_transport/output*
 launch.json
 *doc.zip
 *debug*.py
+sg_execution_times.rst

@@ -57,7 +57,7 @@ You should then type the following lines in the SSH prompt::
     sudo apt install python3-pip
     pip3 install numpy GPUtil cmake ninja sklearn scipy imageio scikit-image
     pip3 install torch torchvision
-    pip3 install dipy nibabel vtk pyvtk SimpleITK
+    pip3 install dipy nibabel vtk pyvista SimpleITK
     pip3 install sphinx sphinx-gallery recommonmark sphinxcontrib-httpdomain sphinx_rtd_theme plyfile >> install.log
     
     # Clone the latest versions of keops and geomloss, adding them to the path

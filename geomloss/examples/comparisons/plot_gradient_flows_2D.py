@@ -35,7 +35,7 @@ from matplotlib import pyplot as plt
 
 
 def load_image(fname):
-    img = imread(fname, as_gray=True)  # Grayscale
+    img = imread(fname, mode="F")  # Grayscale
     img = (img[::-1, :]) / 255.0
     return 1 - img
 

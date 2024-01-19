@@ -136,17 +136,15 @@ def display_cloud(ax, measure, color):
 folder = "output/wasserstein_3D/"
 os.makedirs(os.path.dirname("output/wasserstein_3D/"), exist_ok=True)
 
-from pyvtk import PolyData, PointData, CellData, Scalars, VtkData, PointData
-
+import pyvista as pv
 
 def save_vtk(fname, points, colors):
     """N.B.: Paraview is a good VTK viewer, which supports ray-tracing."""
 
-    structure = PolyData(points=points, vertices=np.arange(len(points)))
-    values = PointData(Scalars(colors, name="colors"))
-    vtk = VtkData(structure, values)
-
-    vtk.tofile(folder + fname, "binary")
+    # Use PyVista to save the point cloud as a VTK file:
+    points = pv.PolyData(points)
+    points["colors"] = colors
+    points.save(folder + fname)
 
 
 #################################################################
