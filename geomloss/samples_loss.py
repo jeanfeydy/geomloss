@@ -112,7 +112,7 @@ class SamplesLoss(Module):
             If **truncate** is not **None**, kernel truncation
             steps will assume that
             :math:`\\exp(-x/\sigma)` or
-            :math:`\\exp(-x^2/2\sigma^2) are zero when
+            :math:`\\exp(-x^2/2\sigma^2)` are zero when
             :math:`\|x\| \,>\, \\text{truncate}\cdot \sigma`.
 
 
