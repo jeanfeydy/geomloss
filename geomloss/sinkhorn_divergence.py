@@ -157,6 +157,9 @@ def scaling_parameters(x, y, p, blur, reach, diameter, scaling):
     if diameter is None:
         D = x.shape[-1]
         diameter = max_diameter(x.view(-1, D), y.view(-1, D))
+    
+    # small diameter np.log() in epsilon_schedule() cannot be 0.
+    diameter = max(diameter, blur)
 
     eps = blur**p
     rho = None if reach is None else reach**p
