@@ -206,13 +206,24 @@ class SamplesLoss(Module):
         self.potentials = potentials
         self.verbose = verbose
 
-    def forward(self, *args):
+    def forward(self, *args, ptr_x=None, ptr_y=None):
         """Computes the loss between sampled measures.
 
         Documentation and examples: Soon!
-        Until then, please check the tutorials :-)"""
+        Until then, please check the tutorials :-) 
 
-        l_x, α, x, l_y, β, y = self.process_args(*args)
+        keyword only:
+
+        ptr_x (LongTensor, default=None): If **backend** is ``"online"``, specifies the batches pyg-style, 
+            i.e. the pointer tensor that indicates the start of each new sample in the flattened **x** tensor.
+            If **None**, the routine will assume that the samples are concatenated along the first dimension.
+        ptr_y (LongTensor, default=None): If **backend** is ``"online"``, specifies the batches pyg-style,
+            i.e. the pointer tensor that indicates the start of each new sample in the flattened **y** tensor.
+            If **None**, the routine will assume that the samples are concatenated along the first dimension.
+
+        """
+
+        l_x, α, x, l_y, β, y = self.process_args(*args, ptr_x=ptr_x, ptr_y=ptr_y)
         B, N, M, D, l_x, α, l_y, β = self.check_shapes(l_x, α, x, l_y, β, y)
 
         backend = (
@@ -227,7 +238,9 @@ class SamplesLoss(Module):
                 )
 
         elif backend == "auto":
-            if M * N <= 5000**2:
+            if ptr_x is not None or ptr_y is not None:
+                backend = "online"
+            elif M * N <= 5000**2:
                 backend = (
                     "tensorized"  # Fast backend, with a quadratic memory footprint
                 )
@@ -260,6 +273,10 @@ class SamplesLoss(Module):
         ]:  # tensorized and online routines work on batched tensors
             α, x, β, y = α.unsqueeze(0), x.unsqueeze(0), β.unsqueeze(0), y.unsqueeze(0)
 
+        if ptr_x is not None:
+            kwargs = {"ptr_x": ptr_x, "ptr_y": ptr_y}
+        else: kwargs = {}
+
         # Run --------------------------------------------------------------------------------
         values = routines[self.loss][backend](
             α,
@@ -280,6 +297,7 @@ class SamplesLoss(Module):
             labels_x=l_x,
             labels_y=l_y,
             verbose=self.verbose,
+            **kwargs
         )
 
         # Make sure that the output has the correct shape ------------------------------------
@@ -288,7 +306,8 @@ class SamplesLoss(Module):
         ):  # Return some dual potentials (= test functions) sampled on the input measures
             F, G = values
             return F.view_as(α), G.view_as(β)
-
+        elif ptr_x is not None:
+            return values # The user expects a "batch vector" of distances
         else:  # Return a scalar cost value
             if backend in ["multiscale"]:  # KeOps backends return a single scalar value
                 if B == 0:
@@ -304,7 +323,7 @@ class SamplesLoss(Module):
                 else:
                     return values  # The user expects a "batch vector" of distances
 
-    def process_args(self, *args):
+    def process_args(self, *args, ptr_x=None, ptr_y=None):
         if len(args) == 6:
             return args
         if len(args) == 4:
@@ -312,15 +331,21 @@ class SamplesLoss(Module):
             return None, α, x, None, β, y
         elif len(args) == 2:
             x, y = args
-            α = self.generate_weights(x)
-            β = self.generate_weights(y)
+            α = self.generate_weights(x, ptr_x)
+            β = self.generate_weights(y, ptr_y)
             return None, α, x, None, β, y
         else:
             raise ValueError(
                 "A SamplesLoss accepts two (x, y), four (α, x, β, y) or six (l_x, α, x, l_y, β, y)  arguments."
             )
 
-    def generate_weights(self, x):
+    def generate_weights(self, x, ptr = None):
+        if ptr is not None:
+            with torch.no_grad():
+                batch = ptr[1:] - ptr[:-1]
+                weights = 1 / batch.type_as(x)
+                weights = torch.repeat_interleave(weights, batch)
+                return weights
         if x.dim() == 2:  #
             N = x.shape[0]
             return torch.ones(N).type_as(x) / N

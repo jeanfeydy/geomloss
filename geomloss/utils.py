@@ -10,8 +10,22 @@ try:  # Import the keops library, www.kernel-operations.io
 except:
     keops_available = False
 
+def segment_sum(x, batch):
+    """uses only torch primitives, avoids needing to import torch_scatter"""
+    if x.dim() == 2:
+        x = x.squeeze(0)
+    result = torch.zeros(batch.shape[0], *x.shape[1:], device=x.device)
+    index = torch.arange(batch.shape[0], device=x.device)
+    index = index.repeat_interleave(batch)
+    result.index_add_(0, index, x)
+    return result
 
-def scal(a, f, batch=False):
+def scal(a, f, batch=False, ranges=None):
+    if ranges is not None:
+        ranges_a, *_ = ranges
+        batch_a = ranges_a[:, 1] - ranges_a[:, 0]
+        prod = a * f
+        return segment_sum(prod, batch_a)
     if batch:
         B = a.shape[0]
         return (a.reshape(B, -1) * f.reshape(B, -1)).sum(1)
@@ -278,3 +292,16 @@ def softmin_grid(eps, C_xy, h_y):
         )  # Act on dim 2
 
     return -eps * h_y
+
+
+########################
+# For batching
+
+def ranges_from_ptr(ptr_x):
+    """Converts a list of pointers to a list of ranges."""
+    B, = ptr_x.shape
+    ranges_x = torch.stack([ptr_x[:-1],ptr_x[1:]], dim=-1)
+    slices = torch.arange(1, B + 1, device=ptr_x.device)
+    return ranges_x, slices
+
+    

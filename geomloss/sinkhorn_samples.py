@@ -14,7 +14,7 @@ try:  # Import the keops library, www.kernel-operations.io
 except:
     keops_available = False
 
-from .utils import scal, squared_distances, distances
+from .utils import scal, squared_distances, distances, ranges_from_ptr
 
 from .sinkhorn_divergence import epsilon_schedule, scaling_parameters
 from .sinkhorn_divergence import dampening, log_weights, sinkhorn_cost, sinkhorn_loop
@@ -290,6 +290,71 @@ def softmin_online_lazytensor(eps, C_xy, h_y, p=2):
 
     return -eps * smin
 
+def softmin_online_ranges(eps, C_xy, h_y, p=2,*, ranges):
+    r"""Soft-C-transform, implemented using symbolic KeOps LazyTensors.
+
+    This routine implements the (soft-)C-transform
+    between dual vectors, which is the core computation for
+    Auction- and Sinkhorn-like optimal transport solvers.
+
+    If `eps` is a float number, `C_xy = (x, y)` is a pair of (batched)
+    point clouds, encoded as (B, N, D) and (B, M, D) Tensors
+    and `h_y` encodes a dual potential :math:`h_j` that is supported by the points
+    :math:`y_j`'s, then `softmin_tensorized(eps, C_xy, h_y)` returns a dual potential
+    `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
+
+    .. math::
+        f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp
+        \big[ h_j - \|x_i - y_j\|^p / p \varepsilon \big]~.
+
+    For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
+
+    Args:
+        eps (float, positive): Temperature :math:`\varepsilon` for the Gibbs kernel
+            :math:`K_{i,j} = \exp(- \|x_i - y_j\|^p / p \varepsilon)`.
+
+        C_xy (pair of (B, N, D), (B, M, D) Tensors): Point clouds :math:`x_i`
+            and :math:`y_j`, with a batch dimension.
+
+        h_y ((B, M) Tensor): Vector of logarithmic "dual" values, with a batch dimension.
+            Most often, this vector will be computed as `h_y = b_log + g_j / eps`,
+            where `b_log` is a vector of log-weights :math:`\log(\beta_j)`
+            for the :math:`y_j`'s and :math:`g_j` is a dual vector
+            in the Sinkhorn algorithm, so that:
+
+            .. math::
+                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \beta_j
+                \exp \tfrac{1}{\varepsilon} \big[ g_j - \|x_i - y_j\|^p / p \big]~.
+
+    Returns:
+        (B, N) Tensor: Dual potential `f` of values :math:`f_i`, supported
+            by the points :math:`x_i`.
+    """
+    x, y = C_xy  # Retrieve our point clouds
+    B = x.shape[0]  # Batch dimension
+    assert B == 1
+
+    # Encoding as batched KeOps LazyTensors:
+    x_i = LazyTensor(x.squeeze(0)[:, None, :])  # (N, 1, D)
+    y_j = LazyTensor(y.squeeze(0)[None, :, :])  # (1, M, D)
+    h_j = LazyTensor(h_y.squeeze(0)[None, :, None])  # (1, M, 1)
+
+    # Cost matrix:
+    if p == 2:  # Halved, squared Euclidean distance
+        C_ij = ((x_i - y_j) ** 2).sum(-1) / 2  # (B, N, M, 1)
+
+    elif p == 1:  # Simple Euclidean distance
+        C_ij = ((x_i - y_j) ** 2).sum(-1).sqrt()  # (B, N, M, 1)
+
+    else:
+        raise NotImplementedError()
+
+    pre_reduction = (h_j - C_ij * torch.Tensor([1 / eps]).type_as(x))
+
+    # KeOps log-sum-exp reduction over the "M" dimension:
+    smin = pre_reduction.logsumexp(1, ranges=ranges).view(B, -1)
+
+    return -eps * smin
 
 def lse_lazytensor(p, D, batchdims=(1,)):
     """This implementation is currently disabled."""
@@ -360,6 +425,8 @@ def sinkhorn_online(
     cost=None,
     debias=True,
     potentials=False,
+    ptr_x=None,
+    ptr_y=None, 
     **kwargs,
 ):
     B, N, D = x.shape
@@ -372,7 +439,8 @@ def sinkhorn_online(
         else:
             my_lse = lse_lazytensor(p, D, batchdims=(B,))
             softmin = partial(softmin_online, log_conv=my_lse)
-
+    elif ptr_x is not None or ptr_y is not None:
+        softmin = partial(softmin_online_ranges, p=p)
     else:
         if B > 1:
             raise ValueError(
@@ -393,6 +461,18 @@ def sinkhorn_online(
     C_xx, C_yy = ((x, x.detach()), (y, y.detach())) if debias else (None, None)
     C_xy, C_yx = ((x, y.detach()), (y, x.detach()))
 
+    if ptr_x is not None and ptr_y is not None:
+        ranges_x, slices_x = ranges_from_ptr(ptr_x)
+        ranges_y, slices_y = ranges_from_ptr(ptr_y)
+        ranges_xy = (ranges_x, slices_x, ranges_y, ranges_y, slices_y, ranges_x)
+        ranges_yx = (ranges_y, slices_y, ranges_x, ranges_x, slices_x, ranges_y)
+        ranges_xx = (ranges_x, slices_x, ranges_x, ranges_x, slices_x, ranges_x)
+        ranges_yy = (ranges_y, slices_y, ranges_y, ranges_y, slices_y, ranges_y)
+    elif ptr_x is None and ptr_y is None : 
+        ranges_xy = ranges_yx = ranges_xx = ranges_yy = None
+    else:
+        raise ValueError("ptr_x and ptr_y should be both None or both not None")
+
     diameter, eps, eps_list, rho = scaling_parameters(
         x, y, p, blur, reach, diameter, scaling
     )
@@ -408,6 +488,10 @@ def sinkhorn_online(
         eps_list,
         rho,
         debias=debias,
+        batch_ranges_xx=ranges_xx,
+        batch_ranges_yy=ranges_yy,
+        batch_ranges_xy=ranges_xy,
+        batch_ranges_yx=ranges_yx,
     )
 
     return sinkhorn_cost(
@@ -422,6 +506,10 @@ def sinkhorn_online(
         batch=True,
         debias=debias,
         potentials=potentials,
+        batch_ranges_xx=ranges_xx,
+        batch_ranges_yy=ranges_yy,
+        batch_ranges_xy=ranges_xy,
+        batch_ranges_yx=ranges_yx,
     )
 
 
