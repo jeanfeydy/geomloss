@@ -44,7 +44,7 @@ routines = {
 
 
 class SamplesLoss(Module):
-    """Creates a criterion that computes distances between sampled measures on a vector space.
+    r"""Creates a criterion that computes distances between sampled measures on a vector space.
 
     Warning:
         If **loss** is ``"sinkhorn"`` and **reach** is **None** (balanced Optimal Transport),

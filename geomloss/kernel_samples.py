@@ -1,4 +1,4 @@
-"""Implements kernel ("gaussian", "laplacian", "energy") norms between sampled measures.
+r"""Implements kernel ("gaussian", "laplacian", "energy") norms between sampled measures.
 
 .. math::
     \\text{Loss}(\\alpha,\\beta) 
