@@ -39,7 +39,6 @@ PY
 
 ```bash
 python -m pip install .
-python -m pip install ".[torch]"
 python -m pip install ".[full]"
 ```
 

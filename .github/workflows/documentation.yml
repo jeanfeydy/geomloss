@@ -49,10 +49,10 @@ jobs:
 
     - name: build documentation (pull request or push)
       run: |
-        cd doc/source/
+        cd doc/
         make clean
         PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 make html
-        cd ../..
+        cd ..
 
     - name: upload artifact
       uses: actions/upload-artifact@v4
