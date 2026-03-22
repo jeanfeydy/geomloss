@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geomloss"
+dynamic = ["version"]
+description = "Geometric loss functions between point clouds, images and volumes."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.8"
+authors = [
+  { name = "Jean Feydy", email = "jean.feydy@inria.fr" }
+]
+license = "MIT"
+keywords = ["kernels", "optimal transport", "measure", "loss", "geometry"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Scientific/Engineering",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: Python :: 3 :: Only",
+]
+dependencies = [
+  "numpy",
+]
+
+[project.optional-dependencies]
+torch = [
+  "torch",
+]
+full = [
+  "pykeops",
+]
+
+[project.urls]
+Homepage = "https://www.kernel-operations.io/geomloss/"
+
+[tool.setuptools]
+packages = ["geomloss"]
+
+[tool.setuptools.dynamic]
+version = { attr = "geomloss.__version__" }

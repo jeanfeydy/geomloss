@@ -225,7 +225,7 @@ class OTResult:
         # The string below refers to the GeomLoss library:
         # successor methods may concatenate the relevant references
         # to the original definitions, solvers and underlying numerical backends.
-        return """GeomLoss library: 
+        return r"""GeomLoss library: 
         
             "Interpolating between optimal transport and MMD using Sinkhorn divergences." 
             In The 22nd International Conference on Artificial Intelligence and Statistics, pp. 2681-2690. PMLR, 2019.
