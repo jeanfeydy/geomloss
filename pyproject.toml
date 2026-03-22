@@ -41,6 +41,7 @@ test = [
   "pre-commit",
   "pytest",
   "pytest-cov",
+  "pytest-check",
   "pytest-sphinx @ git+https://github.com/jeanfeydy/pytest-sphinx.git",
 ]
 docs = [
