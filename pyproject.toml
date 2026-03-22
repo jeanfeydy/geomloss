@@ -34,6 +34,43 @@ full = [
   "pykeops",
 ]
 
+[dependency-groups]
+test = [
+  "black",
+  "flake8",
+  "hypothesis",
+  "pre-commit",
+  "pytest",
+  "pytest-cov",
+  "pytest-sphinx @ git+https://github.com/jeanfeydy/pytest-sphinx.git",
+]
+docs = [
+  "furo",
+  "myst_parser>=0.13",
+  # To generate GIFs
+  "imageio",
+  # Sphinx + theme/plugins
+  "sphinx>=4.0",
+  "sphinx-autodoc-typehints",
+  "sphinx-copybutton",
+  "sphinx-design",
+  "sphinx-gallery<= 0.15.0",
+  "sphinx-math-dollar",
+  "sphinx-rtd-theme",
+  # To generate interactive scenes
+  "ipython",
+  "jupyterlab",
+  "trame",
+  "trame_vtk",
+  "trame_vuetify",
+  "trimesh",
+  "rtree",
+]
+dev = [
+  { include-group = "test" },
+  { include-group = "docs" },
+]
+
 [project.urls]
 Homepage = "https://www.kernel-operations.io/geomloss/"
 
