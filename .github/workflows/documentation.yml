@@ -18,54 +18,44 @@ on:
 
 jobs:
 
-    build_documentation:
-        name: Build Documentation
-        runs-on: ubuntu-20.04
+  build_documentation:
+    name: Build Documentation
+    runs-on: ubuntu-latest
 
-        permissions:
-          deployments: write
-          contents: write
+    permissions:
+      deployments: write
+      contents: write
 
-        steps:
-        - uses: actions/checkout@v4
-        - name: Configure Git Credentials
-          run: |
-            git config user.name github-actions[bot]
-            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+    steps:
+    - uses: actions/checkout@v4
+    - name: Configure Git Credentials
+      run: |
+        git config user.name github-actions[bot]
+        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
-        - uses: actions/setup-python@v5
-          with:
-            python-version: "3.13"
-            cache: "pip"
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: "pip"
 
-        - name: Install package (with dependencies for docs)
-          run: |
-            pip install --upgrade pip
-            pip install .[full] --group dev
+    - name: Install package (with dependencies for docs)
+      run: |
+        pip install --upgrade pip
+        pip install .[full] --group dev
 
-        # https://github.com/pyvista/setup-headless-display-action
-        - name: Setup headless display
-          uses: pyvista/setup-headless-display-action@v3
+    # https://github.com/pyvista/setup-headless-display-action
+    - name: Setup headless display
+      uses: pyvista/setup-headless-display-action@v3
 
-        - name: build documentation (pull request or push)
-          run: |
-            cd doc/source/
-            make clean
-            PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 make html
-            cd ../..
+    - name: build documentation (pull request or push)
+      run: |
+        cd doc/source/
+        make clean
+        PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 make html
+        cd ../..
 
-        - name: upload artifact
-          uses: actions/upload-artifact@v4
-          with:
-            path:
-              doc/_build/html/
-
-
-        - name: Deploy to GitHub Pages
-          uses: peaceiris/actions-gh-pages@v4
-          if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
-          with:
-            publish_branch: gh-pages
-            github_token: ${{ secrets.GITHUB_TOKEN }}
-            publish_dir: doc/_build/html
-            force_orphan: true
+    - name: upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        path:
+          doc/_build/html/
