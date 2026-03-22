@@ -112,7 +112,7 @@ class SamplesLoss(Module):
             If **truncate** is not **None**, kernel truncation
             steps will assume that
             :math:`\\exp(-x/\sigma)` or
-            :math:`\\exp(-x^2/2\sigma^2) are zero when
+            :math:`\\exp(-x^2/2\sigma^2)` are zero when
             :math:`\|x\| \,>\, \\text{truncate}\cdot \sigma`.
 
 
@@ -190,7 +190,6 @@ class SamplesLoss(Module):
         verbose=False,
         backend="auto",
     ):
-
         super(SamplesLoss, self).__init__()
         self.loss = loss
         self.backend = backend
@@ -334,7 +333,6 @@ class SamplesLoss(Module):
             )
 
     def check_shapes(self, l_x, α, x, l_y, β, y):
-
         if α.dim() != β.dim():
             raise ValueError(
                 "Input weights 'α' and 'β' should have the same number of dimensions."

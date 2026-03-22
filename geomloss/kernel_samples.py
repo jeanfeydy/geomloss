@@ -189,7 +189,6 @@ def kernel_multiscale(
     verbose=False,
     **kwargs
 ):
-
     if truncate is None or name == "energy":
         return kernel_online(
             α.unsqueeze(0),

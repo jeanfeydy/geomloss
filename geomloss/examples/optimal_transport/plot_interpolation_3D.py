@@ -116,7 +116,6 @@ def create_sphere(n_samples=1000):
 
 
 def display_cloud(ax, measure, color):
-
     w_i, x_i = numpy(measure[0]), numpy(measure[1])
 
     ax.view_init(elev=110, azim=-90)
@@ -136,17 +135,16 @@ def display_cloud(ax, measure, color):
 folder = "output/wasserstein_3D/"
 os.makedirs(os.path.dirname("output/wasserstein_3D/"), exist_ok=True)
 
-from pyvtk import PolyData, PointData, CellData, Scalars, VtkData, PointData
+import pyvista as pv
 
 
 def save_vtk(fname, points, colors):
     """N.B.: Paraview is a good VTK viewer, which supports ray-tracing."""
 
-    structure = PolyData(points=points, vertices=np.arange(len(points)))
-    values = PointData(Scalars(colors, name="colors"))
-    vtk = VtkData(structure, values)
-
-    vtk.tofile(folder + fname, "binary")
+    # Use PyVista to save the point cloud as a VTK file:
+    points = pv.PolyData(points)
+    points["colors"] = colors
+    points.save(folder + fname)
 
 
 #################################################################
@@ -299,8 +297,7 @@ matchings = [
 #################################################################
 # Display our matchings:
 
-for (i, (matching, target)) in enumerate(zip(matchings, targets)):
-
+for i, (matching, target) in enumerate(zip(matchings, targets)):
     fig = plt.figure(figsize=(6, 6))
     plt.set_cmap("hsv")
 
@@ -339,7 +336,7 @@ pairs = [
 frame = 0
 
 print("Save as a VTK movie...", end="", flush=True)
-for (A, B) in pairs:
+for A, B in pairs:
     A, B = numpy(A), numpy(B)
     for t in np.linspace(0, 1, FPS):
         save_vtk(f"frame_{frame}.vtk", (1 - t) * A + t * B, colors)

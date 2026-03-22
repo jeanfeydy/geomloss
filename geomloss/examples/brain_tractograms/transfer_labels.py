@@ -216,7 +216,6 @@ def nn_search(x_i, y_j, ranges=None):
 
 
 def KMeans(x_i, c_j, Nits=10, ranges=None):
-
     D = x_i.shape[1]
     for i in range(10):
         # Points -> Nearest cluster

@@ -153,7 +153,6 @@ from geomloss.examples.performances.benchmarks_ot_solvers import (
 
 
 def full_benchmark(source, target, blur, maxtime=None):
-
     # Compute a suitable "ground truth" ----------------------------------------
     OT_solver = SamplesLoss(
         "sinkhorn",

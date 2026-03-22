@@ -362,7 +362,6 @@ def sinkhorn_online(
     potentials=False,
     **kwargs,
 ):
-
     B, N, D = x.shape
     B, M, _ = y.shape
 
@@ -566,7 +565,6 @@ def sinkhorn_multiscale(
     verbose=False,
     **kwargs,
 ):
-
     N, D = x.shape
     M, _ = y.shape
 

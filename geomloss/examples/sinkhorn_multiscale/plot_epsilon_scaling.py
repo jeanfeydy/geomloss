@@ -207,7 +207,6 @@ from geomloss import SamplesLoss
 
 
 def display_scaling(scaling=0.5, Nits=9, debias=True):
-
     plt.figure(figsize=((12, ((Nits - 1) // 3 + 1) * 4)))
 
     for i in range(Nits):

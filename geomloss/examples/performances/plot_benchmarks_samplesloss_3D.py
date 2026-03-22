@@ -84,7 +84,8 @@ def generate_samples(N, device):
 def benchmark(Loss, dev, N, loops=10):
     """Times a loss computation+gradient on an N-by-N problem."""
 
-    importlib.reload(torch)  # In case we had a memory overflow just before...
+    # NB: torch does not accept reloading anymore.
+    # importlib.reload(torch)  # In case we had a memory overflow just before...
     device = torch.device(dev)
     a, x, b, y = generate_samples(N, device)
 

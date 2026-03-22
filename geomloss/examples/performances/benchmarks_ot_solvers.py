@@ -74,7 +74,6 @@ def create_sphere(n_samples=1000):
 
 
 def display_cloud(ax, measure, color):
-
     w_i, x_i = numpy(measure[0]), numpy(measure[1])
 
     ax.view_init(elev=110, azim=-90)
@@ -251,7 +250,6 @@ def benchmark_solvers(
     display=False,
     maxtime=None,
 ):
-
     timings, errors, costs = [], [], []
     break_loop = False
     print(
@@ -260,7 +258,6 @@ def benchmark_solvers(
         )
     )
     for i, OT_solver in enumerate(OT_solvers):
-
         try:
             timing, error, cost = benchmark_solver(OT_solver, blur, source, target)
 

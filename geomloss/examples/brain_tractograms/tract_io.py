@@ -30,7 +30,6 @@ except NameError:
 
 
 def read_vtk(filename):
-
     if filename.endswith("xml") or filename.endswith("vtp"):
         polydata_reader = vtk.vtkXMLPolyDataReader()
     else:
@@ -45,7 +44,6 @@ def read_vtk(filename):
 
 
 def vtkPolyData_to_tracts(polydata):
-
     result = {}
     result["lines"] = ns.vtk_to_numpy(polydata.GetLines().GetData())
     result["points"] = ns.vtk_to_numpy(polydata.GetPoints().GetData())
@@ -74,7 +72,6 @@ def vtkPolyData_to_tracts(polydata):
 
 
 def vtkPolyData_dictionary_to_tracts_and_data(dictionary):
-
     dictionary_keys = set(("lines", "points", "numberOfLines"))
     if not dictionary_keys.issubset(dictionary.keys()):
         raise ValueError(
@@ -135,7 +132,6 @@ def vtkPolyData_dictionary_to_tracts_and_data(dictionary):
 
 
 def save_vtk(filename, tracts, lines_indices=None, scalars=None):
-
     lengths = [len(p) for p in tracts]
     line_starts = ns.numpy.r_[0, ns.numpy.cumsum(lengths)]
     if lines_indices is None:
@@ -179,7 +175,6 @@ def save_vtk(filename, tracts, lines_indices=None, scalars=None):
 
 
 def save_vtk_labels(filename, tracts, scalars, lines_indices=None):
-
     lengths = [len(p) for p in tracts]
     line_starts = ns.numpy.r_[0, ns.numpy.cumsum(lengths)]
     if lines_indices is None:
@@ -225,7 +220,6 @@ def save_vtk_labels(filename, tracts, scalars, lines_indices=None):
 
 
 def streamlines_resample(streamlines, perc=None, npoints=None):
-
     if perc is not None:
         resampled = [
             set_number_of_points(s, int(len(s) * perc / 100.0)) for s in streamlines
@@ -260,7 +254,6 @@ def check_resample(value):
 
 
 def setup():
-
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "Input_Tractogram", help="Name of the input tractography file", type=check_ext
@@ -275,7 +268,6 @@ def setup():
 
 
 if __name__ == "__main__":
-
     in_file, perc = setup()
 
     streamlines = read_vtk(in_file)[0]

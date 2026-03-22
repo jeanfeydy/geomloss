@@ -4,7 +4,6 @@ from .utils import softmin_grid as softmin
 
 
 def barycenter_iteration(f_k, g_k, d_log, eps, p, ak_log, w_k):
-
     # Sinkhorn "pseudo-step" - from the measures to the barycenter:
     ft_k = softmin(eps, p, ak_log + g_k / eps) / eps  # (B,K,n,n)
     # Update the barycenter:
@@ -35,7 +34,6 @@ def barycenter_iteration(f_k, g_k, d_log, eps, p, ak_log, w_k):
 def ImagesBarycenter(
     measures, weights, blur=0, p=2, scaling_N=10, backward_iterations=5
 ):
-
     a_k = measures  # Densities, (B,K,N,N)
     w_k = weights  # Barycentric weights, (B,K)
 
@@ -44,7 +42,6 @@ def ImagesBarycenter(
         blur = 1 / measures.shape[-1]
 
     with torch.set_grad_enabled(backward_iterations == 0):
-
         # Initialize the barycenter as a pointwise linear combination:
         bar = (a_k * w_k[:, :, None, None]).sum(1)  # (B,K,N,N) @ (B,K,1,1) -> (B,N,N)
 
