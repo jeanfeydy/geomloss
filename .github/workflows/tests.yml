@@ -40,14 +40,14 @@ jobs:
       - name: Setup headless display
         uses: pyvista/setup-headless-display-action@v3
 
-      # Tests are run first with minimal dependencies
+      # Tests are run first without pykeops
       - name: Test (minimal dependencies)
         run: |
           pytest --cov-report xml:coverage.xml --durations=0
 
-      # Tests are run with all optional dependencies, to ensure that the optional functionality is working
+      # Then, with all optional dependencies
       - name: Test (with all optional dependencies)
         run: |
-          pip install -e .[torch,full]
+          pip install -e .[full] --group dev
           pytest --cov-append --cov-report xml:coverage_opt.xml --durations=0
 

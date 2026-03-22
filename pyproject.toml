@@ -24,12 +24,10 @@ classifiers = [
 ]
 dependencies = [
   "numpy",
+  "torch",
 ]
 
 [project.optional-dependencies]
-torch = [
-  "torch",
-]
 full = [
   "pykeops",
 ]
