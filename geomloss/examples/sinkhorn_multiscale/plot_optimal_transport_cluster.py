@@ -47,7 +47,7 @@ def display_4d_samples(ax1, ax2, x, color):
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
 #   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
 
-N, M = (100, 100) if not use_cuda else (50000, 50000)
+N, M = (10, 10) if not use_cuda else (50000, 50000)
 
 # Generate some kind of 4d-helix:
 t = torch.linspace(0, 2 * np.pi, N).type(dtype)

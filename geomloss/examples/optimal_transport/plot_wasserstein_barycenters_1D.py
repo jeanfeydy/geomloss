@@ -52,7 +52,7 @@ dtype = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 #   \gamma  ~=~ \sum_{k=1}^N \gamma_k\,\delta_{z_k}.
 
 
-N, M = (50, 50) if not use_cuda else (500, 500)
+N, M = (5, 5) if not use_cuda else (500, 500)
 
 t_i = torch.linspace(0, 1, M).type(dtype).view(-1, 1)
 t_j = torch.linspace(0, 1, M).type(dtype).view(-1, 1)

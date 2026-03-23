@@ -50,7 +50,7 @@ def display_samples(ax, x, color):
 #   \alpha ~=~ \frac{1}{N}\sum_{i=1}^N \delta_{x_i}, ~~~
 #   \beta  ~=~ \frac{1}{M}\sum_{j=1}^M \delta_{y_j}.
 
-N, M = (50, 50) if not use_cuda else (10000, 10000)
+N, M = (10, 10) if not use_cuda else (10000, 10000)
 
 t_i = torch.linspace(0, 1, N).type(dtype).view(-1, 1)
 t_j = torch.linspace(0, 1, M).type(dtype).view(-1, 1)

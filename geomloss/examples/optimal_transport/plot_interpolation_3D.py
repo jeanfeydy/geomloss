@@ -158,7 +158,7 @@ fast_demo = False if use_cuda else True
 if use_cuda:
     Npoints = 1e4 if fast_demo else 2e5
 else:
-    Npoints = 1e3
+    Npoints = 1e2
 
 ##############################################################
 # Create a reference template:

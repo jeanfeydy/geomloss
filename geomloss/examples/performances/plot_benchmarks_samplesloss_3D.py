@@ -22,9 +22,9 @@ use_cuda = torch.cuda.is_available()
 
 from geomloss import SamplesLoss
 
-MAXTIME = 10 if use_cuda else 1  # Max number of seconds before we break the loop
+MAXTIME = 10 if use_cuda else .01  # Max number of seconds before we break the loop
 REDTIME = (
-    2 if use_cuda else 0.2
+    2 if use_cuda else .01
 )  # Decrease the number of runs if computations take longer than 2s...
 D = 3  # Let's do this in 3D
 

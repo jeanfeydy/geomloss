@@ -1,4 +1,4 @@
-"""
+r"""
 2) Kernel truncation, log-linear runtimes
 =====================================================
 
@@ -261,7 +261,7 @@ def display_samples(ax, x, weights, color, v=None):
 #   \alpha ~=~ \sum_{i=1}^N \alpha_i\,\delta_{x_i}, ~~~
 #   \beta  ~=~ \sum_{j=1}^M \beta_j\,\delta_{y_j}.
 
-sampling = 10 if not use_cuda else 2
+sampling = 20 if not use_cuda else 2
 
 A_i, X_i = draw_samples("data/ell_a.png", sampling)
 B_j, Y_j = draw_samples("data/ell_b.png", sampling)
@@ -278,7 +278,7 @@ from geomloss import SamplesLoss
 
 
 scaling, Nits = 0.5, 9
-cluster_scale = 0.1 if not use_cuda else 0.05
+cluster_scale = 0.2 if not use_cuda else 0.05
 
 plt.figure(figsize=((12, ((Nits - 1) // 3 + 1) * 4)))
 

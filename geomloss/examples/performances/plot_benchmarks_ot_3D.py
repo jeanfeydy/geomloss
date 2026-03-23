@@ -340,7 +340,7 @@ targets = [
 # while making sure that weights still sum up to one:
 
 
-def subsample(measure, decimation=500):
+def subsample(measure, decimation=2000):
     weights, locations = measure
     weights, locations = weights[::decimation], locations[::decimation]
     weights = weights / weights.sum()
@@ -458,7 +458,7 @@ plt.tight_layout()
 #
 
 
-maxtime = 100 if use_cuda else 1
+maxtime = 100 if use_cuda else .1
 
 full_statistics(sources[0], targets[0], blur=0.10, maxtime=maxtime)
 
