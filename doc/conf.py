@@ -73,7 +73,7 @@ sphinx_gallery_conf = {
     # path where to save gallery generated examples
     "gallery_dirs": ["./_auto_examples"],
     "within_subsection_order": FileNameSortKey,
-    "ignore_pattern": ".*__init__\.py",
+    "ignore_pattern": r".*__init__\.py",
 }
 
 # Generate the API documentation when building

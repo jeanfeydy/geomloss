@@ -45,6 +45,7 @@ test = [
   "pytest-sphinx @ git+https://github.com/jeanfeydy/pytest-sphinx.git",
 ]
 docs = [
+  "recommonmark",
   "furo",
   "myst_parser>=0.13",
   # To generate GIFs
