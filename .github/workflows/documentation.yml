@@ -21,6 +21,8 @@ jobs:
   build_documentation:
     name: Build Documentation
     if: |
+      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'release' ||
       contains(github.event.head_commit.message, '[doc]') || 
       contains(github.event.pull_request.title, '[doc]')
     runs-on: ubuntu-latest
