@@ -1,6 +1,6 @@
 r"""
 Wasserstein distances between large point clouds
-==========================================================
+================================================
 
 Let's compare the performances of several OT solvers
 on subsampled versions of the `Stanford dragon <http://graphics.stanford.edu/data/3Dscanrep/>`_,
@@ -138,10 +138,7 @@ sinkhorn_solver = lambda blur, nits, backend: partial(
 # Feel free to have a look!
 
 
-from geomloss.examples.performances.benchmarks_ot_solvers import (
-    benchmark_solver,
-    benchmark_solvers,
-)
+from benchmarks_ot_solvers import benchmark_solver, benchmark_solvers
 
 ######################################################################
 # The GeomLoss routines rely on a **scaling** parameter to tune
@@ -285,7 +282,7 @@ def full_statistics(source, target, blur=0.01, maxtime=None):
 # as the target meshes:
 #
 
-from geomloss.examples.performances.benchmarks_ot_solvers import create_sphere
+from benchmarks_ot_solvers import create_sphere
 
 sources = [create_sphere(npoints) for npoints in [1e4, 5e4, 2e5, 8e5]]
 
@@ -310,10 +307,7 @@ if not os.path.exists("data/dragon_recon/dragon_vrip_res4.ply"):
 # To read the raw ``.ply`` ascii files, we rely on the
 # `plyfile <https://github.com/dranjan/python-plyfile>`_ package:
 
-from geomloss.examples.performances.benchmarks_ot_solvers import (
-    load_ply_file,
-    display_cloud,
-)
+from benchmarks_ot_solvers import load_ply_file, display_cloud
 
 
 ############################################################

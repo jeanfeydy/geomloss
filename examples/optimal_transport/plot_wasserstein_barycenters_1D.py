@@ -108,9 +108,7 @@ def display_samples(ax, x, color, weights=None, blur=0.002):
 # descent on the **log-weights** :math:`l_k = \log(\gamma_k)`:
 
 
-from geomloss.examples.optimal_transport.model_fitting import (
-    fit_model,
-)  # Wrapper around scipy.optimize
+from model_fitting import fit_model  # Wrapper around scipy.optimize
 from torch.nn import Module, Parameter  # PyTorch syntax for optimization problems
 
 

@@ -60,14 +60,14 @@ from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
 sphinx_gallery_conf = {
     # path to your examples scripts
-    "examples_dirs": ["../geomloss/examples"],
+    "examples_dirs": ["../examples"],
     "subsection_order": ExplicitOrder(
         [
-            "../geomloss/examples/comparisons",
-            "../geomloss/examples/sinkhorn_multiscale",
-            "../geomloss/examples/optimal_transport",
-            "../geomloss/examples/performances",
-            "../geomloss/examples/brain_tractograms",
+            "../examples/comparisons",
+            "../examples/sinkhorn_multiscale",
+            "../examples/optimal_transport",
+            "../examples/performances",
+            "../examples/brain_tractograms",
         ]
     ),
     # path where to save gallery generated examples

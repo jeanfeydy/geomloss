@@ -106,22 +106,22 @@ venv.bak/
 
 # Build junk
 *build*
-geomloss/examples/performances/output/*
-!geomloss/examples/performances/output/.gitkeep
+examples/performances/output/*
+!examples/performances/output/.gitkeep
 !*input_output.py
 /build/*
 !/build/.gitkeep
 *_auto_examples*
 *_auto_tutorials*
 
-geomloss/examples/performances/data/*
-!geomloss/examples/performances/data/.gitkeep
+examples/performances/data/*
+!examples/performances/data/.gitkeep
 
-geomloss/examples/brain_tractograms/data/*
-!geomloss/examples/brain_tractograms/data/.gitkeep
+examples/brain_tractograms/data/*
+!examples/brain_tractograms/data/.gitkeep
 
-geomloss/examples/optimal_transport/data/wasserstein_3D_models*
-geomloss/examples/optimal_transport/output*
+examples/optimal_transport/data/wasserstein_3D_models*
+examples/optimal_transport/output*
 
 *.ipynb
 launch.json
