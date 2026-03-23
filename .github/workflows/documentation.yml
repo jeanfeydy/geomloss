@@ -20,7 +20,9 @@ jobs:
 
   build_documentation:
     name: Build Documentation
-    if: contains(github.event.head_commit.message, "[doc]")
+    if: |
+      contains(github.event.head_commit.message, '[doc]') || 
+      contains(github.event.pull_request.title, '[doc]')
     runs-on: ubuntu-latest
 
     permissions:
