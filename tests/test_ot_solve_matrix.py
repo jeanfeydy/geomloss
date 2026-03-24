@@ -6,7 +6,8 @@ from hypothesis import strategies as st
 
 from geomloss import ot
 from geomloss import backends as bk
-from geomloss.ot.tests.common import cast
+from .generators.common import cast
+from . import generators
 from .check_ot_result import (
     check_ot_result,
     check_ot_result_symmetric,
@@ -193,7 +194,7 @@ def test_correct_values_diracs(method, **kwargs):
     """Checks correctness on trivial 1-by-1 cost matrices."""
 
     # Load our test case:
-    ex = ot.tests.diracs_matrix(**kwargs)
+    ex = generators.diracs_matrix(**kwargs)
     # Run it and check correctness:
     check_solve_correct_values(ex, method=method)
 
@@ -206,7 +207,7 @@ def test_correct_values_permutations(N, method, **kwargs):
     """Checks correctness on (N,N) cost matrix whose associated transport plan is a permutation matrix."""
 
     # Load our test case:
-    ex = ot.tests.permutations_matrix(N=N, **kwargs)
+    ex = generators.permutations_matrix(N=N, **kwargs)
     # Run it and check correctness:
     check_solve_correct_values(ex, method=method)
 
@@ -220,7 +221,7 @@ def test_correct_values_random(N, method, **kwargs):
     """Checks correctness on random (N,N) cost matrices (ground truth = scipy)."""
 
     # Load our test case:
-    ex = ot.tests.random_matrix(N=N, **kwargs)
+    ex = generators.random_matrix(N=N, **kwargs)
     # Run it and check correctness:
     check_solve_correct_values(ex, method=method)
 
@@ -239,7 +240,7 @@ def test_correct_values_convex_gradients(N, D, method, **kwargs):
     """
 
     # Load our test case:
-    ex = ot.tests.convex_gradients_matrix(N=N, D=D, **kwargs)
+    ex = generators.convex_gradients_matrix(N=N, D=D, **kwargs)
     # Run it and check correctness:
     check_solve_correct_values(ex, method=method)
 
@@ -270,7 +271,7 @@ def test_correct_values_gaussians(N, M, D, debias, blur, reach, method, **kwargs
     """
 
     # Load our test case:
-    ex = ot.tests.gaussians_matrix(
+    ex = generators.gaussians_matrix(
         N=N,
         M=M,
         D=D,

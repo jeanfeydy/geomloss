@@ -130,3 +130,5 @@ launch.json
 *debug*.png
 
 doc/sg_execution_times.rst
+
+.vscode
