@@ -1,16 +1,17 @@
 import numpy as np
-from .common import ExpectedOTResult, cast
+from .common import OTExperimentConfig, ExpectedOTResult, cast
+from .common import st_batchsize, st_library_dtype_device
+from hypothesis import strategies as st
+from hypothesis.extra.numpy import arrays as st_arrays
 
-
-def diracs_matrix(
-    *,
-    batchsize,
-    **kwargs,
-):
+@st.composite
+def st_diracs_matrix(draw):
     """Generates a minimal (1,1) cost matrix and computes the expected solutions in closed form.
 
     This example is used by tests/test_ot_solve_matrix.py.
     """
+
+    batchsize = draw(st_batchsize)  # integer, 0 means no batch mode
 
     # Generate some random data ----------------------------------------------------------
     # We use a simple configuration with one source point and one target point:
@@ -18,7 +19,12 @@ def diracs_matrix(
 
     a = np.ones((B, N))
     b = np.ones((B, M))
-    C = 200 * (np.random.rand(B, N, M) - 0.5)  # Random values in [-100,100)
+    C = draw(st_arrays(
+        dtype=np.float64, 
+        shape=(B, N, M),
+        elements=st.floats(min_value=-100, max_value=100),  # TODO: support inf and NaN
+    ))
+
     value = C.reshape(B)
     plan = np.ones((B, N, M))
     potential_a = C.reshape(B, N) / 2
@@ -31,14 +37,15 @@ def diracs_matrix(
         potential_a, potential_b = potential_a[0], potential_b[0]
 
     return cast(
-        {
-            "a": None,
-            "b": None,
-            "C": C,
-            "maxiter": 100,
-            "reg": 1e-4,
-            "atol": 1e-2,
-            "result": ExpectedOTResult(
+        OTExperimentConfig(
+             # We also want to test the case where a and b are None (i.e. uniform weights)
+            a=draw(st.just(a) | st.none()),
+            b=draw(st.just(b) | st.none()),
+            C=C,
+            maxiter=100,
+            reg=1e-4,
+            atol=1e-2,
+            result=ExpectedOTResult(
                 value=value,
                 # value_linear=value,
                 plan=plan,
@@ -47,6 +54,6 @@ def diracs_matrix(
                 marginal_a=a,
                 marginal_b=b,
             ),
-        },
-        **kwargs,
+        ),
+        **draw(st_library_dtype_device),
     )

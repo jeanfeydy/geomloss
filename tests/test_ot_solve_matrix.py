@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 
 from geomloss import ot
 from geomloss import backends as bk
-from .generators.common import cast
+from .generators.common import cast, OTExperimentConfig
 from . import generators
 from .check_ot_result import (
     check_ot_result,
@@ -18,7 +18,7 @@ from .check_ot_result import (
 generic_parameters = {
     "N": st.integers(min_value=1, max_value=10),
     "M": st.integers(min_value=1, max_value=10),
-    "maxiter": st.integers(min_value=1, max_value=100),
+    "maxiter": st.integers(min_value=1, max_value=50),
     "debias": st.sampled_from([False]),
     "reg": st.floats(min_value=1e-2, max_value=10.0),
     "reg_type": st.sampled_from(["relative entropy"]),
@@ -37,6 +37,8 @@ all_configs = {
     "dtype": st.sampled_from(["float32", "float64"]),
     "device": st.sampled_from(["cpu", "cuda"]),
 }
+
+st_method = st.sampled_from(["auto"])
 
 
 # ========================================================================================
@@ -189,14 +191,36 @@ def check_solve_correct_values(ex, *, method):
     check_ot_result(us, ex["result"], atol=ex["atol"])
 
 
-@given(**all_configs)
-def test_correct_values_diracs(method, **kwargs):
-    """Checks correctness on trivial 1-by-1 cost matrices."""
 
-    # Load our test case:
-    ex = generators.diracs_matrix(**kwargs)
-    # Run it and check correctness:
-    check_solve_correct_values(ex, method=method)
+def check_solver(
+    ex: OTExperimentConfig, 
+    *, 
+    method: str,
+    ):
+    """Runs the ot.solve() matrix solver and checks the result."""
+
+    # Compute a solution with high precision settings:
+    ours = ot.solve(
+        ex.C,
+        a=ex.a,
+        b=ex.b,
+        reg=ex.reg,
+        unbalanced=ex.unbalanced,
+        maxiter=ex.maxiter,
+        method=method,
+    )
+    # Check that all the attributes have the expected values:
+    check_ot_result(ours, ex.result, atol=ex.atol)
+
+
+
+@given(
+    experiment=generators.st_diracs_matrix(),
+    method=st_method,
+)
+def test_correct_values_diracs(experiment, method):
+    """Checks correctness on trivial 1-by-1 cost matrices."""
+    check_solver(experiment, method=method)
 
 
 @given(

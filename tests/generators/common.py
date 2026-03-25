@@ -1,5 +1,7 @@
 import numpy as np
 from typing import NamedTuple, Any
+from hypothesis import strategies as st
+from dataclasses import dataclass
 
 try:
     import torch
@@ -16,7 +18,22 @@ except:
     cuda_available = False
 
 
-class ExpectedOTResult(NamedTuple):
+st_batchsize = st.integers(min_value=0, max_value=2)  # 0 means no batch mode
+
+st_library = st.sampled_from(["numpy", "torch"])
+st_dtype = st.sampled_from(["float32", "float64"])
+st_device = st.sampled_from(["cpu", "cuda"])
+
+st_library_dtype_device = st.fixed_dictionaries(
+    {
+        "library": st_library,
+        "dtype": st_dtype,
+        "device": st_device,
+    }
+)
+
+@dataclass
+class ExpectedOTResult:
     """Stores the expected results of an OT solver following the OTResult API."""
 
     value: Any = None
@@ -34,11 +51,31 @@ class ExpectedOTResult(NamedTuple):
     b_to_a: Any = None
 
 
+@dataclass
+class OTExperimentConfig:
+    a: Any
+    b: Any
+    C: Any
+    maxiter: int
+    reg: float
+    atol: float
+    result: ExpectedOTResult
+    unbalanced: Any = None
+
+
+
 def cast(x, *, library, dtype, device):
     """Casts a NumPy array to the expected Tensor type.
 
     Containers (dict and ExpectedOTResult) are handled recursively.
     """
+
+    # We may need to apply cast recursively:
+    def transform_mapping(mapping):
+        return {
+            k: cast(v, library=library, dtype=dtype, device=device) 
+            for k, v in mapping.items()
+        }
 
     if library == "torch" and not torch_available:
         raise ImportError(
@@ -68,18 +105,10 @@ def cast(x, *, library, dtype, device):
         return None
 
     elif isinstance(x, dict):
-        return {
-            key: cast(val, library=library, dtype=dtype, device=device)
-            for (key, val) in x.items()
-        }
+        return transform_mapping(x)
 
-    elif isinstance(x, ExpectedOTResult):
-        return ExpectedOTResult(
-            **{
-                key: cast(val, library=library, dtype=dtype, device=device)
-                for (key, val) in x._asdict().items()
-            }
-        )
+    elif isinstance(x, (OTExperimentConfig, ExpectedOTResult)):
+        return type(x)(**transform_mapping(x.__dict__))
 
     else:
         raise ValueError(
