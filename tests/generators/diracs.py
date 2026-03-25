@@ -19,10 +19,11 @@ def st_diracs_matrix(draw):
 
     a = np.ones((B, N))
     b = np.ones((B, M))
+    # TODO: support inf and NaN
     C = draw(st_arrays(
         dtype=np.float64, 
         shape=(B, N, M),
-        elements=st.floats(min_value=-100, max_value=100),  # TODO: support inf and NaN
+        elements=st.floats(min_value=-100, max_value=100),
     ))
 
     value = C.reshape(B)

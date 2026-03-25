@@ -240,7 +240,7 @@ def solve(
 
     # Actual computations ================================================================
     descent = annealing_parameters(
-        diameter=bk.amax(C),
+        diameter=bk.amax(C) - bk.amin(C),
         p=1,
         blur=reg,
         reach=unbalanced,

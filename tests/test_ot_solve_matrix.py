@@ -224,16 +224,12 @@ def test_correct_values_diracs(experiment, method):
 
 
 @given(
-    N=st.integers(min_value=1, max_value=10),
-    **all_configs,
+    experiment=generators.st_permutations_matrix(),
+    method=st_method,
 )
-def test_correct_values_permutations(N, method, **kwargs):
+def test_correct_values_permutations(experiment, method):
     """Checks correctness on (N,N) cost matrix whose associated transport plan is a permutation matrix."""
-
-    # Load our test case:
-    ex = generators.permutations_matrix(N=N, **kwargs)
-    # Run it and check correctness:
-    check_solve_correct_values(ex, method=method)
+    check_solver(experiment, method=method)
 
 
 @given(

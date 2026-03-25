@@ -19,6 +19,8 @@ except:
 
 
 st_batchsize = st.integers(min_value=0, max_value=2)  # 0 means no batch mode
+st_N = st.integers(min_value=1, max_value=10)
+st_M = st.integers(min_value=1, max_value=10)
 
 st_library = st.sampled_from(["numpy", "torch"])
 st_dtype = st.sampled_from(["float32", "float64"])
