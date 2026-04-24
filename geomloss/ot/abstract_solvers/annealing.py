@@ -1,8 +1,8 @@
-r"""This file controls the schedule for annealing schemes 
+r"""This file controls the schedule for annealing schemes
 (also known as "epsilon-scaling") in Sinkhorn solvers.
 
 The main reference for this file is Chapter 3.3 in Jean Feydy's PhD thesis:
-Geometric data analysis, beyond convolutions (2020), 
+Geometric data analysis, beyond convolutions (2020),
 https://www.jeanfeydy.com/geometric_data_analysis.pdf
 """
 

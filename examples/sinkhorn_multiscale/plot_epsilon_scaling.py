@@ -2,7 +2,7 @@
 1) Blur parameter, scaling strategy
 =====================================================
 
-Dating back to the work of `Schrödinger <http://www.numdam.org/article/AIHP_1932__2_4_269_0.pdf>`_ 
+Dating back to the work of `Schrödinger <http://www.numdam.org/article/AIHP_1932__2_4_269_0.pdf>`_
 - see e.g. `(Léonard, 2013) <https://arxiv.org/abs/1308.0215>`_ for a modern review -
 entropy-regularized Optimal Transport is all about
 solving the convex primal/dual problem:

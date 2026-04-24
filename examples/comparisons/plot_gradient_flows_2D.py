@@ -7,7 +7,6 @@ and **Sinkhorn** divergences on a simple toy problem:
 the registration of one blob onto another.
 """
 
-
 ##############################################
 # Setup
 # ---------------------

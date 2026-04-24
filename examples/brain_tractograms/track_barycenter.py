@@ -2,8 +2,8 @@
 Create an atlas using Wasserstein barycenters
 ==================================================
 
-In this tutorial, we compute the barycenter of a dataset of probability tracks. 
-The barycenter is computed as the Fréchet mean for the Sinkhorn divergence, using a Lagrangian optimization scheme. 
+In this tutorial, we compute the barycenter of a dataset of probability tracks.
+The barycenter is computed as the Fréchet mean for the Sinkhorn divergence, using a Lagrangian optimization scheme.
 """
 
 #############################################
@@ -31,7 +31,6 @@ import pdb
 
 import nibabel as nib
 import matplotlib.pyplot as plt
-
 
 ###############################################
 # Dataset

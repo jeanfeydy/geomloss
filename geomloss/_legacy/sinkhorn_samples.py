@@ -19,7 +19,6 @@ from .utils import scal, squared_distances, distances
 from .sinkhorn_divergence import epsilon_schedule, scaling_parameters
 from .sinkhorn_divergence import dampening, log_weights, sinkhorn_cost, sinkhorn_loop
 
-
 # ==============================================================================
 #                          backend == "tensorized"
 # ==============================================================================

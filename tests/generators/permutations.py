@@ -4,6 +4,7 @@ from .common import st_N, st_batchsize, st_library_dtype_device
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays as st_arrays
 
+
 @st.composite
 def st_permutations_matrix(draw):
     """Generates a random (N,N) cost matrix whose associated transport plan is a permutation matrix.
@@ -26,17 +27,21 @@ def st_permutations_matrix(draw):
 
     # Generate a random cost matrix with values larger than threshold
     # TODO: support inf and NaN
-    C = draw(st_arrays(
-        dtype=np.float64, 
-        shape=(B, N, M),
-        elements=st.floats(min_value=threshold, max_value=10000),
-    ))
+    C = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N, M),
+            elements=st.floats(min_value=threshold, max_value=10000),
+        )
+    )
     # except for N small values in each batch, which we will put in C[i, sigma[i]] to ensure that the optimal plan is a permutation matrix:
-    small_values = draw(st_arrays(
-        dtype=np.float64,
-        shape=(B, N),
-        elements=st.floats(min_value=-1000, max_value=threshold - gap),
-    ))
+    small_values = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N),
+            elements=st.floats(min_value=-1000, max_value=threshold - gap),
+        )
+    )
 
     # Ensure that we will retrieve a given permutation matrix by putting
     # small values in C[i, sigma[i]]:

@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from torch.nn.functional import conv1d, avg_pool2d, avg_pool3d, interpolate
 
-
 try:  # Import the keops library, www.kernel-operations.io
     from pykeops.torch import LazyTensor
 

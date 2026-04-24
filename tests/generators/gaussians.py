@@ -186,9 +186,7 @@ def C_sigma(*, A, B, sigma):
     d = len(A)
     A_12 = sqrtm(A)
     A_m12 = inv(A_12)
-    return 0.5 * A_12 @ D_sigma(A=A, B=B, sigma=sigma) @ A_m12 - 0.5 * sigma**2 * eye(
-        d
-    )
+    return 0.5 * A_12 @ D_sigma(A=A, B=B, sigma=sigma) @ A_m12 - 0.5 * sigma**2 * eye(d)
 
 
 def pi_sigma(*, a, A, b, B, sigma):
@@ -302,9 +300,7 @@ def Sinkhorn_barycenters(*, w, a, A, sigma):
 def UOT_cost_masses(*, m_a, m_b, m_pi, sigma, gamma):
     """Implements Eq. (37)."""
     return (
-        gamma * (m_a + m_b)
-        + 2 * sigma**2 * m_a * m_b
-        - 2 * (sigma**2 + gamma) * m_pi
+        gamma * (m_a + m_b) + 2 * sigma**2 * m_a * m_b - 2 * (sigma**2 + gamma) * m_pi
     )
 
 
@@ -485,14 +481,10 @@ def gaussians_matrix(
     # Geometry:
     # We sample the two distributions on regular grids on [-1,2]^D:
     x_i = np.linspace(-1, 2, N)
-    x_i = np.stack(np.meshgrid(*((x_i,) * D), indexing="ij"), axis=-1).reshape(
-        N**D, D
-    )
+    x_i = np.stack(np.meshgrid(*((x_i,) * D), indexing="ij"), axis=-1).reshape(N**D, D)
 
     y_j = np.linspace(-1, 2, M)
-    y_j = np.stack(np.meshgrid(*((y_j,) * D), indexing="ij"), axis=-1).reshape(
-        M**D, D
-    )
+    y_j = np.stack(np.meshgrid(*((y_j,) * D), indexing="ij"), axis=-1).reshape(M**D, D)
 
     # Matrix of squared distances (not halved), following the convention of Janati et al.:
     C = np.sum((x_i.reshape(N**D, 1, D) - y_j.reshape(1, M**D, D)) ** 2, axis=-1)

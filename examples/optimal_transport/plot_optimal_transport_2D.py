@@ -6,7 +6,6 @@ Let's use the gradient of the Sinkhorn
 divergence to compute an Optimal Transport map.
 """
 
-
 ##############################################
 # Setup
 # ---------------------

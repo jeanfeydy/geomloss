@@ -23,7 +23,7 @@ def sinkhorn_initialization(
 ) -> RealTensor:
     # TODO: handle properly the unbalanced case, and non-probability measures.
     f_ba = softmin(float("inf"), log_b, C_xy, 0 * log_b)  # a -> b
-    constant_offset = .5 * bk.dot_products(bk.exp(log_a), f_ba)
+    constant_offset = 0.5 * bk.dot_products(bk.exp(log_a), f_ba)
     assert constant_offset.ndim == 1
     f_ba = f_ba - bk.view(constant_offset, (-1, *(1,) * (f_ba.ndim - 1)))
     return dampen(f_ba)
@@ -238,7 +238,7 @@ def sinkhorn_loop(
     g_ab = sinkhorn_initialization(log_b, log_a, C.yx, softmin, dampen)  # a -> b
 
     if debias:
-        f_aa = sinkhorn_initialization(log_a, log_a, C.xx, softmin, dampen) # a -> a
+        f_aa = sinkhorn_initialization(log_a, log_a, C.xx, softmin, dampen)  # a -> a
         g_bb = sinkhorn_initialization(log_b, log_b, C.yy, softmin, dampen)  # b -> b
 
     # Lines 4-5: eps-scaling descent ---------------------------------------------------
@@ -426,8 +426,8 @@ def sinkhorn_loop(
         # The cross-updates *must* be done in parallel!
         # Do *not* split this coupled update.
         f_ba, g_ab = (
-            dampen(softmin(eps, bk.detach(log_b), C.xy,  bk.detach(g_ab))),
-            dampen(softmin(eps, bk.detach(log_a), C.yx,  bk.detach(f_ba))),
+            dampen(softmin(eps, bk.detach(log_b), C.xy, bk.detach(g_ab))),
+            dampen(softmin(eps, bk.detach(log_a), C.yx, bk.detach(f_ba))),
         )
 
         if debias:

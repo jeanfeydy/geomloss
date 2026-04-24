@@ -34,6 +34,7 @@ st_library_dtype_device = st.fixed_dictionaries(
     }
 )
 
+
 @dataclass
 class ExpectedOTResult:
     """Stores the expected results of an OT solver following the OTResult API."""
@@ -67,7 +68,6 @@ class OTExperimentConfig:
     CT: Any = None
 
 
-
 def cast(x, *, library, dtype, device):
     """Casts a NumPy array to the expected Tensor type.
 
@@ -77,7 +77,7 @@ def cast(x, *, library, dtype, device):
     # We may need to apply cast recursively:
     def transform_mapping(mapping):
         return {
-            k: cast(v, library=library, dtype=dtype, device=device) 
+            k: cast(v, library=library, dtype=dtype, device=device)
             for k, v in mapping.items()
         }
 

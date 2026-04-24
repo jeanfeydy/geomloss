@@ -2,7 +2,7 @@ import pytest_check as check
 from geomloss import backends as bk
 
 
-def check_approx_equal(a, b, atol=0., rtol=0., name=""):
+def check_approx_equal(a, b, atol=0.0, rtol=0.0, name=""):
     """Checks that two numerical arrays are nearly the same.
 
     If b is None, we skip the checks.
@@ -73,8 +73,12 @@ def check_ot_result(us, gt, atol=1e-3, rtol=0.0):
         )
 
     # Check that the two marginals are correct:
-    check_approx_equal(us.marginal_a, gt.marginal_a, atol=atol, rtol=rtol, name="marginal_a")
-    check_approx_equal(us.marginal_b, gt.marginal_b, atol=atol, rtol=rtol, name="marginal_b")
+    check_approx_equal(
+        us.marginal_a, gt.marginal_a, atol=atol, rtol=rtol, name="marginal_a"
+    )
+    check_approx_equal(
+        us.marginal_b, gt.marginal_b, atol=atol, rtol=rtol, name="marginal_b"
+    )
 
     # Check that the barycentric mappings are correct:
     if gt.a_to_b is not None:
@@ -89,19 +93,33 @@ def check_ot_result_symmetric(a_to_b, b_to_a, *, transpose, atol=1e-4, rtol=0.0)
 
     if a_to_b.value_linear is not None:
         check_approx_equal(
-            a_to_b.value_linear, b_to_a.value_linear, atol=atol, rtol=rtol, name="value_linear"
+            a_to_b.value_linear,
+            b_to_a.value_linear,
+            atol=atol,
+            rtol=rtol,
+            name="value_linear",
         )
 
     # Transport plan:
-    check_approx_equal(a_to_b.plan, transpose(b_to_a.plan), atol=atol, rtol=rtol, name="plan")
+    check_approx_equal(
+        a_to_b.plan, transpose(b_to_a.plan), atol=atol, rtol=rtol, name="plan"
+    )
 
     # Dual potentials:
     if a_to_b.potential_a is not None:
         check_approx_equal(
-            a_to_b.potential_a, b_to_a.potential_b, atol=atol, rtol=rtol, name="potential_a"
+            a_to_b.potential_a,
+            b_to_a.potential_b,
+            atol=atol,
+            rtol=rtol,
+            name="potential_a",
         )
         check_approx_equal(
-            a_to_b.potential_b, b_to_a.potential_a, atol=atol, rtol=rtol, name="potential_b"
+            a_to_b.potential_b,
+            b_to_a.potential_a,
+            atol=atol,
+            rtol=rtol,
+            name="potential_b",
         )
 
     # Two marginals:
@@ -114,8 +132,12 @@ def check_ot_result_symmetric(a_to_b, b_to_a, *, transpose, atol=1e-4, rtol=0.0)
 
     # Check that the barycentric mappings are correct:
     if a_to_b.a_to_b is not None:
-        check_approx_equal(a_to_b.a_to_b, b_to_a.b_to_a, atol=atol, rtol=rtol, name="a_to_b")
-        check_approx_equal(a_to_b.b_to_a, b_to_a.a_to_b, atol=atol, rtol=rtol, name="b_to_a")
+        check_approx_equal(
+            a_to_b.a_to_b, b_to_a.b_to_a, atol=atol, rtol=rtol, name="a_to_b"
+        )
+        check_approx_equal(
+            a_to_b.b_to_a, b_to_a.a_to_b, atol=atol, rtol=rtol, name="b_to_a"
+        )
 
 
 def check_ot_result_cost_linearity(normal, scaled, *, scaling, offset, atol=1e-2):
@@ -138,7 +160,9 @@ def check_ot_result_cost_linearity(normal, scaled, *, scaling, offset, atol=1e-2
     check_approx_equal(normal.plan, scaled.plan, atol=atol, name="plan")
 
     # Check that the two dual potentials are correct.
-    if False: # normal.potential_a is not None:  # (Only if we expect to return the dual potentials)
+    if (
+        False
+    ):  # normal.potential_a is not None:  # (Only if we expect to return the dual potentials)
         # Since the pair of dual potentials is only defined up to an additive constant
         # for the Monge-Kantorovitch (= unregularized OT) problem,
         # we check that both vectors are equal when we remove the mean,
@@ -169,10 +193,16 @@ def check_ot_result_cost_linearity(normal, scaled, *, scaling, offset, atol=1e-2
             name="sum(dual_potentials)",
         )
         check_approx_equal(
-            scaling * (normal_a - mean_normal_a), scaled_a - mean_scaled_a, atol=atol, name="potential_a"
+            scaling * (normal_a - mean_normal_a),
+            scaled_a - mean_scaled_a,
+            atol=atol,
+            name="potential_a",
         )
         check_approx_equal(
-            scaling * (normal_b - mean_normal_b), scaled_b - mean_scaled_b, atol=atol, name="potential_b"
+            scaling * (normal_b - mean_normal_b),
+            scaled_b - mean_scaled_b,
+            atol=atol,
+            name="potential_b",
         )
 
     # Two marginals:

@@ -6,7 +6,6 @@ Let's use a custom clustering scheme to generalize the
 **multiscale** Sinkhorn algorithm to high-dimensional settings.
 """
 
-
 ##############################################
 # Setup
 # ---------------------

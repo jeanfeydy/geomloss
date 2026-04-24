@@ -7,7 +7,6 @@ to select the backend and truncation/scaling values that
 are best suited to your data.
 """
 
-
 ##############################################
 # Setup
 # ---------------------

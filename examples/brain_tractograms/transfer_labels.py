@@ -2,15 +2,14 @@
 Transferring labels from a segmented atlas
 =============================================
 
-We use a new multiscale algorithm for solving regularized Optimal Transport 
-problems on the GPU, with a linear memory footprint. 
+We use a new multiscale algorithm for solving regularized Optimal Transport
+problems on the GPU, with a linear memory footprint.
 
-We use the resulting smooth assignments to perform label transfer for atlas-based 
-segmentation of fiber tractograms. The parameters -- \emph{blur} and \emph{reach} -- 
-of our method are meaningful, defining the minimum and maximum distance at which 
+We use the resulting smooth assignments to perform label transfer for atlas-based
+segmentation of fiber tractograms. The parameters -- \emph{blur} and \emph{reach} --
+of our method are meaningful, defining the minimum and maximum distance at which
 two fibers are compared with each other. They can be set according to anatomical knowledge.
 """
-
 
 ##############################################
 # Setup

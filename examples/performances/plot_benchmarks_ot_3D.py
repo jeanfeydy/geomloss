@@ -7,7 +7,7 @@ on subsampled versions of the `Stanford dragon <http://graphics.stanford.edu/dat
 a standard test surface made up of more than **870,000 triangles**.
 In this benchmark, we measure timings on a simple registration task:
 the **optimal transport of a sphere onto the (subsampled) dragon**, using
-a quadratic ground cost 
+a quadratic ground cost
 :math:`\text{C}(x,y) = \tfrac{1}{2}\|x-y\|^2`
 in the ambient space :math:`\mathbb{R}^3`.
 
@@ -59,7 +59,6 @@ numpy = lambda x: x.detach().cpu().numpy()
 
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
 
 #############################################################
 # This tutorial is all about highlighting the differences between
@@ -309,7 +308,6 @@ if not os.path.exists("data/dragon_recon/dragon_vrip_res4.ply"):
 
 from benchmarks_ot_solvers import load_ply_file, display_cloud
 
-
 ############################################################
 # Our meshes are encoded using **one weighted Dirac mass per triangle**.
 # To keep things simple, we use as **targets** the subsamplings provided
@@ -452,7 +450,7 @@ plt.tight_layout()
 #
 
 
-maxtime = 100 if use_cuda else .1
+maxtime = 100 if use_cuda else 0.1
 
 full_statistics(sources[0], targets[0], blur=0.10, maxtime=maxtime)
 

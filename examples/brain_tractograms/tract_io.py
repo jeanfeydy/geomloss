@@ -4,7 +4,6 @@ Input-Output with brain tractograms
 
 """
 
-
 import argparse
 import os.path
 import sys

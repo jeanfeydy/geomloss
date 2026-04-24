@@ -107,5 +107,6 @@ def set_grad_enabled(typical_array, b):
 def scale(f, *, forward, backward):
     return forward * f
 
+
 def view(x, shape):
     return x.reshape(shape)

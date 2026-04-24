@@ -1,10 +1,10 @@
 from typing import Union, Tuple, List, Optional, Any, NamedTuple, Callable
 from numpy.typing import ArrayLike
 
-
 RealTensor = ArrayLike
 CostMatrix = Union[RealTensor, Any]
 CostFunction = Any
+
 
 # A CostMatrices object encodes the full information about cost
 # values between the supports of our two distributions,

@@ -40,6 +40,7 @@ ascontiguousarray = pick(
 # Array creation:
 ones_like = pick(numpy=bk_numpy.ones_like, torch=bk_torch.ones_like)
 
+
 # Conversion between NumPy arrays, PyTorch tensors...:
 def cast(x, *, shape, dtype, device, library):
     # `library` denotes the target library.

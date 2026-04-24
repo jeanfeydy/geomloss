@@ -9,7 +9,7 @@ from geomloss import backends as bk
 @st.composite
 def st_simple_matrix(draw):
     """Generates a minimal input configuration for ot.solve(...).
-    
+
     This example is used by tests/test_ot_solve_matrix.py.
     """
 
@@ -23,24 +23,30 @@ def st_simple_matrix(draw):
     B = max(1, batchsize)
 
     # TODO: support inf and NaN
-    C = draw(st_arrays(
-        dtype=np.float64, 
-        shape=(B, N, M),
-        elements=st.floats(min_value=-1000, max_value=1000),
-    ))  # (B,N,M)
-    
+    C = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N, M),
+            elements=st.floats(min_value=-1000, max_value=1000),
+        )
+    )  # (B,N,M)
+
     CT = np.transpose(C, (0, 2, 1))  # (B,M,N)
 
-    a = draw(st_arrays(
-        dtype=np.float64, 
-        shape=(B, N),
-        elements=st.floats(min_value=0.001, max_value=1000),
-    ))  # (B,N)
-    b = draw(st_arrays(
-        dtype=np.float64, 
-        shape=(B, M),
-        elements=st.floats(min_value=0.001, max_value=1000),
-    ))  # (B,M)
+    a = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N),
+            elements=st.floats(min_value=0.001, max_value=1000),
+        )
+    )  # (B,N)
+    b = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, M),
+            elements=st.floats(min_value=0.001, max_value=1000),
+        )
+    )  # (B,M)
 
     # If we use balanced OT, the measures must have the same mass:
     if probability:
@@ -48,11 +54,13 @@ def st_simple_matrix(draw):
         b = b / bk.sum(b, axis=1, keepdims=True)
 
     elif unbalanced is None:
-        total_mass = draw(st_arrays(
-            dtype=np.float64,
-            shape=(B, 1),
-            elements=st.floats(min_value=0.001, max_value=1000),
-        ))
+        total_mass = draw(
+            st_arrays(
+                dtype=np.float64,
+                shape=(B, 1),
+                elements=st.floats(min_value=0.001, max_value=1000),
+            )
+        )
         a = total_mass * (a / bk.sum(a, axis=1, keepdims=True))
         b = total_mass * (b / bk.sum(b, axis=1, keepdims=True))
 

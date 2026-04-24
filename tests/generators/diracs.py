@@ -29,11 +29,13 @@ def st_diracs_matrix(draw):
     a = np.ones((B, N))
     b = np.ones((B, M))
     # TODO: support inf and NaN
-    C = draw(st_arrays(
-        dtype=np.float64, 
-        shape=(B, N, M),
-        elements=st.floats(min_value=-100, max_value=100),
-    ))
+    C = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N, M),
+            elements=st.floats(min_value=-100, max_value=100),
+        )
+    )
 
     value = C.reshape(B)
     plan = np.ones((B, N, M))
@@ -48,7 +50,7 @@ def st_diracs_matrix(draw):
 
     return cast(
         OTExperimentConfig(
-             # We also want to test the case where a and b are None (i.e. uniform weights)
+            # We also want to test the case where a and b are None (i.e. uniform weights)
             a=draw(st.just(a) | st.none()),
             b=draw(st.just(b) | st.none()),
             C=C,

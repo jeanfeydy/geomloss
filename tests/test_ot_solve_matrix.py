@@ -81,7 +81,9 @@ def test_symmetry(ex, method):
     # Check that all the attributes coincide as expected:
     dims = (1, 0) if len(ex.C.shape) == 2 else (0, 2, 1)
     transpose = lambda plan: bk.transpose(plan, dims)
-    check_ot_result_symmetric(a_to_b, b_to_a, transpose=transpose, atol=ex.atol, rtol=ex.rtol)
+    check_ot_result_symmetric(
+        a_to_b, b_to_a, transpose=transpose, atol=ex.atol, rtol=ex.rtol
+    )
 
 
 @given(
@@ -122,13 +124,17 @@ def test_cost_linearity(
     offset = (use_offset * np.random.randn(1)).astype(dtype)[0]
 
     # Compute a direct solution:
-    normal = ot.solve(ex["C"], a=ex["a"], b=ex["b"], reg=reg, unbalanced=unbalanced, **params)
+    normal = ot.solve(
+        ex["C"], a=ex["a"], b=ex["b"], reg=reg, unbalanced=unbalanced, **params
+    )
     # Compute a reverse solution:
     s_C = scaling * ex["C"] + offset
     s_reg = scaling * reg
     s_unbalanced = None if unbalanced is None else scaling * unbalanced
 
-    scaled = ot.solve(s_C, a=ex["a"], b=ex["b"], reg=s_reg, unbalanced=s_unbalanced, **params)
+    scaled = ot.solve(
+        s_C, a=ex["a"], b=ex["b"], reg=s_reg, unbalanced=s_unbalanced, **params
+    )
 
     # Check that all the attributes coincide as expected:
     check_ot_result_cost_linearity(normal, scaled, scaling=scaling, offset=offset)
@@ -156,12 +162,11 @@ def check_solve_correct_values(ex, *, method):
     check_ot_result(us, ex["result"], atol=ex["atol"])
 
 
-
 def check_solver(
-    ex: OTExperimentConfig, 
-    *, 
+    ex: OTExperimentConfig,
+    *,
     method: str,
-    ):
+):
     """Runs the ot.solve() matrix solver and checks the result."""
 
     # Compute a solution with high precision settings:
@@ -176,7 +181,6 @@ def check_solver(
     )
     # Check that all the attributes have the expected values:
     check_ot_result(ours, ex.result, atol=ex.atol)
-
 
 
 @given(

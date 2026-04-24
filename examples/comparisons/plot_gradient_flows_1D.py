@@ -7,7 +7,6 @@ and **Sinkhorn** divergences on a simple toy problem:
 the registration of an interval onto another.
 """
 
-
 ##############################################
 # Setup
 # ---------------------

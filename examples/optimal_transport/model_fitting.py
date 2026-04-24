@@ -78,7 +78,7 @@ def fit_model(
     maxcor=10,
     gtol=1e-10,
     display=False,
-    **params
+    **params,
 ):
     """"""
 

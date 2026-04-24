@@ -13,7 +13,6 @@ from .kernel_samples import kernel_tensorized as hausdorff_tensorized
 from .kernel_samples import kernel_online as hausdorff_online
 from .kernel_samples import kernel_multiscale as hausdorff_multiscale
 
-
 routines = {
     "sinkhorn": {
         "tensorized": sinkhorn_tensorized,

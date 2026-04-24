@@ -102,7 +102,7 @@ def kernel_loss(
     ranges_xx=None,
     ranges_yy=None,
     ranges_xy=None,
-    **kwargs
+    **kwargs,
 ):
     if kernel is None:
         kernel = kernel_routines[name]
@@ -187,7 +187,7 @@ def kernel_multiscale(
     cluster_scale=None,
     potentials=False,
     verbose=False,
-    **kwargs
+    **kwargs,
 ):
     if truncate is None or name == "energy":
         return kernel_online(
@@ -200,7 +200,7 @@ def kernel_multiscale(
             truncate=truncate,
             name=name,
             potentials=potentials,
-            **kwargs
+            **kwargs,
         )
 
     # Renormalize our point cloud so that blur = 1:

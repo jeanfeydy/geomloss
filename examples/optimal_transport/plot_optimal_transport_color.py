@@ -6,7 +6,6 @@ Let's use the gradient of the Sinkhorn
 divergence to change the color palette of an image.
 """
 
-
 ##############################################
 # Setup
 # ---------------------

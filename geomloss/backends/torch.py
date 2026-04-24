@@ -127,5 +127,6 @@ class ScaleForwardBackward(torch.nn.Module):
 def scale(f, *, forward, backward):
     return ScaleForwardBackward(forward=forward, backward=backward)(f)
 
+
 def view(x, shape):
     return x.view(shape)

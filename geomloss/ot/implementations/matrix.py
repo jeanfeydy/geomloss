@@ -23,7 +23,6 @@ from ...arguments import (
     check_marginals,
 )
 
-
 # ========================================================================================
 #                          High-level public interface
 # ========================================================================================
@@ -419,11 +418,11 @@ def barycenter(
 
 
 def softmin_dense(
-        eps: float,
-        log_weights: RealTensor,
-        costs: RealTensor, 
-        potentials: RealTensor,
-        ) -> RealTensor:
+    eps: float,
+    log_weights: RealTensor,
+    costs: RealTensor,
+    potentials: RealTensor,
+) -> RealTensor:
     """Softmin function implemented on dense arrays, without using KeOps.
 
     The softmin function is at the heart of any (stable) implementation
@@ -460,13 +459,15 @@ def softmin_dense(
 
     assert g_y.shape == (B, M), "g_y should be a (B,M) Tensor."
     assert log_b_y.shape == (B, M), "log_b_y should be a (B,M) Tensor."
-    
+
     if eps == float("inf"):
         # TODO: handle the case where b is not a probability measure
         # Currently, we're "missing" the -eps * log(b_y.sum()) term.
         b_y = bk.exp(log_b_y)  # (B,M)
         sum_b = b_y.sum(axis=1, keepdims=True)  # (B,1)
-        f_i = ((C_xy - bk.view(g_y, (B, 1, M))) * bk.view(b_y, (B, 1, M))).sum(axis=2)  # (B,N)
+        f_i = ((C_xy - bk.view(g_y, (B, 1, M))) * bk.view(b_y, (B, 1, M))).sum(
+            axis=2
+        )  # (B,N)
         return f_i / sum_b
 
     elif eps == 0:

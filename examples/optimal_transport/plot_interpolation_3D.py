@@ -4,7 +4,6 @@
 N.B.: I am currently very busy writing my PhD thesis. Comments will come soon!
 """
 
-
 ################################################################################
 # Setup
 # ----------------------
@@ -26,7 +25,6 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from geomloss import SamplesLoss
 from pykeops.torch import LazyTensor
-
 
 ################################################################################
 # Utility: turn a triangle mesh into a weighted point cloud.

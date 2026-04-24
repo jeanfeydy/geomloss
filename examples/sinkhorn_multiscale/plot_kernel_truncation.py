@@ -276,7 +276,6 @@ B_j, Y_j = draw_samples("data/ell_b.png", sampling)
 from pykeops.torch.cluster import grid_cluster, cluster_ranges_centroids
 from geomloss import SamplesLoss
 
-
 scaling, Nits = 0.5, 9
 cluster_scale = 0.2 if not use_cuda else 0.05
 
