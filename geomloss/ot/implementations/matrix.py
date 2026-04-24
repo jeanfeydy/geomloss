@@ -418,35 +418,62 @@ def barycenter(
 # ========================================================================================
 
 
-def softmin_dense(eps: float, C_xy: RealTensor, G_y: RealTensor) -> RealTensor:
+def softmin_dense(
+        eps: float,
+        log_weights: RealTensor,
+        costs: RealTensor, 
+        potentials: RealTensor,
+        ) -> RealTensor:
     """Softmin function implemented on dense arrays, without using KeOps.
 
     The softmin function is at the heart of any (stable) implementation
     of the Sinkhorn algorithm. It takes as input:
     - a temperature eps(ilon),
-    - a cost matrix C_xy[i,j] = C(x[i],y[j]),
-    - a weighted dual potential G_y[j] = log(b(y[j])) + g_ab(y[j]) / eps.
+    - log_weights lb[j] = log(b(y[j])) of shape (B,M),
+    - a cost matrix C_xy[i,j] = C(x[i],y[j]) of shape (B, N, M),
+    - a weighted dual potential G_y[j] = g_ab(y[j]) of shape (B, M).
 
     It returns a new dual potential supported on the points x[i]:
-    f_x[i] = - eps * log(sum_j(exp( G_y[j]  -  C_xy[i,j] / eps )))
+    f_x[i] = - eps * log(sum_j(exp[ lb[j] + (G_y[j]  -  C_xy[i,j]) / eps ] ))
 
     In the Sinkhorn loop, we typically use calls like:
-        ft_ba = softmin(eps, C_xy, b_log + g_ab / eps)
+        ft_ba = softmin(eps, b_log, C_xy, g_ab)
 
     Args:
-        eps (float > 0): Positive temperature eps(ilon), the main regularization parameter
+        eps (float >= 0): Temperature eps(ilon), the main regularization parameter
             of the Sinkhorn algorithm.
-        C_xy ((B,N,M) real-valued Tensor): Batch of B cost matrices of shape (N,M).
-        G_y ((B,M) real-valued Tensor): Batch of B vectors of shape (M,).
+        log_weights ((B,M) real-valued Tensor): Batch of B vectors of shape (M,) containing
+            the logarithm of the weights of the measure b.
+        costs ((B,N,M) real-valued Tensor): Batch of B cost matrices of shape (N,M).
+        potentials ((B,M) real-valued Tensor): Batch of B vectors of shape (M,).
 
     Returns:
         (B,N) real-valued Tensor:
     """
-    assert eps > 0, "We only support positive temperatures (eps > 0)."
-    assert len(C_xy.shape) == 3, "C_xy should be a (B,N,M) Tensor."
-    assert len(G_y.shape) == 2, "G_y should be a (B,M) Tensor."
-    assert C_xy.shape[0] == G_y.shape[0], "Batch dimensions 'B' are incompatible."
-    assert C_xy.shape[2] == G_y.shape[1], "Numbers of columns 'M' are incompatible."
+    log_b_y = log_weights
+    C_xy = costs
+    g_y = potentials
 
-    scores_xy = G_y[:, None, :] - C_xy / eps  # (B,N,M)
-    return -eps * bk.logsumexp(scores_xy, axis=2)
+    assert eps >= 0, "We only support non-negative temperatures (eps >= 0)."
+    assert len(C_xy.shape) == 3, "C_xy should be a (B,N,M) Tensor."
+    B, N, M = C_xy.shape
+
+    assert g_y.shape == (B, M), "g_y should be a (B,M) Tensor."
+    assert log_b_y.shape == (B, M), "log_b_y should be a (B,M) Tensor."
+    
+    if eps == float("inf"):
+        # TODO: handle the case where b is not a probability measure
+        # Currently, we're "missing" the -eps * log(b_y.sum()) term.
+        b_y = bk.exp(log_b_y)  # (B,M)
+        sum_b = b_y.sum(axis=1, keepdims=True)  # (B,1)
+        f_i = ((C_xy - bk.view(g_y, (B, 1, M))) * bk.view(b_y, (B, 1, M))).sum(axis=2)  # (B,N)
+        return f_i / sum_b
+
+    elif eps == 0:
+        # TODO: handle the case where some of the b_y are zero
+        f_i = bk.amin(C_xy - bk.view(g_y, (B, 1, M)), axis=2)  # (B,N)
+        return f_i
+
+    else:
+        scores_xy = bk.view(log_b_y + g_y / eps, (B, 1, M)) - C_xy / eps  # (B,N,M)
+        return -eps * bk.logsumexp(scores_xy, axis=2)

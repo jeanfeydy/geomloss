@@ -67,3 +67,4 @@ set_grad_enabled = pick(
 )
 
 scale = pick(numpy=bk_numpy.scale, torch=bk_torch.scale)
+view = pick(numpy=bk_numpy.view, torch=bk_torch.view)

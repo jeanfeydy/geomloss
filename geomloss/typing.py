@@ -65,8 +65,9 @@ class DescentParameters(NamedTuple):
 SoftMin = Callable[
     [
         float,  # eps
+        RealTensor,  # log_weights_y
         CostMatrix,  # C_xy
-        RealTensor,  # G_y
+        RealTensor,  # g_y
     ],
     RealTensor,  # f_x
 ]

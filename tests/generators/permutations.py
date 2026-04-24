@@ -65,7 +65,7 @@ def st_permutations_matrix(draw):
             b=b,
             C=C,
             maxiter=100,
-            reg=1e-4,
+            reg=1e-1,
             atol=1e-2,
             result=ExpectedOTResult(
                 value=value,

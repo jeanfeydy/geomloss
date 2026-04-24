@@ -4,9 +4,18 @@ from .common import st_batchsize, st_library_dtype_device
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays as st_arrays
 
+# import torch
+# torch.set_printoptions(precision=8)
+
+
 @st.composite
 def st_diracs_matrix(draw):
     """Generates a minimal (1,1) cost matrix and computes the expected solutions in closed form.
+
+    Since this is a trivial example, we should have perfect results
+    with any regularization strength and number of iterations.
+    However, due to float32 cancellation issues, a value of epsilon < 1e-2
+    may lead to small inaccuracies in the transport plan.
 
     This example is used by tests/test_ot_solve_matrix.py.
     """
@@ -43,8 +52,8 @@ def st_diracs_matrix(draw):
             a=draw(st.just(a) | st.none()),
             b=draw(st.just(b) | st.none()),
             C=C,
-            maxiter=100,
-            reg=1e-4,
+            maxiter=draw(st.integers(min_value=1, max_value=50)),
+            reg=draw(st.floats(min_value=1e-2, max_value=10.0)),
             atol=1e-2,
             result=ExpectedOTResult(
                 value=value,

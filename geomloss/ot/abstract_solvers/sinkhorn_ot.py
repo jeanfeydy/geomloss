@@ -5,12 +5,28 @@ from ...typing import (
     Optional,
     SinkhornPotentials,
     SoftMin,
+    CostMatrix,
     CostMatrices,
     Extrapolator,
     KernelTruncation,
     DescentParameters,
 )
 from .unbalanced_ot import dampening
+
+
+def sinkhorn_initialization(
+    log_a: RealTensor,
+    log_b: RealTensor,
+    C_xy: CostMatrix,
+    softmin: SoftMin,
+    dampen: callable,
+) -> RealTensor:
+    # TODO: handle properly the unbalanced case, and non-probability measures.
+    f_ba = softmin(float("inf"), log_b, C_xy, 0 * log_b)  # a -> b
+    constant_offset = .5 * bk.dot_products(bk.exp(log_a), f_ba)
+    assert constant_offset.ndim == 1
+    f_ba = f_ba - bk.view(constant_offset, (-1, *(1,) * (f_ba.ndim - 1)))
+    return dampen(f_ba)
 
 
 def sinkhorn_loop(
@@ -75,14 +91,15 @@ def sinkhorn_loop(
         softmin (function): This routine must implement the (soft-)C-transform
             between dual vectors, which is the core computation for
             Auction- and Sinkhorn-like optimal transport solvers.
-            If `eps` is a float number, `C_xy` encodes a cost matrix :math:`C(x_i,y_j)`
+            If `eps` is a float number, `log_b` encodes the logarithm of weights :math:`\beta_j`,
+            `C_xy` encodes a cost matrix :math:`C(x_i,y_j)`
             and `g` encodes a dual potential :math:`g_j` that is supported by the points
-            :math:`y_j`'s, then `softmin(eps, C_xy, g)` must return a dual potential
+            :math:`y_j`'s, then `softmin(eps, log_b, C_xy, g)` must return a dual potential
             `f` for ":math:`f_i`", supported by the :math:`x_i`'s, that is equal to:
 
             .. math::
-                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \exp
-                \big[ g_j - C(x_i, y_j) / \varepsilon \big]~.
+                f_i \gets - \varepsilon \log \sum_{j=1}^{\text{M}} \beta_j \exp \tfrac{1}{\varepsilon}
+                \big[ g_j - C(x_i, y_j) \big]~.
 
             For more detail, see e.g. Section 3.3 and Eq. (3.186) in Jean Feydy's PhD thesis.
 
@@ -216,17 +233,13 @@ def sinkhorn_loop(
     log_a, log_b, C = log_a_list[scale], log_b_list[scale], C_list[scale]
 
     # Line 2 ---------------------------------------------------------------------------
-    # Start with a decent initialization for the dual vectors:
-    # N.B.: eps is really large here, so the log-sum-exp behaves as a sum
-    #       and the softmin is basically
-    #       a convolution with the cost function (i.e. the limit for eps=+infty).
-    #       The algorithm was originally written with this convolution
-    #       - but in this implementation, we use "softmin" for the sake of simplicity.
-    g_ab = dampen(softmin(eps, C.yx, log_a))  # a -> b
-    f_ba = dampen(softmin(eps, C.xy, log_b))  # b -> a
+    # Start with the optimal solution for eps = +infty.
+    f_ba = sinkhorn_initialization(log_a, log_b, C.xy, softmin, dampen)  # b -> a
+    g_ab = sinkhorn_initialization(log_b, log_a, C.yx, softmin, dampen)  # a -> b
+
     if debias:
-        f_aa = dampen(softmin(eps, C.xx, log_a))  # a -> a
-        g_bb = dampen(softmin(eps, C.yy, log_b))  # a -> a
+        f_aa = sinkhorn_initialization(log_a, log_a, C.xx, softmin, dampen) # a -> a
+        g_bb = sinkhorn_initialization(log_b, log_b, C.yy, softmin, dampen)  # b -> b
 
     # Lines 4-5: eps-scaling descent ---------------------------------------------------
     # See Fig. 3.25-26 in Jean Feydy's PhD thesis for intuitions.
@@ -243,15 +256,15 @@ def sinkhorn_loop(
         #       (for "f-tilde", "g-tilde") using the standard
         #       Sinkhorn formulas, and update both dual vectors
         #       simultaneously.
-        ft_ba = dampen(softmin(eps, C.xy, log_b + g_ab / eps))  # b -> a
-        gt_ab = dampen(softmin(eps, C.yx, log_a + f_ba / eps))  # a -> b
+        ft_ba = dampen(softmin(eps, log_b, C.xy, g_ab))  # b -> a
+        gt_ab = dampen(softmin(eps, log_a, C.yx, f_ba))  # a -> b
 
         # See Fig. 3.21 in Jean Feydy's PhD thesis to see the importance
         # of debiasing when the target "blur" or "eps**(1/p)" value is larger
         # than the average distance between samples x_i, y_j and their neighbours.
         if debias:
-            ft_aa = dampen(softmin(eps, C.xx, log_a + f_aa / eps))  # a -> a
-            gt_bb = dampen(softmin(eps, C.yy, log_b + g_bb / eps))  # b -> b
+            ft_aa = dampen(softmin(eps, log_a, C.xx, f_aa))  # a -> a
+            gt_bb = dampen(softmin(eps, log_b, C.yy, g_bb))  # b -> b
 
         # Symmetrized updates - see Fig. 3.24.b in Jean Feydy's PhD thesis:
         f_ba, g_ab = 0.5 * (f_ba + ft_ba), 0.5 * (g_ab + gt_ab)  # OT(a,b) wrt. a, b
@@ -413,13 +426,13 @@ def sinkhorn_loop(
         # The cross-updates *must* be done in parallel!
         # Do *not* split this coupled update.
         f_ba, g_ab = (
-            dampen(softmin(eps, C.xy, bk.detach(log_b + g_ab / eps))),
-            dampen(softmin(eps, C.yx, bk.detach(log_a + f_ba / eps))),
+            dampen(softmin(eps, bk.detach(log_b), C.xy,  bk.detach(g_ab))),
+            dampen(softmin(eps, bk.detach(log_a), C.yx,  bk.detach(f_ba))),
         )
 
         if debias:
-            f_aa = dampen(softmin(eps, C.xx, bk.detach(log_a + f_aa / eps)))
-            g_bb = dampen(softmin(eps, C.yy, bk.detach(log_b + g_bb / eps)))
+            f_aa = dampen(softmin(eps, bk.detach(log_a), C.xx, bk.detach(f_aa)))
+            g_bb = dampen(softmin(eps, bk.detach(log_b), C.yy, bk.detach(g_bb)))
 
     # If there is no de-biasing, we should define empty "self-attention"
     # potentials.
