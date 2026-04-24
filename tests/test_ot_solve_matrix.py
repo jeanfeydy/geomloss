@@ -87,57 +87,49 @@ def test_symmetry(ex, method):
 
 
 @given(
-    **generic_parameters,
-    **unbalanced_parameters,
-    **all_configs,
+    ex=generators.st_simple_matrix(),
+    scaling=st.floats(min_value=0.01, max_value=100.0),
+    offset=st.floats(min_value=-100.0, max_value=100.0),
+    method=st_method,
 )
-@pytest.mark.skip(reason="To investigate...")
 @pytest.mark.filterwarnings("ignore:overflow encountered in exp")
-def test_cost_linearity(
-    N,
-    M,
-    batchsize,
-    library,
-    dtype,
-    device,
-    reg,
-    unbalanced,
-    **params,
-):
-    """Checks that OT_{scaling * C}(a,b) = scaling * OT(a,b) if scaling > 0."""
-    ex = basic_example(
-        N=N,
-        M=M,
-        batchsize=batchsize,
-        # probability=(unbalanced is None),
-        unbalanced=unbalanced,
-        library=library,
-        dtype=dtype,
-        device=device,
-    )
+@pytest.mark.filterwarnings("ignore:overflow encountered in cast")
+def test_cost_linearity(ex, scaling, offset, method):
+    """Checks that OT_{scaling * C + offset}(a,b) = scaling * OT(a,b) + offset if scaling > 0."""
 
-    # N.B.: scaling must be > 0, and we must be sure that it is of the correct dtype
-    scaling = (0.01 + np.random.rand(1)).astype(dtype)[0]
     # TODO: Augment this test with an offset, only for the balanced case
     # This will require a "translation-invariant" initialization of the dual potentials.
     use_offset = 0  # 1 if unbalanced is None else 0
-    offset = (use_offset * np.random.randn(1)).astype(dtype)[0]
+    offset = use_offset * offset
 
     # Compute a direct solution:
     normal = ot.solve(
-        ex["C"], a=ex["a"], b=ex["b"], reg=reg, unbalanced=unbalanced, **params
+        ex.C,
+        a=ex.a,
+        b=ex.b,
+        reg=ex.reg,
+        unbalanced=ex.unbalanced,
+        maxiter=100,
+        method=method,
     )
-    # Compute a reverse solution:
-    s_C = scaling * ex["C"] + offset
-    s_reg = scaling * reg
-    s_unbalanced = None if unbalanced is None else scaling * unbalanced
+
+    # Compute a scaled solution:
+    s_unbalanced = None if ex.unbalanced is None else scaling * ex.unbalanced
 
     scaled = ot.solve(
-        s_C, a=ex["a"], b=ex["b"], reg=s_reg, unbalanced=s_unbalanced, **params
+        scaling * ex.C + offset,
+        a=ex.a,
+        b=ex.b,
+        reg=scaling * ex.reg,
+        unbalanced=s_unbalanced,
+        maxiter=100,
+        method=method,
     )
 
     # Check that all the attributes coincide as expected:
-    check_ot_result_cost_linearity(normal, scaled, scaling=scaling, offset=offset)
+    check_ot_result_cost_linearity(
+        normal, scaled, scaling=scaling, offset=offset, atol=1e-2, rtol=1e-2
+    )
 
 
 # ========================================================================================

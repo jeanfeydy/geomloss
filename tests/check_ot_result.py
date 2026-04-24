@@ -140,12 +140,18 @@ def check_ot_result_symmetric(a_to_b, b_to_a, *, transpose, atol=1e-4, rtol=0.0)
         )
 
 
-def check_ot_result_cost_linearity(normal, scaled, *, scaling, offset, atol=1e-2):
+def check_ot_result_cost_linearity(
+    normal, scaled, *, scaling, offset, atol=1e-4, rtol=0.0
+):
     """Checks that OT_{scaling * C}(a,b) = scaling * OT(a,b) if scaling > 0."""
 
     # Values:
     check_approx_equal(
-        scaling * normal.value + offset, scaled.value, atol=atol, name="value"
+        scaling * normal.value + offset,
+        scaled.value,
+        atol=atol,
+        rtol=rtol,
+        name="value",
     )
 
     if normal.value_linear is not None:
@@ -157,7 +163,7 @@ def check_ot_result_cost_linearity(normal, scaled, *, scaling, offset, atol=1e-2
         )
 
     # Transport plan:
-    check_approx_equal(normal.plan, scaled.plan, atol=atol, name="plan")
+    check_approx_equal(normal.plan, scaled.plan, atol=atol, rtol=rtol, name="plan")
 
     # Check that the two dual potentials are correct.
     if (
@@ -190,30 +196,37 @@ def check_ot_result_cost_linearity(normal, scaled, *, scaling, offset, atol=1e-2
             scaling * (mean_normal_a + mean_normal_b) + offset,
             mean_scaled_a + mean_scaled_b,
             atol=atol,
+            rtol=rtol,
             name="sum(dual_potentials)",
         )
         check_approx_equal(
             scaling * (normal_a - mean_normal_a),
             scaled_a - mean_scaled_a,
             atol=atol,
+            rtol=rtol,
             name="potential_a",
         )
         check_approx_equal(
             scaling * (normal_b - mean_normal_b),
             scaled_b - mean_scaled_b,
             atol=atol,
+            rtol=rtol,
             name="potential_b",
         )
 
     # Two marginals:
     check_approx_equal(
-        normal.marginal_a, scaled.marginal_a, atol=atol, name="marginal_a"
+        normal.marginal_a, scaled.marginal_a, atol=atol, rtol=rtol, name="marginal_a"
     )
     check_approx_equal(
-        normal.marginal_b, scaled.marginal_b, atol=atol, name="marginal_b"
+        normal.marginal_b, scaled.marginal_b, atol=atol, rtol=rtol, name="marginal_b"
     )
 
     # Check that the barycentric mappings are correct:
     if normal.a_to_b is not None:
-        check_approx_equal(normal.a_to_b, scaled.a_to_b, atol=atol, name="a_to_b")
-        check_approx_equal(normal.b_to_a, scaled.b_to_a, atol=atol, name="b_to_a")
+        check_approx_equal(
+            normal.a_to_b, scaled.a_to_b, atol=atol, rtol=rtol, name="a_to_b"
+        )
+        check_approx_equal(
+            normal.b_to_a, scaled.b_to_a, atol=atol, rtol=rtol, name="b_to_a"
+        )
