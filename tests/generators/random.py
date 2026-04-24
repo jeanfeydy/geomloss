@@ -1,18 +1,20 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from .common import ExpectedOTResult, cast
+from .common import OTExperimentConfig, ExpectedOTResult, cast
+from .common import st_N, st_batchsize, st_library_dtype_device
+from hypothesis import strategies as st
+from hypothesis.extra.numpy import arrays as st_arrays
 
 
-def random_matrix(
-    *,
-    N,
-    batchsize,
-    **kwargs,
-):
+@st.composite
+def st_random_matrix(draw):
     """Generates a random (N,N) cost matrix and computes the expected solution with scipy.
 
     This example is used by tests/test_ot_solve_matrix.py.
     """
+
+    N = draw(st.integers(min_value=1, max_value=4))  # small integer
+    batchsize = draw(st_batchsize)  # integer, 0 means no batch mode
 
     # Generate some random data ----------------------------------------------------------
     B, M = max(1, batchsize), N  # M = N, since we are dealing with square matrices
@@ -20,7 +22,14 @@ def random_matrix(
     # The marginals sum up to N:
     a = np.ones((B, N))
     b = np.ones((B, M))
-    C = 2 * (np.random.rand(B, N, M) - 0.5)  # Random values in [-1,1)
+
+    C = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N, M),
+            elements=st.floats(min_value=-1, max_value=1),
+        )
+    )
 
     # Use the SciPy implementation of the O(N^3) Jonker-Volgenant algorithm:
     value = np.zeros((B,))
@@ -38,20 +47,20 @@ def random_matrix(
     # N.B.: Sinkhorn multiscale really isn't very good for this type of unstructured
     #       problem, so we have to use a lot of iterations to ensure correctness.
     return cast(
-        {
-            "a": a,
-            "b": b,
-            "C": C,
-            "maxiter": 1000,
-            "reg": 1e-4,
-            "atol": 1e-2,
-            "result": ExpectedOTResult(
+        OTExperimentConfig(
+            a=a,
+            b=b,
+            C=C,
+            maxiter=1000,
+            reg=1e-4,
+            atol=1e-2,
+            result=ExpectedOTResult(
                 value=value,
                 # value_linear=value,
-                plan=plan,
+                # plan=plan,
                 marginal_a=a,
                 marginal_b=b,
             ),
-        },
-        **kwargs,
+        ),
+        **draw(st_library_dtype_device),
     )

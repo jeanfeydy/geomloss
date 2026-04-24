@@ -194,17 +194,13 @@ def test_correct_values_permutations(experiment, method):
 
 
 @given(
-    N=st.integers(min_value=1, max_value=10),
-    **all_configs,
+    experiment=generators.st_random_matrix(),
+    method=st_method,
 )
 @settings(deadline=None)
-def test_correct_values_random(N, method, **kwargs):
+def test_correct_values_random(experiment, method):
     """Checks correctness on random (N,N) cost matrices (ground truth = scipy)."""
-
-    # Load our test case:
-    ex = generators.random_matrix(N=N, **kwargs)
-    # Run it and check correctness:
-    check_solve_correct_values(ex, method=method)
+    check_solver(experiment, method=method)
 
 
 @given(
