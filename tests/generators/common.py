@@ -61,8 +61,10 @@ class OTExperimentConfig:
     maxiter: int
     reg: float
     atol: float
-    result: ExpectedOTResult
+    rtol: float = 0.0
+    result: ExpectedOTResult = None
     unbalanced: Any = None
+    CT: Any = None
 
 
 

@@ -46,78 +46,42 @@ st_method = st.sampled_from(["auto"])
 # ========================================================================================
 
 
-def basic_example(*, N, M, batchsize, unbalanced, library, dtype, device, probability=False):
-    """Generates a minimal input configuration for ot.solve(...)."""
-
-    B = max(1, batchsize)
-
-    C = np.random.randn(B, N, M)  # (B,N,M)
-    CT = np.transpose(C, (0, 2, 1))  # (B,M,N)
-    a = np.random.rand(B, N)  # (B,N)
-    b = np.random.rand(B, M)  # (B,N)
-
-    # If we use balanced OT, the measures must have the same mass:
-    if probability:
-        a = a / bk.sum(a, axis=1, keepdims=True)
-        b = b / bk.sum(b, axis=1, keepdims=True)
-
-    elif unbalanced is None:
-        total_mass = np.random.rand(B, 1)
-        a = total_mass * (a / bk.sum(a, axis=1, keepdims=True))
-        b = total_mass * (b / bk.sum(b, axis=1, keepdims=True))
-
-    # Cast the arrays as expected:
-    C, CT, a, b = [
-        cast(x, library=library, dtype=dtype, device=device) for x in [C, CT, a, b]
-    ]
-    if batchsize == 0:  # No batch mode
-        C, CT, a, b = C[0], CT[0], a[0], b[0]
-
-    return {
-        "C": C,
-        "CT": CT,
-        "a": a,
-        "b": b,
-    }
-
-
 # Running solvers with very low reg and maxiter may produce +-inf and then NaN in the
 # final computation of the OT cost: we disable this known warning by hand.
 @given(
-    **generic_parameters,
-    **unbalanced_parameters,
-    **all_configs,
+    ex=generators.st_simple_matrix(),
+    method=st_method,
 )
 @pytest.mark.filterwarnings("ignore:overflow encountered in exp")
-def test_symmetry(
-    N,
-    M,
-    batchsize,
-    library,
-    dtype,
-    device,
-    **params,
-):
+@pytest.mark.filterwarnings("ignore:overflow encountered in cast")
+def test_symmetry(ex, method):
     """Checks that OT(a,b) = OT(b,a)."""
-    ex = basic_example(
-        N=N,
-        M=M,
-        batchsize=batchsize,
-        unbalanced=params["unbalanced"],
-        library=library,
-        dtype=dtype,
-        device=device,
-    )
 
     # Compute a direct solution:
-    a_to_b = ot.solve(ex["C"], a=ex["a"], b=ex["b"], **params)
+    a_to_b = ot.solve(
+        ex.C,
+        a=ex.a,
+        b=ex.b,
+        reg=ex.reg,
+        unbalanced=ex.unbalanced,
+        maxiter=ex.maxiter,
+        method=method,
+    )
     # Compute a reverse solution:
-    b_to_a = ot.solve(ex["CT"], a=ex["b"], b=ex["a"], **params)
+    b_to_a = ot.solve(
+        ex.CT,
+        a=ex.b,
+        b=ex.a,
+        reg=ex.reg,
+        unbalanced=ex.unbalanced,
+        maxiter=ex.maxiter,
+        method=method,
+    )
 
     # Check that all the attributes coincide as expected:
-    dims = (1, 0) if batchsize == 0 else (0, 2, 1)
+    dims = (1, 0) if len(ex.C.shape) == 2 else (0, 2, 1)
     transpose = lambda plan: bk.transpose(plan, dims)
-    check_ot_result_symmetric(a_to_b, b_to_a, transpose=transpose)
+    check_ot_result_symmetric(a_to_b, b_to_a, transpose=transpose, atol=ex.atol, rtol=ex.rtol)
 
 
 @given(
