@@ -33,37 +33,105 @@ from ...arguments import (
 
 
 def solve(
-    C,  # (N, M) or (B, N, M)  (B is the batch dimension)
+    C, # (N, M)
     *,
-    a=None,  # (N,) or (B, N)
-    b=None,  # (M,) or (B, M)
+    a=None,  # (N,)
+    b=None,  # (M,)
     # Regularization:
     reg=0,  # -> None by default
-    reg_type="relative entropy",  # "entropy", "quadratic", etc.
+    reg_type="KL",
     # Unbalanced OT:
     unbalanced=None,  # None = +infty -> balanced by default;
-    # We also support scalar numbers, pairs of scalar numbers,
+    # We will also support scalar numbers, pairs of scalar numbers,
     # ((N,), (M,)) and ((B, N), (B, M)) point-dependent penalties.
-    unbalanced_type="relative entropy",  # ="KL", "TV", etc.
-    # Partial OT?
-    debias=False,  # Use debiasing? This also requires C_aa, C_bb
+    unbalanced_type="KL",
     # Optim parameters, following SciPy convention:
     method="auto",  # We can match keywords in this
     # string to activate some options such as
     # "symmetric", "annealing", etc.
     # Tolerance values.
     maxiter=None,
-    ftol=None,  # Changes of the objective?
-    xtol=None,  # Changes of the variables?
-    # We may just use "tol" and let the solver decide...
-    # As far as I can tell, most users are interested in a
-    # simple, one-dimensional parameter that lets them trade
-    # time for accuracy. For instance, we could allow
-    # users to specify an "rtol" ratio in (0, 1)
-    # that would drive a sensible heuristic for the parameter choices.
-    # The main thing to guarantee is a monotonic improvement
-    # of the solution quality as rtol goes to 0.
-    rtol=1e-2,  # ~1% relative accuracy
+    tol=None,
+):
+    if len(C.shape) != 2:
+        raise ValueError(
+            "The 'cost' matrix should be an array with 2 dimensions. "
+            f"Instead, ot.solve received an array of shape {C.shape}."
+        )
+
+    N, M = C.shape
+
+    if a is not None:
+        if len(a.shape) != 1:
+            raise ValueError(
+                "The first marginal 'a' should be a vector with 1 dimension. "
+                f"Instead, ot.solve received an array of shape {a.shape}."
+            )
+        
+        if a.shape[0] != N:
+            raise ValueError(
+                f"The dimension of 'cost' ({N},{M}) "
+                f"is not compatible with that of the first marginal 'a' {a.shape}. "
+                f"We expect a vector of shape ({N},)."
+            )
+        
+        a = a[None, :]  # Add a dummy batch dimension
+
+    
+    if b is not None:
+        if len(b.shape) != 1:
+            raise ValueError(
+                "The second marginal 'b' should be a vector with 1 dimension. "
+                f"Instead, ot.solve received an array of shape {b.shape}."
+            )
+        
+        if b.shape[0] != M:
+            raise ValueError(
+                f"The dimension of 'cost' ({N},{M}) "
+                f"is not compatible with that of the second marginal 'b' {b.shape}. "
+                f"We expect a vector of shape ({M},)."
+            )
+        
+        b = b[None, :]  # Add a dummy batch dimension
+
+    # We simply call the batch version of the solver, which will add a dummy batch dimension if needed.
+    result = solve_batch(
+        C[None, :, :],
+        a=a,
+        b=b,
+        reg=reg,
+        reg_type=reg_type,
+        unbalanced=unbalanced,
+        unbalanced_type=unbalanced_type,
+        method=method,
+        maxiter=maxiter,
+        tol=tol,
+    )
+    # Since we know that there is no batch dimension, we can remove it from the result:
+    result._squeeze_batchdim()
+    return result
+
+
+def solve_batch(
+    C,  # (B, N, M)  (B is the batch dimension)
+    *,
+    a=None,  # (B, N)
+    b=None,  # (B, M)
+    # Regularization:
+    reg=0,  # -> None by default
+    reg_type="KL",
+    # Unbalanced OT:
+    unbalanced=None,  # None = +infty -> balanced by default;
+    # We will also support scalar numbers, pairs of scalar numbers,
+    # ((N,), (M,)) and ((B, N), (B, M)) point-dependent penalties.
+    unbalanced_type="KL",
+    # Optim parameters, following SciPy convention:
+    method="auto",  # We can match keywords in this
+    # string to activate some options such as
+    # "symmetric", "annealing", etc.
+    # Tolerance values.
+    maxiter=None,
+    tol=None,
 ):
     # Basic checks on the parameters =====================================================
     if reg < 0:
@@ -71,7 +139,7 @@ def solve(
     elif reg == 0:
         raise NotImplementedError("Currently, we require that reg > 0.")
 
-    if reg_type != "relative entropy":
+    if reg_type != "KL":
         raise NotImplementedError("Currently, we only support a Sinkhorn solver.")
 
     if unbalanced is not None and unbalanced <= 0:
@@ -80,21 +148,16 @@ def solve(
             f"or > 0. Received {unbalanced}."
         )
 
-    if unbalanced_type != "relative entropy":
+    if unbalanced_type != "KL":
         raise NotImplementedError(
             "Currently, we only support unbalanced OT with "
-            "a 'relative entropy' penalty on the marginal constraints."
-        )
-
-    if debias:
-        raise NotImplementedError(
-            "Currently, we do not support debiasing " "for the matrix-mode OT solver."
+            "a 'KL' penalty on the marginal constraints."
         )
 
     if method != "auto":
         raise NotImplementedError("Currently, we only support a single method.")
 
-    if ftol is not None or xtol is not None:
+    if tol is not None:
         raise NotImplementedError(
             "Currently, we do not support rigorous stopping criteria."
         )
@@ -103,19 +166,14 @@ def solve(
 
     # Cost matrix ------------------------------------------------------------------------
     # Check the shape:
-    if len(C.shape) == 2:
-        C = C[None, :, :]  # Add an extra, dummy batch dimension
-        B = 0  # No batch size
-    elif len(C.shape) == 3:
-        B = C.shape[0]
-    else:
+    if len(C.shape) != 3:
         raise ValueError(
-            "The 'cost' matrix should be an array with 2 or 3 dimensions. "
+            "The 'cost' matrix should be an array with 3 dimensions (batch, N, M). "
             f"Instead, ot.solve received an array of shape {C.shape}."
         )
 
-    # At this point, we know that C is a (max(1, B), N, M) array.
-    N, M = C.shape[1], C.shape[2]
+    # At this point, we know that C is a (B, N, M) array.
+    B, N, M = C.shape
 
     # First marginal a -------------------------------------------------------------------
     if a is None:
@@ -123,38 +181,20 @@ def solve(
         a = a / N  # By default, the marginal sums up to 1
 
     else:
-        if B == 0:  # No batch mode
-            if len(a.shape) != 1:
-                raise ValueError(
-                    "Since 'cost' was given as a 2-dimensional array, "
-                    "the first marginal 'a' should be a vector with 1 dimension. "
-                    f"Instead, ot.solve received an array of shape {a.shape}."
-                )
+        if len(a.shape) != 2:
+            raise ValueError(
+                "Since 'cost' was given as a 3-dimensional array, "
+                "we work in batch mode an expect that "
+                "the first marginal 'a' is an array with 2 dimensions. "
+                f"Instead, ot.solve received an array of shape {a.shape}."
+            )
 
-            if a.shape[0] != N:
-                raise ValueError(
-                    f"The dimension of 'cost' ({N},{M}) "
-                    f"is not compatible with that of the first marginal 'a' {a.shape}. "
-                    f"We expect a vector of shape ({N},)."
-                )
-
-            a = a[None, :]  # Add a dummy batch dimension
-
-        else:  # Batch mode
-            if len(a.shape) != 2:
-                raise ValueError(
-                    "Since 'cost' was given as a 3-dimensional array, "
-                    "we work in batch mode an expect that "
-                    "the first marginal 'a' is an array with 2 dimensions. "
-                    f"Instead, ot.solve received an array of shape {a.shape}."
-                )
-
-            if a.shape[0] != B or a.shape[1] != N:
-                raise ValueError(
-                    f"The dimension of 'cost' ({B},{N},{M}) "
-                    f"is not compatible with that of the first marginal 'a' {a.shape}. "
-                    f"We expect an array of shape ({B},{N})."
-                )
+        if a.shape[0] != B or a.shape[1] != N:
+            raise ValueError(
+                f"The dimension of 'cost' ({B},{N},{M}) "
+                f"is not compatible with that of the first marginal 'a' {a.shape}. "
+                f"We expect an array of shape ({B},{N})."
+            )
 
     # Check that all values are non-negative:
     if bk.any(a < 0):
@@ -163,7 +203,7 @@ def solve(
             "ot.solve requires that a >= 0."
         )
 
-    # Add this point, we know that a is a (max(1, B), N) array with >= 0 values.
+    # Add this point, we know that a is a (B, N) array with >= 0 values.
 
     # Second marginal b ------------------------------------------------------------------
     if b is None:
@@ -171,38 +211,20 @@ def solve(
         b = b / M  # By default, the marginal sums up to 1
 
     else:
-        if B == 0:  # No batch mode
-            if len(b.shape) != 1:
-                raise ValueError(
-                    "Since 'cost' was given as a 2-dimensional array, "
-                    "the second marginal 'b' should be a vector with 1 dimension. "
-                    f"Instead, ot.solve received an array of shape {b.shape}."
-                )
+        if len(b.shape) != 2:
+            raise ValueError(
+                "Since 'cost' was given as a 3-dimensional array, "
+                "we work in batch mode an expect that "
+                "the second marginal 'b' is an array with 2 dimensions. "
+                f"Instead, ot.solve received an array of shape {b.shape}."
+            )
 
-            if b.shape[0] != M:
-                raise ValueError(
-                    f"The dimension of 'cost' ({N},{M}) "
-                    f"is not compatible with that of the second marginal 'b' {b.shape}. "
-                    f"We expect a vector of shape ({M},)."
-                )
-
-            b = b[None, :]  # Add a dummy batch dimension
-
-        else:  # Batch mode
-            if len(b.shape) != 2:
-                raise ValueError(
-                    "Since 'cost' was given as a 3-dimensional array, "
-                    "we work in batch mode an expect that "
-                    "the second marginal 'b' is an array with 2 dimensions. "
-                    f"Instead, ot.solve received an array of shape {b.shape}."
-                )
-
-            if b.shape[0] != B or b.shape[1] != M:
-                raise ValueError(
-                    f"The dimension of 'cost' ({B},{N},{M}) "
-                    f"is not compatible with that of the second marginal 'b' {b.shape}. "
-                    f"We expect an array of shape ({B},{M})."
-                )
+        if b.shape[0] != B or b.shape[1] != M:
+            raise ValueError(
+                f"The dimension of 'cost' ({B},{N},{M}) "
+                f"is not compatible with that of the second marginal 'b' {b.shape}. "
+                f"We expect an array of shape ({B},{M})."
+            )
 
     # Check that all values are non-negative:
     if bk.any(b < 0):
@@ -211,7 +233,7 @@ def solve(
             "ot.solve requires that b >= 0."
         )
 
-    # Add this point, we know that b is a (max(1, B), M) array with >= 0 values.
+    # Add this point, we know that b is a (B, M) array with >= 0 values.
 
     # Check that the marginals have the same total mass ----------------------------------
     if unbalanced is None:  # if we work in balanced mode
@@ -275,7 +297,6 @@ def solve(
         reg_type=reg_type,
         unbalanced=unbalanced,
         unbalanced_type=unbalanced_type,
-        debias=debias,
     )
 
 
@@ -292,7 +313,6 @@ class OTResultMatrix(OTResult):
         reg_type,
         unbalanced,
         unbalanced_type,
-        debias,
     ):
         super().__init__(
             a=a,
@@ -304,23 +324,31 @@ class OTResultMatrix(OTResult):
             reg_type=reg_type,
             unbalanced=unbalanced,
             unbalanced_type=unbalanced_type,
-            debias=debias,
+            debias=False,
         )
 
         # Fill the dictionary of "expected shapes", that will be used to format the
         # result as expected by the user:
         ap = self._array_properties
 
-        if ap.B == 0:
-            batchdim = ()  # No batch dimension
-        else:
-            batchdim = (ap.B,)  # One batch dimension
+        # Under the hood, we always work with batch dimensions, even if the user did not provide one.
+        self._shapes = {
+            "a": (ap.B, ap.N),
+            "b": (ap.B, ap.M),
+            "C": (ap.B, ap.N, ap.M),
+            "B": (ap.B,),
+        }
+
+    def _squeeze_batchdim(self):
+        """Removes the batch dimension, assuming that it is a dummy one."""
+        ap = self._array_properties
+        assert ap.B == 1
 
         self._shapes = {
-            "a": batchdim + (ap.N,),
-            "b": batchdim + (ap.M,),
-            "C": batchdim + (ap.N, ap.M),
-            "B": batchdim,
+            "a": (ap.N,),
+            "b": (ap.M,),
+            "C": (ap.N, ap.M),
+            "B": (),
         }
 
     @property
@@ -334,8 +362,7 @@ class OTResultMatrix(OTResult):
 
         # Make sure that everyone has the expected shape:
         ap = self._array_properties
-        # If ap.B == 0 (no batch mode), we still use B = 1:
-        B, N, M = max(1, ap.B), ap.N, ap.M
+        B, N, M = ap.B, ap.N, ap.M
 
         assert f.shape == (B, N)
         assert g.shape == (B, M)
@@ -354,21 +381,20 @@ class OTResultMatrix(OTResult):
 
         # Make sure that everyone has the expected shape:
         ap = self._array_properties
-        # If ap.B == 0 (no batch mode), we still use B = 1:
-        B, N, M = max(1, ap.B), ap.N, ap.M
+        B, N, M = ap.B, ap.N, ap.M
 
         assert a.shape == (B, N)
         assert b.shape == (B, M)
         assert plan.shape == (B, N, M)
 
         # Actual computation:
-        if self._reg_type == "relative entropy":
+        if self._reg_type == "KL":
             # Multiply by the reference product measure:
             plan = a[:, :, None] * b[:, None, :] * plan  # (B,N,1) * (B,1,M) * (B,N,M)
         else:
             raise NotImplementedError(
                 "Currently, we only support the computation "
-                "of transport plans when `reg_type = 'relative entropy'`."
+                "of transport plans when `reg_type = 'KL'`."
             )
 
         return self.cast(plan, "C")  # Cast as a (N,M) or (B,N,M) Tensor

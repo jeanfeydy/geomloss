@@ -152,15 +152,15 @@ class OTResult:
     @property
     def value(self):
         """Full transport cost, including possible regularization terms."""
-        if self._reg_type != "relative entropy":
+        if self._reg_type != "KL":
             raise NotImplementedError(
-                "Currently, we only support 'relative entropy' "
+                "Currently, we only support 'KL' "
                 "as regularization for the OT problem."
             )
 
-        if self._unbalanced_type != "relative entropy":
+        if self._unbalanced_type != "KL":
             raise NotImplementedError(
-                "Currently, we only support 'relative entropy' "
+                "Currently, we only support 'KL' "
                 "as regularization for the marginal constraints."
             )
 

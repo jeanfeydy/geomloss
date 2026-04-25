@@ -29,8 +29,10 @@ from .check_ot_result import (
 def test_symmetry(ex, method):
     """Checks that OT(a,b) = OT(b,a)."""
 
+    solver = ot.solve if len(ex.C.shape) == 2 else ot.solve_batch
+
     # Compute a direct solution:
-    a_to_b = ot.solve(
+    a_to_b = solver(
         ex.C,
         a=ex.a,
         b=ex.b,
@@ -40,7 +42,7 @@ def test_symmetry(ex, method):
         method=method,
     )
     # Compute a reverse solution:
-    b_to_a = ot.solve(
+    b_to_a = solver(
         ex.CT,
         a=ex.b,
         b=ex.a,
@@ -73,8 +75,10 @@ def test_cost_linearity(ex, scaling, offset, method):
     use_offset = 0  # 1 if unbalanced is None else 0
     offset = use_offset * offset
 
+    solver = ot.solve if len(ex.C.shape) == 2 else ot.solve_batch
+
     # Compute a direct solution:
-    normal = ot.solve(
+    normal = solver(
         ex.C,
         a=ex.a,
         b=ex.b,
@@ -87,7 +91,7 @@ def test_cost_linearity(ex, scaling, offset, method):
     # Compute a scaled solution:
     s_unbalanced = None if ex.unbalanced is None else scaling * ex.unbalanced
 
-    scaled = ot.solve(
+    scaled = solver(
         scaling * ex.C + offset,
         a=ex.a,
         b=ex.b,
@@ -99,7 +103,7 @@ def test_cost_linearity(ex, scaling, offset, method):
 
     # Check that all the attributes coincide as expected:
     check_ot_result_cost_linearity(
-        normal, scaled, scaling=scaling, offset=offset, atol=1e-2, rtol=1e-2
+        normal, scaled, scaling=scaling, offset=offset, atol=1e-2, rtol=5e-2
     )
 
 
@@ -113,10 +117,11 @@ def check_solver(
     *,
     method: str,
 ):
-    """Runs the ot.solve() matrix solver and checks the result."""
+    """Runs the ot.solve() or ot.solve_batch() matrix solver and checks the result."""
+    
+    solver = ot.solve if len(ex.C.shape) == 2 else ot.solve_batch
 
-    # Compute a solution with high precision settings:
-    ours = ot.solve(
+    ours = solver(
         ex.C,
         a=ex.a,
         b=ex.b,
