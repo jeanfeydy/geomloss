@@ -18,6 +18,8 @@ except:
     cuda_available = False
 
 
+st_method = st.sampled_from(["auto"])
+
 st_batchsize = st.integers(min_value=0, max_value=2)  # 0 means no batch mode
 st_N = st.integers(min_value=1, max_value=10)
 st_M = st.integers(min_value=1, max_value=10)
@@ -62,7 +64,10 @@ class OTExperimentConfig:
     C: Any
     maxiter: int
     reg: float
-    atol: float
+    means: Any = None
+    covs: Any = None
+    total_mass: Any = None
+    atol: float = 0.0
     rtol: float = 0.0
     result: ExpectedOTResult = None
     unbalanced: Any = None

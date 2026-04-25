@@ -1,5 +1,9 @@
 import numpy as np
-from .common import ExpectedOTResult, cast
+from .common import OTExperimentConfig, ExpectedOTResult, cast
+from .common import st_batchsize, st_library_dtype_device
+from hypothesis import strategies as st
+from hypothesis.extra.numpy import arrays as st_arrays
+
 
 from numpy import log, eye, trace, allclose, block, concatenate, tile
 from scipy.linalg import inv, det, sqrtm
@@ -458,22 +462,29 @@ def OT_sigma_gamma(*, m_a, a, A, m_b, b, B, sigma, gamma):
 # ========================================================================================
 
 
-def gaussians_matrix(
-    *,
-    N,
-    M,
-    D,
-    debias,
-    blur,
-    reach,
-    cov_type,
-    batchsize,
-    **kwargs,
-):
+@st.composite
+def st_gaussians_matrix(draw):
     """Generates two Gaussian distributions sampled on a regular grid.
 
     This example is used by tests/test_ot_solve_matrix.py.
     """
+
+    batchsize = draw(st_batchsize)
+    N = draw(st.integers(min_value=50, max_value=60))  # Spice things up...
+    M = draw(
+        st.integers(min_value=51, max_value=60)
+    )  # with different values for N and M.
+    D = draw(st.integers(min_value=1, max_value=1))  # We stick to 1D examples
+    debias = draw(st.sampled_from([False]))
+    # We generate Gaussian distributions on [0,1]:
+    blur = draw(
+        st.one_of(st.sampled_from([0]), st.floats(min_value=0.1, max_value=1.0))
+    )
+    # blur=st.floats(min_value=0.1, max_value=1.0),
+    # N.B.: If rho is too large, the cost is dominated by the marginal constraints
+    #       and we cannot satisfy |error| < atol = 1e-2.
+    reach = draw(st.one_of(st.none(), st.floats(min_value=1e-2, max_value=10.0)))
+    cov_type = "diagonal"
 
     # Generate some random data ----------------------------------------------------------
     B = max(1, batchsize)
@@ -494,7 +505,13 @@ def gaussians_matrix(
     # Gaussian distributions:
     # Means for the sources and the targets are in [0,1]:
     if True:
-        means = np.random.rand(2, B, D)
+        means = draw(
+            st_arrays(
+                dtype=np.float64,
+                shape=(2, B, D),
+                elements=st.floats(min_value=0.0, max_value=1.0),
+            )
+        )
     else:
         means = np.array([[[0.0]], [[1.0]]])
     min_std = 3 * 3 / min(N, M)  # Typical distance between samples in 3/N
@@ -504,14 +521,26 @@ def gaussians_matrix(
 
     # Total mass for the unbalanced case, in [0, 2):
     if True:
-        total_mass = 2 * np.random.rand(2, B)  # (2, B)
+        total_mass = draw(
+            st_arrays(
+                dtype=np.float64,
+                shape=(2, B),
+                elements=st.floats(min_value=0.1, max_value=2.0),
+            )
+        )
     else:
         total_mass = 0.5 * np.ones((2, B))
 
     # TODO: Add non-diagonal test cases
     if cov_type == "diagonal":
-        stds = np.random.rand(2, B, D)  # Standard deviations = cov^1/2
-        stds = min_std + (max_std - min_std) * stds
+        # Standard deviations = cov^1/2
+        stds = draw(
+            st_arrays(
+                dtype=np.float64,
+                shape=(2, B, D),
+                elements=st.floats(min_value=min_std, max_value=max_std),
+            )
+        )
         covs = np.zeros((2, B, D, D))
         covs[:, :, np.arange(D), np.arange(D)] = stds**2
     else:
@@ -599,26 +628,25 @@ def gaussians_matrix(
             plan = plan[0]
 
     return cast(
-        {
-            "a": source_weights,
-            "b": target_weights,
-            "C": C,
-            "x": x_i,
-            "y": y_j,
-            "means": means,
-            "covs": covs,
-            "total_mass": total_mass,
-            "maxiter": 1000,
-            "reg": eps,
-            "unbalanced": rho,
-            "atol": 0.01,
-            "result": ExpectedOTResult(
+        OTExperimentConfig(
+            a=source_weights,
+            b=target_weights,
+            C=C,
+            means=means,
+            covs=covs,
+            total_mass=total_mass,
+            maxiter=1000,
+            reg=eps,
+            unbalanced=rho,
+            atol=1e-2,
+            rtol=1e-2,
+            result=ExpectedOTResult(
                 value=value,
                 # value_linear=value,
                 plan=plan,
                 marginal_a=marginal_a,
                 marginal_b=marginal_b,
             ),
-        },
-        **kwargs,
+        ),
+        **draw(st_library_dtype_device),
     )
