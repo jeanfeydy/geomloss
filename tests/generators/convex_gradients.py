@@ -1,13 +1,11 @@
 import numpy as np
-from .common import ExpectedOTResult, cast
+from .common import OTExperimentConfig, ExpectedOTResult, cast
+from .common import st_N, st_D, st_batchsize, st_library_dtype_device
+from hypothesis import strategies as st
+from hypothesis.extra.numpy import arrays as st_arrays
 
 
-def random_points(
-    *,
-    B,
-    N,
-    D,
-):
+def random_points(*, draw, B, N, D):
     """Generates a batch of B clouds of N points in dimension D.
 
     We apply a synthetic deformation which is the gradient of a random sum of Euclidean
@@ -15,13 +13,20 @@ def random_points(
     """
 
     # We use random weights that sum up to 1:
-    weights = np.random.rand(B, N)  # (B,N)
+    weights = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N),
+            elements=st.floats(min_value=0.01, max_value=1.0),
+        )
+    )
     weights = weights / np.sum(weights, axis=1, keepdims=True)  # rows sum up to 1
 
     # TODO: Fix this with a better error criterion on the plan and marginals...
     if False:
         x_i = np.random.rand(B, N, D)  # (B,N,D) source point cloud
     else:
+        # Uniform spacing of the source points along a segment
         x_i = 0.5 * np.ones((B, N, D))
         for k in range(B):
             x_i[k, :, 0] = np.arange(N) / N
@@ -30,8 +35,20 @@ def random_points(
     # f(x) = sum_j=1^N v_j * |x - z_j|
     # with gradient
     # g(x) = sum_j=1^N v_j * normalize(x - z_j)
-    v_j = 2 * np.random.rand(B, N)  # (B,N) random values in [0,2)
-    z_j = np.random.rand(B, N, D)
+    v_j = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N),
+            elements=st.floats(min_value=0.1, max_value=2.0),
+        )
+    )
+    z_j = draw(
+        st_arrays(
+            dtype=np.float64,
+            shape=(B, N, D),
+            elements=st.floats(min_value=0.0, max_value=1.0),
+        )
+    )
 
     # Compute normalize(x_i - z_j):
     diff_ij = x_i.reshape(B, N, 1, D) - z_j.reshape(B, 1, N, D)  # (B,N,N,D)
@@ -57,23 +74,21 @@ def random_points(
     }
 
 
-def convex_gradients_matrix(
-    *,
-    N,
-    D,
-    batchsize,
-    **kwargs,
-):
+@st.composite
+def st_convex_gradients_matrix(draw):
     """Generates a random cloud of N points in dimension D and applies a random gradient of a convex function.
 
     This example is used by tests/test_ot_solve_matrix.py.
     """
 
+    N, D = draw(st_N), draw(st_D)  # small integers
+    batchsize = draw(st_batchsize)  # integer, 0 means no batch mode
+
     # Generate some random data ----------------------------------------------------------
     B, M = max(1, batchsize), N  # M = N, since we just move points around.
 
     # Generate a random configuration, encoded using (B,N,D) arrays:
-    points = random_points(B=B, N=N, D=D)
+    points = random_points(draw=draw, B=B, N=N, D=D)
 
     # Turn this data into "matrix" format:
     a = points["weights"]  # (B,N)
@@ -96,22 +111,21 @@ def convex_gradients_matrix(
         a, b, C, value, plan = a[0], b[0], C[0], value[0], plan[0]
 
     return cast(
-        {
-            "a": a,
-            "b": b,
-            "C": C,
-            "x": points["x"],
-            "y": points["y"],
-            "maxiter": 1000,
-            "reg": 1e-4,
-            "atol": 1e-2,
-            "result": ExpectedOTResult(
+        OTExperimentConfig(
+            a=a,
+            b=b,
+            C=C,
+            maxiter=1000,
+            reg=1e-3,
+            atol=1e-2,
+            rtol=1e-2,
+            result=ExpectedOTResult(
                 value=value,
                 # value_linear=value,
                 plan=plan,
                 marginal_a=a,
                 marginal_b=b,
             ),
-        },
-        **kwargs,
+        ),
+        **draw(st_library_dtype_device),
     )

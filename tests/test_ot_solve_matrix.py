@@ -52,8 +52,7 @@ st_method = st.sampled_from(["auto"])
     ex=generators.st_simple_matrix(),
     method=st_method,
 )
-@pytest.mark.filterwarnings("ignore:overflow encountered in exp")
-@pytest.mark.filterwarnings("ignore:overflow encountered in cast")
+@pytest.mark.filterwarnings("ignore:overflow encountered in")
 def test_symmetry(ex, method):
     """Checks that OT(a,b) = OT(b,a)."""
 
@@ -92,8 +91,7 @@ def test_symmetry(ex, method):
     offset=st.floats(min_value=-100.0, max_value=100.0),
     method=st_method,
 )
-@pytest.mark.filterwarnings("ignore:overflow encountered in exp")
-@pytest.mark.filterwarnings("ignore:overflow encountered in cast")
+@pytest.mark.filterwarnings("ignore:overflow encountered in")
 def test_cost_linearity(ex, scaling, offset, method):
     """Checks that OT_{scaling * C + offset}(a,b) = scaling * OT(a,b) + offset if scaling > 0."""
 
@@ -204,22 +202,17 @@ def test_correct_values_random(experiment, method):
 
 
 @given(
-    N=st.integers(min_value=1, max_value=10),
-    D=st.integers(min_value=1, max_value=10),
-    **all_configs,
+    experiment=generators.st_convex_gradients_matrix(),
+    method=st_method,
 )
 @settings(deadline=None)
-def test_correct_values_convex_gradients(N, D, method, **kwargs):
+def test_correct_values_convex_gradients(experiment, method):
     """Checks correctness on clouds of N points in dimension D on which we applied a synthetic deformation.
 
     This test relies on the fact that OT with a squared Euclidean cost retrieves
     the unique gradient of a convex function that maps the source onto the target.
     """
-
-    # Load our test case:
-    ex = generators.convex_gradients_matrix(N=N, D=D, **kwargs)
-    # Run it and check correctness:
-    check_solve_correct_values(ex, method=method)
+    check_solver(experiment, method=method)
 
 
 # In the test below, we use ~100**D samples per distribution.
