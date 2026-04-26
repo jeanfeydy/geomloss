@@ -42,27 +42,80 @@ def distances(x, y, use_keops=False):
 
 
 # OT on empirical distributions
-def solve_samples(
-    xa,  # (N, D) or (B, N, D)
-    xb,  # (M, D) or (B, M, D)
-    a=None,  # (N,) or (B, N)
-    b=None,  # (M,) or (B, M)
-    # To support heterogeneous batches (which are very common in shape analysis),
-    # we let users specify "batch vectors" following PyTorch_Geometric's convention:
-    # https://pytorch-geometric.readthedocs.io/en/latest/notes/introduction.html#mini-batches
-    a_batch=None,  # (N,) vector of increasing integer values in [0,B-1]
-    b_batch=None,  # (M,) vector of increasing integer values in [0,B-1]
+def solve_sample(
+    X_a,  # (N, D)
+    X_b,  # (M, D)
+    a=None,  # (N,)
+    b=None,  # (M,)
     cost="sqeuclidean",
     # We also support simple functions such as "lambda C(x_i,y_j) = ((x_i - y_j) ** 2).sum(-1) / 2".
     # Depending on the context, these will be run on NumPy arrays, Torch tensors or KeOps LazyTensors
     # of shape (B, N, 1, D) and (B, M, 1, D) and return a (B, N, M) "array".
     # (B may be equal to 1 but *not* collapsed if no batch dimension was provided)
     debias=False,
+    # Regularization:
+    reg=0,  # -> None by default
+    reg_type="KL",
+    # Unbalanced OT:
+    unbalanced=None,  # None = +infty -> balanced by default;
+    # We will also support scalar numbers, pairs of scalar numbers,
+    # ((N,), (M,)) and ((B, N), (B, M)) point-dependent penalties.
+    unbalanced_type="KL",
+    # Optim parameters, following SciPy convention:
+    method="auto",  # We can match keywords in this
+    # string to activate some options such as
+    # "symmetric", "annealing", etc.
+    # Tolerance values.
+    maxiter=None,
+    tol=None,
     # Redundant parameters, that make sense for geometric problems:
     p=None,  # Specifies cost(x,y) = (1/p) * |x-y|^p
     blur=None,  # Specifies "epsilon" = blur^p
     reach=None,  # Specifies "rho" = reach^p
     # + same other params as above
+):
+    args, output_shapes = cast_input(
+        X_a=(X_a, "N,D"),
+        X_b=(X_b, "M,D"),
+        a=(a, "N"),
+        b=(b, "M"),
+    )
+
+    return SinkhornSamplesOTResult(potentials)
+
+
+# To support heterogeneous batches (which are very common in shape analysis),
+# we will at some point let users specify "batch vectors" following PyTorch_Geometric's convention:
+# https://pytorch-geometric.readthedocs.io/en/latest/notes/introduction.html#mini-batches
+# batch_a=None,  # (N,) vector of increasing integer values in [0,B-1]
+# batch_b=None,  # (M,) vector of increasing integer values in [0,B-1]
+
+
+def solve_sample_batch(
+    X_a,  # (B, N, D)
+    X_b,  # (B, M, D)
+    a=None,  # (B, N)
+    b=None,  # (B, M)
+    cost="sqeuclidean",
+    debias=False,
+    # Regularization:
+    reg=0,  # -> None by default
+    reg_type="KL",
+    # Unbalanced OT:
+    unbalanced=None,  # None = +infty -> balanced by default;
+    # We will also support scalar numbers, pairs of scalar numbers,
+    # ((N,), (M,)) and ((B, N), (B, M)) point-dependent penalties.
+    unbalanced_type="KL",
+    # Optim parameters, following SciPy convention:
+    method="auto",  # We can match keywords in this
+    # string to activate some options such as
+    # "symmetric", "annealing", etc.
+    # Tolerance values.
+    maxiter=None,
+    tol=None,
+    p=None,
+    blur=None,
+    reach=None,
 ):
     args, output_shapes = cast_input(
         xa=(xa, "B,N,D"),
@@ -82,7 +135,7 @@ class SinkhornSamplesOTResult(OTResult):
 
 # Convention:
 # - D is the number of coordinates per sample (= point)
-def barycenter_samples(
+def barycenter_sample(
     xa,  # (N, D) or (K, N, D) or (B, K, N, D)
     a=None,  # (N,) or (K, N) or (B, K, N)
     weights=None,  # (K,) or (B, K)

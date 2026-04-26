@@ -118,7 +118,7 @@ def check_solver(
     method: str,
 ):
     """Runs the ot.solve() or ot.solve_batch() matrix solver and checks the result."""
-    
+
     solver = ot.solve if len(ex.C.shape) == 2 else ot.solve_batch
 
     ours = solver(

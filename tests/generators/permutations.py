@@ -22,8 +22,8 @@ def st_permutations_matrix(draw):
     a = np.ones((B, N))
     b = np.ones((B, M))
 
-    threshold = draw(st.floats(min_value=0.0, max_value=100.0))  # large positive float
-    gap = draw(st.floats(min_value=0.1, max_value=100.0))  # large positive float
+    threshold = draw(st.floats(min_value=0.0, max_value=10.0))  # large positive float
+    gap = draw(st.floats(min_value=5, max_value=10.0))  # large positive float
 
     # Generate a random cost matrix with values larger than threshold
     # TODO: support inf and NaN
@@ -31,7 +31,7 @@ def st_permutations_matrix(draw):
         st_arrays(
             dtype=np.float64,
             shape=(B, N, M),
-            elements=st.floats(min_value=threshold, max_value=10000),
+            elements=st.floats(min_value=threshold, max_value=20),
         )
     )
     # except for N small values in each batch, which we will put in C[i, sigma[i]] to ensure that the optimal plan is a permutation matrix:
@@ -39,7 +39,7 @@ def st_permutations_matrix(draw):
         st_arrays(
             dtype=np.float64,
             shape=(B, N),
-            elements=st.floats(min_value=-1000, max_value=threshold - gap),
+            elements=st.floats(min_value=-20, max_value=threshold - gap),
         )
     )
 

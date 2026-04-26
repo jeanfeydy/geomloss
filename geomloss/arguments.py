@@ -11,6 +11,44 @@ class ArrayProperties(NamedTuple):
     library: str  # Underlying framework: one of "numpy", "torch".
 
 
+def check_regularization(
+    *,
+    reg,
+    reg_type,
+    unbalanced,
+    unbalanced_type,
+    method,
+    tol,
+):
+    if reg < 0:
+        raise ValueError(f"Parameter 'reg' should be >= 0. Received {reg}.")
+    elif reg == 0:
+        raise NotImplementedError("Currently, we require that reg > 0.")
+
+    if reg_type != "KL":
+        raise NotImplementedError("Currently, we only support a Sinkhorn solver.")
+
+    if unbalanced is not None and unbalanced <= 0:
+        raise ValueError(
+            "Parameter 'unbalanced' should be None (= +infty) "
+            f"or > 0. Received {unbalanced}."
+        )
+
+    if unbalanced_type != "KL":
+        raise NotImplementedError(
+            "Currently, we only support unbalanced OT with "
+            "a 'KL' penalty on the marginal constraints."
+        )
+
+    if method != "auto":
+        raise NotImplementedError("Currently, we only support a single method.")
+
+    if tol is not None:
+        raise NotImplementedError(
+            "Currently, we do not support rigorous stopping criteria."
+        )
+
+
 def check_library(*args):
     """Checks that all input arrays come from the same library (numpy, torch...)."""
 
@@ -53,7 +91,67 @@ def check_device(*args):
         return devices[0]
 
 
-def check_marginals(sums_a, sums_b, rtol=1e-3):
+def check_marginal(m, *, cost_shape, ones_like, marginal_size, name):
+    if m is None:
+        m = bk.ones_like(ones_like)
+        m = m / marginal_size  # By default, the marginal sums up to 1
+
+    else:
+        if len(m.shape) != 1:
+            raise ValueError(
+                f"The marginal '{name}' should be a vector with 1 dimension. "
+                f"Instead, ot.solve received an array of shape {m.shape}."
+            )
+
+        if m.shape[0] != marginal_size:
+            raise ValueError(
+                f"The dimension of the 'cost matrix' {cost_shape} "
+                f"is not compatible with that of the marginal '{name}' {m.shape}. "
+                f"We expect a vector of shape ({marginal_size},)."
+            )
+
+    # Check that all values are non-negative:
+    if bk.any(m < 0):
+        raise ValueError(
+            f"The marginal '{name}' contains negative values. "
+            f"We require that {name} >= 0."
+        )
+
+    return m
+
+
+def check_marginal_batch(m, *, cost_shape, ones_like, marginal_size, name):
+    if m is None:
+        m = bk.ones_like(ones_like)
+        m = m / marginal_size  # By default, the marginal sums up to 1
+
+    else:
+        if len(m.shape) != 2:
+            raise ValueError(
+                f"Since 'cost' was given as a 3-dimensional array, "
+                f"we work in batch mode an expect that "
+                f"the marginal '{name}' is an array with 2 dimensions. "
+                f"Instead, ot.solve received an array of shape {m.shape}."
+            )
+
+        if m.shape[0] != cost_shape[0] or m.shape[1] != marginal_size:
+            raise ValueError(
+                f"The dimension of 'cost' {cost_shape} "
+                f"is not compatible with that of the marginal '{name}' {m.shape}. "
+                f"We expect an array of shape ({cost_shape[0]},{marginal_size})."
+            )
+
+    # Check that all values are non-negative:
+    if bk.any(m < 0):
+        raise ValueError(
+            f"The marginal '{name}' contains negative values. "
+            f"We require that {name} >= 0."
+        )
+
+    return m
+
+
+def check_marginal_masses(sums_a, sums_b, rtol=1e-3):
     """Raises an error if two vectors of total sums do not coincide.
 
     Args:

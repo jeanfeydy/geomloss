@@ -1,3 +1,3 @@
 from .implementations.matrix import solve, solve_batch, barycenter
-from .implementations.samples import solve_samples, barycenter_samples
+from .implementations.sample import solve_sample, solve_sample_batch, barycenter_sample
 from .implementations.grid import solve_grid, barycenter_grid

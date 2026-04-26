@@ -20,7 +20,10 @@ from ...arguments import (
     check_library,
     check_dtype,
     check_device,
-    check_marginals,
+    check_regularization,
+    check_marginal,
+    check_marginal_batch,
+    check_marginal_masses,
 )
 
 # ========================================================================================
@@ -33,7 +36,7 @@ from ...arguments import (
 
 
 def solve(
-    C, # (N, M)
+    C,  # (N, M)
     *,
     a=None,  # (N,)
     b=None,  # (M,)
@@ -61,44 +64,18 @@ def solve(
 
     N, M = C.shape
 
-    if a is not None:
-        if len(a.shape) != 1:
-            raise ValueError(
-                "The first marginal 'a' should be a vector with 1 dimension. "
-                f"Instead, ot.solve received an array of shape {a.shape}."
-            )
-        
-        if a.shape[0] != N:
-            raise ValueError(
-                f"The dimension of 'cost' ({N},{M}) "
-                f"is not compatible with that of the first marginal 'a' {a.shape}. "
-                f"We expect a vector of shape ({N},)."
-            )
-        
-        a = a[None, :]  # Add a dummy batch dimension
-
-    
-    if b is not None:
-        if len(b.shape) != 1:
-            raise ValueError(
-                "The second marginal 'b' should be a vector with 1 dimension. "
-                f"Instead, ot.solve received an array of shape {b.shape}."
-            )
-        
-        if b.shape[0] != M:
-            raise ValueError(
-                f"The dimension of 'cost' ({N},{M}) "
-                f"is not compatible with that of the second marginal 'b' {b.shape}. "
-                f"We expect a vector of shape ({M},)."
-            )
-        
-        b = b[None, :]  # Add a dummy batch dimension
+    a = check_marginal(
+        a, cost_shape=(N, M), ones_like=C[:, 0], marginal_size=N, name="a"
+    )
+    b = check_marginal(
+        b, cost_shape=(N, M), ones_like=C[0, :], marginal_size=M, name="b"
+    )
 
     # We simply call the batch version of the solver, which will add a dummy batch dimension if needed.
     result = solve_batch(
         C[None, :, :],
-        a=a,
-        b=b,
+        a=a[None, :],
+        b=b[None, :],
         reg=reg,
         reg_type=reg_type,
         unbalanced=unbalanced,
@@ -133,36 +110,17 @@ def solve_batch(
     maxiter=None,
     tol=None,
 ):
-    # Basic checks on the parameters =====================================================
-    if reg < 0:
-        raise ValueError(f"Parameter 'reg' should be >= 0. Received {reg}.")
-    elif reg == 0:
-        raise NotImplementedError("Currently, we require that reg > 0.")
+    # Basic checks on the solver parameters
+    check_regularization(
+        reg=reg,
+        reg_type=reg_type,
+        unbalanced=unbalanced,
+        unbalanced_type=unbalanced_type,
+        method=method,
+        tol=tol,
+    )
 
-    if reg_type != "KL":
-        raise NotImplementedError("Currently, we only support a Sinkhorn solver.")
-
-    if unbalanced is not None and unbalanced <= 0:
-        raise ValueError(
-            "Parameter 'unbalanced' should be None (= +infty) "
-            f"or > 0. Received {unbalanced}."
-        )
-
-    if unbalanced_type != "KL":
-        raise NotImplementedError(
-            "Currently, we only support unbalanced OT with "
-            "a 'KL' penalty on the marginal constraints."
-        )
-
-    if method != "auto":
-        raise NotImplementedError("Currently, we only support a single method.")
-
-    if tol is not None:
-        raise NotImplementedError(
-            "Currently, we do not support rigorous stopping criteria."
-        )
-
-    # Check the parameters ===============================================================
+    # Check the input data ===============================================================
 
     # Cost matrix ------------------------------------------------------------------------
     # Check the shape:
@@ -176,70 +134,23 @@ def solve_batch(
     B, N, M = C.shape
 
     # First marginal a -------------------------------------------------------------------
-    if a is None:
-        a = bk.ones_like(C[:, :, 0])  # (max(1, B), N) array
-        a = a / N  # By default, the marginal sums up to 1
 
-    else:
-        if len(a.shape) != 2:
-            raise ValueError(
-                "Since 'cost' was given as a 3-dimensional array, "
-                "we work in batch mode an expect that "
-                "the first marginal 'a' is an array with 2 dimensions. "
-                f"Instead, ot.solve received an array of shape {a.shape}."
-            )
+    a = check_marginal_batch(
+        a, cost_shape=(B, N, M), ones_like=C[:, :, 0], marginal_size=N, name="a"
+    )
+    b = check_marginal_batch(
+        b, cost_shape=(B, N, M), ones_like=C[:, 0, :], marginal_size=M, name="b"
+    )
 
-        if a.shape[0] != B or a.shape[1] != N:
-            raise ValueError(
-                f"The dimension of 'cost' ({B},{N},{M}) "
-                f"is not compatible with that of the first marginal 'a' {a.shape}. "
-                f"We expect an array of shape ({B},{N})."
-            )
-
-    # Check that all values are non-negative:
-    if bk.any(a < 0):
-        raise ValueError(
-            "The first marginal 'a' contains negative values. "
-            "ot.solve requires that a >= 0."
-        )
-
-    # Add this point, we know that a is a (B, N) array with >= 0 values.
-
-    # Second marginal b ------------------------------------------------------------------
-    if b is None:
-        b = bk.ones_like(C[:, 0, :])  # (max(1, B), M) array
-        b = b / M  # By default, the marginal sums up to 1
-
-    else:
-        if len(b.shape) != 2:
-            raise ValueError(
-                "Since 'cost' was given as a 3-dimensional array, "
-                "we work in batch mode an expect that "
-                "the second marginal 'b' is an array with 2 dimensions. "
-                f"Instead, ot.solve received an array of shape {b.shape}."
-            )
-
-        if b.shape[0] != B or b.shape[1] != M:
-            raise ValueError(
-                f"The dimension of 'cost' ({B},{N},{M}) "
-                f"is not compatible with that of the second marginal 'b' {b.shape}. "
-                f"We expect an array of shape ({B},{M})."
-            )
-
-    # Check that all values are non-negative:
-    if bk.any(b < 0):
-        raise ValueError(
-            "The second marginal 'b' contains negative values. "
-            "ot.solve requires that b >= 0."
-        )
-
-    # Add this point, we know that b is a (B, M) array with >= 0 values.
+    # Add this point, we know that:
+    # - a is a (B, N) array with >= 0 values.
+    # - b is a (B, M) array with >= 0 values.
 
     # Check that the marginals have the same total mass ----------------------------------
     if unbalanced is None:  # if we work in balanced mode
         sums_a = bk.sum(a, axis=1)  # (B,)
         sums_b = bk.sum(b, axis=1)  # (B,)
-        check_marginals(sums_a, sums_b, rtol=1e-3)
+        check_marginal_masses(sums_a, sums_b, rtol=1e-3)
 
     # Low-level compatibility ------------------------------------------------------------
 

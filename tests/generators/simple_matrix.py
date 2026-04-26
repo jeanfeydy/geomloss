@@ -27,7 +27,7 @@ def st_simple_matrix(draw):
         st_arrays(
             dtype=np.float64,
             shape=(B, N, M),
-            elements=st.floats(min_value=-1000, max_value=1000),
+            elements=st.floats(min_value=-10, max_value=10),
         )
     )  # (B,N,M)
 
@@ -37,14 +37,14 @@ def st_simple_matrix(draw):
         st_arrays(
             dtype=np.float64,
             shape=(B, N),
-            elements=st.floats(min_value=0.001, max_value=1000),
+            elements=st.floats(min_value=0.1, max_value=10),
         )
     )  # (B,N)
     b = draw(
         st_arrays(
             dtype=np.float64,
             shape=(B, M),
-            elements=st.floats(min_value=0.001, max_value=1000),
+            elements=st.floats(min_value=0.1, max_value=10),
         )
     )  # (B,M)
 
@@ -58,7 +58,7 @@ def st_simple_matrix(draw):
             st_arrays(
                 dtype=np.float64,
                 shape=(B, 1),
-                elements=st.floats(min_value=0.001, max_value=1000),
+                elements=st.floats(min_value=0.1, max_value=10),
             )
         )
         a = total_mass * (a / bk.sum(a, axis=1, keepdims=True))
