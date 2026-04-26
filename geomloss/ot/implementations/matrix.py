@@ -17,12 +17,9 @@ from ..abstract_solvers import (
 # Utility functions:
 from ...arguments import (
     ArrayProperties,
-    check_library,
-    check_dtype,
-    check_device,
+    check_library_dtype_device,
     check_regularization,
     check_marginal,
-    check_marginal_batch,
     check_marginal_masses,
 )
 
@@ -53,7 +50,7 @@ def solve(
     # string to activate some options such as
     # "symmetric", "annealing", etc.
     # Tolerance values.
-    maxiter=None,
+    max_iter=None,
     tol=None,
 ):
     if len(C.shape) != 2:
@@ -64,12 +61,8 @@ def solve(
 
     N, M = C.shape
 
-    a = check_marginal(
-        a, cost_shape=(N, M), ones_like=C[:, 0], marginal_size=N, name="a"
-    )
-    b = check_marginal(
-        b, cost_shape=(N, M), ones_like=C[0, :], marginal_size=M, name="b"
-    )
+    a = check_marginal(a, ones_like=C[:, 0], marginal_size=N, name="a")
+    b = check_marginal(b, ones_like=C[0, :], marginal_size=M, name="b")
 
     # We simply call the batch version of the solver, which will add a dummy batch dimension if needed.
     result = solve_batch(
@@ -81,7 +74,7 @@ def solve(
         unbalanced=unbalanced,
         unbalanced_type=unbalanced_type,
         method=method,
-        maxiter=maxiter,
+        max_iter=max_iter,
         tol=tol,
     )
     # Since we know that there is no batch dimension, we can remove it from the result:
@@ -107,7 +100,7 @@ def solve_batch(
     # string to activate some options such as
     # "symmetric", "annealing", etc.
     # Tolerance values.
-    maxiter=None,
+    max_iter=None,
     tol=None,
 ):
     # Basic checks on the solver parameters
@@ -135,12 +128,8 @@ def solve_batch(
 
     # First marginal a -------------------------------------------------------------------
 
-    a = check_marginal_batch(
-        a, cost_shape=(B, N, M), ones_like=C[:, :, 0], marginal_size=N, name="a"
-    )
-    b = check_marginal_batch(
-        b, cost_shape=(B, N, M), ones_like=C[:, 0, :], marginal_size=M, name="b"
-    )
+    a = check_marginal(a, ones_like=C[:, :, 0], marginal_size=N, name="a")
+    b = check_marginal(b, ones_like=C[:, 0, :], marginal_size=M, name="b")
 
     # Add this point, we know that:
     # - a is a (B, N) array with >= 0 values.
@@ -150,16 +139,10 @@ def solve_batch(
     if unbalanced is None:  # if we work in balanced mode
         sums_a = bk.sum(a, axis=1)  # (B,)
         sums_b = bk.sum(b, axis=1)  # (B,)
-        check_marginal_masses(sums_a, sums_b, rtol=1e-3)
+        check_marginal_masses(sums_a, sums_b)
 
     # Low-level compatibility ------------------------------------------------------------
-
-    # Check that all the arrays come from the same library (numpy, torch...):
-    library = check_library(a, b, C)
-    # Check that every array has the same numerical precision:
-    dtype = check_dtype(a, b, C)
-    # Check that every array is on the same device:
-    device = check_device(a, b, C)
+    library, dtype, device = check_library_dtype_device(a, b, C)
 
     array_properties = ArrayProperties(
         B=B,
@@ -176,7 +159,7 @@ def solve_batch(
         p=1,
         blur=reg,
         reach=unbalanced,
-        n_iter=maxiter,
+        n_iter=max_iter,
     )
 
     # N.B.: With a fixed cost matrix, there is no debiasing.

@@ -62,7 +62,7 @@ class OTExperimentConfig:
     a: Any
     b: Any
     C: Any
-    maxiter: int
+    max_iter: int
     reg: float
     means: Any = None
     covs: Any = None

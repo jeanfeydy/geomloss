@@ -51,7 +51,7 @@ def st_random_matrix(draw):
             a=a,
             b=b,
             C=C,
-            maxiter=1000,
+            max_iter=1000,
             reg=1e-4,
             atol=1e-2,
             result=ExpectedOTResult(

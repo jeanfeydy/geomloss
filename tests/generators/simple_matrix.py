@@ -73,7 +73,7 @@ def st_simple_matrix(draw):
             b=b,
             C=C,
             CT=CT,
-            maxiter=draw(st.integers(min_value=1, max_value=100)),
+            max_iter=draw(st.integers(min_value=1, max_value=100)),
             reg=draw(st.floats(min_value=1e-2, max_value=10.0)),
             atol=1e-3,
             rtol=1e-3,

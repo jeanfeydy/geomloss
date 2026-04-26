@@ -91,55 +91,27 @@ def check_device(*args):
         return devices[0]
 
 
-def check_marginal(m, *, cost_shape, ones_like, marginal_size, name):
+def check_library_dtype_device(*args):
+    # Check that all the arrays come from the same library (numpy, torch...):
+    library = check_library(*args)
+    # Check that every array has the same numerical precision:
+    dtype = check_dtype(*args)
+    # Check that every array is on the same device:
+    device = check_device(*args)
+
+    return library, dtype, device
+
+
+def check_marginal(m, *, ones_like, marginal_size, name):
     if m is None:
         m = bk.ones_like(ones_like)
         m = m / marginal_size  # By default, the marginal sums up to 1
 
-    else:
-        if len(m.shape) != 1:
-            raise ValueError(
-                f"The marginal '{name}' should be a vector with 1 dimension. "
-                f"Instead, ot.solve received an array of shape {m.shape}."
-            )
-
-        if m.shape[0] != marginal_size:
-            raise ValueError(
-                f"The dimension of the 'cost matrix' {cost_shape} "
-                f"is not compatible with that of the marginal '{name}' {m.shape}. "
-                f"We expect a vector of shape ({marginal_size},)."
-            )
-
-    # Check that all values are non-negative:
-    if bk.any(m < 0):
+    if m.shape != ones_like.shape:
         raise ValueError(
-            f"The marginal '{name}' contains negative values. "
-            f"We require that {name} >= 0."
+            f"The marginal '{name}' should be of shape {ones_like.shape}. "
+            f"Instead, received an array of shape {m.shape}."
         )
-
-    return m
-
-
-def check_marginal_batch(m, *, cost_shape, ones_like, marginal_size, name):
-    if m is None:
-        m = bk.ones_like(ones_like)
-        m = m / marginal_size  # By default, the marginal sums up to 1
-
-    else:
-        if len(m.shape) != 2:
-            raise ValueError(
-                f"Since 'cost' was given as a 3-dimensional array, "
-                f"we work in batch mode an expect that "
-                f"the marginal '{name}' is an array with 2 dimensions. "
-                f"Instead, ot.solve received an array of shape {m.shape}."
-            )
-
-        if m.shape[0] != cost_shape[0] or m.shape[1] != marginal_size:
-            raise ValueError(
-                f"The dimension of 'cost' {cost_shape} "
-                f"is not compatible with that of the marginal '{name}' {m.shape}. "
-                f"We expect an array of shape ({cost_shape[0]},{marginal_size})."
-            )
 
     # Check that all values are non-negative:
     if bk.any(m < 0):

@@ -54,7 +54,7 @@ def st_diracs_matrix(draw):
             a=draw(st.just(a) | st.none()),
             b=draw(st.just(b) | st.none()),
             C=C,
-            maxiter=draw(st.integers(min_value=1, max_value=50)),
+            max_iter=draw(st.integers(min_value=1, max_value=50)),
             reg=draw(st.floats(min_value=1e-2, max_value=10.0)),
             atol=1e-2,
             result=ExpectedOTResult(

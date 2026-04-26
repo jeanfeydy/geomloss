@@ -635,7 +635,7 @@ def st_gaussians_matrix(draw):
             means=means,
             covs=covs,
             total_mass=total_mass,
-            maxiter=1000,
+            max_iter=1000,
             reg=eps,
             unbalanced=rho,
             atol=1e-2,

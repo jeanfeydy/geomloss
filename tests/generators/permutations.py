@@ -69,7 +69,7 @@ def st_permutations_matrix(draw):
             a=a,
             b=b,
             C=C,
-            maxiter=100,
+            max_iter=100,
             reg=1e-1,
             atol=5e-2,
             rtol=5e-2,

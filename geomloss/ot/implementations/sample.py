@@ -1,5 +1,12 @@
 from ..ot_result import OTResult
-from ..check_input_output import cast_input
+
+from ...arguments import (
+    ArrayProperties,
+    check_library_dtype_device,
+    check_regularization,
+    check_marginal,
+    check_marginal_masses,
+)
 
 
 def squared_distances(x, y, use_keops=False):
@@ -48,13 +55,10 @@ def solve_sample(
     a=None,  # (N,)
     b=None,  # (M,)
     cost="sqeuclidean",
-    # We also support simple functions such as "lambda C(x_i,y_j) = ((x_i - y_j) ** 2).sum(-1) / 2".
-    # Depending on the context, these will be run on NumPy arrays, Torch tensors or KeOps LazyTensors
-    # of shape (B, N, 1, D) and (B, M, 1, D) and return a (B, N, M) "array".
-    # (B may be equal to 1 but *not* collapsed if no batch dimension was provided)
+    # We will also support simple functions such as "lambda C(x_i,y_j) = ((x_i - y_j) ** 2).sum(-1) / 2".
     debias=False,
     # Regularization:
-    reg=0,  # -> None by default
+    reg=None,  # -> None by default
     reg_type="KL",
     # Unbalanced OT:
     unbalanced=None,  # None = +infty -> balanced by default;
@@ -66,14 +70,78 @@ def solve_sample(
     # string to activate some options such as
     # "symmetric", "annealing", etc.
     # Tolerance values.
-    maxiter=None,
+    max_iter=None,
     tol=None,
     # Redundant parameters, that make sense for geometric problems:
-    p=None,  # Specifies cost(x,y) = (1/p) * |x-y|^p
-    blur=None,  # Specifies "epsilon" = blur^p
-    reach=None,  # Specifies "rho" = reach^p
+    blur=None,  # Specifies "epsilon" = p * blur^p
+    reach=None,  # Specifies "rho" = p * reach^p
     # + same other params as above
 ):
+    if cost == "sqeuclidean":
+        p = 2
+    else:
+        p = 1
+
+    if blur is not None:
+        if reg is not None:
+            raise ValueError(
+                "Parameters 'reg' and 'blur' are redundant. Please specify only one of them."
+            )
+        reg = p * (blur**p)  # Multiply by p because there is no 1/p in the cost
+
+    if reach is not None:
+        if unbalanced is not None:
+            raise ValueError(
+                "Parameters 'unbalanced' and 'reach' are redundant. Please specify only one of them."
+            )
+        unbalanced = p * (reach**p)  # Multiply by p because there is no 1/p in the cost
+
+    # Basic checks on the solver parameters ==============================================
+    check_regularization(
+        reg=reg,
+        reg_type=reg_type,
+        unbalanced=unbalanced,
+        unbalanced_type=unbalanced_type,
+        method=method,
+        tol=tol,
+    )
+
+    # Check the input data ===============================================================
+    # Samples ----------------------------------------------------------------------------
+    if len(X_a.shape) != 2:
+        raise ValueError(f"Expected X_a to be a (N, D) array. Received {X_a.shape}.")
+    if len(X_b.shape) != 2:
+        raise ValueError(f"Expected X_b to be a (M, D) array. Received {X_b.shape}.")
+
+    N, D = X_a.shape
+    M, D_ = X_b.shape
+    if D != D_:
+        raise ValueError(
+            f"Expected X_a and X_b to have the same number of coordinates per sample. "
+            f"Received D={D} for X_a and D={D_} for X_b."
+        )
+
+    # Marginals --------------------------------------------------------------------------
+    a = check_marginal(a, ones_like=X_a[:, 0], marginal_size=N, name="a")
+    b = check_marginal(b, ones_like=X_b[:, 0], marginal_size=M, name="b")
+
+    if unbalanced is None:  # if we work in balanced mode
+        sums_a = bk.sum(a, axis=0, keepdims=True)  # (1,)
+        sums_b = bk.sum(b, axis=0, keepdims=True)  # (1,)
+        check_marginal_masses(sums_a, sums_b)
+
+    # Low-level compatibility ------------------------------------------------------------
+    library, dtype, device = check_library_dtype_device(X_a, X_b, a, b)
+
+    array_properties = ArrayProperties(
+        B=0,  # No batch dimension
+        N=N,
+        M=M,
+        dtype=dtype,
+        device=device,
+        library=library,
+    )
+
     args, output_shapes = cast_input(
         X_a=(X_a, "N,D"),
         X_b=(X_b, "M,D"),
@@ -111,7 +179,7 @@ def solve_sample_batch(
     # string to activate some options such as
     # "symmetric", "annealing", etc.
     # Tolerance values.
-    maxiter=None,
+    max_iter=None,
     tol=None,
     p=None,
     blur=None,

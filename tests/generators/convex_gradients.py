@@ -115,7 +115,7 @@ def st_convex_gradients_matrix(draw):
             a=a,
             b=b,
             C=C,
-            maxiter=1000,
+            max_iter=1000,
             reg=1e-3,
             atol=1e-2,
             rtol=1e-2,

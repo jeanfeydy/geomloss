@@ -19,7 +19,7 @@ from .check_ot_result import (
 # ========================================================================================
 
 
-# Running solvers with very low reg and maxiter may produce +-inf and then NaN in the
+# Running solvers with very low reg and max_iter may produce +-inf and then NaN in the
 # final computation of the OT cost: we disable this known warning by hand.
 @given(
     ex=generators.st_simple_matrix(),
@@ -38,7 +38,7 @@ def test_symmetry(ex, method):
         b=ex.b,
         reg=ex.reg,
         unbalanced=ex.unbalanced,
-        maxiter=ex.maxiter,
+        max_iter=ex.max_iter,
         method=method,
     )
     # Compute a reverse solution:
@@ -48,7 +48,7 @@ def test_symmetry(ex, method):
         b=ex.a,
         reg=ex.reg,
         unbalanced=ex.unbalanced,
-        maxiter=ex.maxiter,
+        max_iter=ex.max_iter,
         method=method,
     )
 
@@ -84,7 +84,7 @@ def test_cost_linearity(ex, scaling, offset, method):
         b=ex.b,
         reg=ex.reg,
         unbalanced=ex.unbalanced,
-        maxiter=100,
+        max_iter=100,
         method=method,
     )
 
@@ -97,7 +97,7 @@ def test_cost_linearity(ex, scaling, offset, method):
         b=ex.b,
         reg=scaling * ex.reg,
         unbalanced=s_unbalanced,
-        maxiter=100,
+        max_iter=100,
         method=method,
     )
 
@@ -127,7 +127,7 @@ def check_solver(
         b=ex.b,
         reg=ex.reg,
         unbalanced=ex.unbalanced,
-        maxiter=ex.maxiter,
+        max_iter=ex.max_iter,
         method=method,
     )
     # Check that all the attributes have the expected values:
