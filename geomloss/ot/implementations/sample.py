@@ -1,5 +1,21 @@
+# Our generic backend, to use instead of NumPy/PyTorch/...
+from ... import backends as bk
+
+# Typing annotations:
+from ...typing import RealTensor, CostMatrices
+
+# Abstract class for our results:
 from ..ot_result import OTResult
 
+# Abstract solvers and annealing strategy:
+from ..abstract_solvers import (
+    sinkhorn_loop,
+    # sinkhorn_barycenter_loop,
+    max_diameter,
+    annealing_parameters,
+)
+
+# Utility functions:
 from ...arguments import (
     ArrayProperties,
     check_library_dtype_device,
@@ -142,11 +158,32 @@ def solve_sample(
         library=library,
     )
 
-    args, output_shapes = cast_input(
-        X_a=(X_a, "N,D"),
-        X_b=(X_b, "M,D"),
-        a=(a, "N"),
-        b=(b, "M"),
+    # Actual computations ================================================================
+    descent = annealing_parameters(
+        maxmin_cost=max_diameter(X_a, X_b) ** p,
+        eps=reg,
+        rho=unbalanced,
+        n_iter=max_iter,
+    )
+
+    # TODO: implement the two-scales method
+    if debias:
+        # TODO
+        pass
+
+    potentials = sinkhorn_loop(
+        softmin=softmin_sample,
+        log_a_list=[bk.stable_log(a)],
+        log_b_list=[bk.stable_log(b)],
+        C_list=[
+            CostMatrices(
+                xy=C,
+                yx=bk.ascontiguousarray(bk.transpose(C, (0, 2, 1))),
+            )
+        ],
+        descent=descent,
+        debias=False,
+        last_extrapolation=True,
     )
 
     return SinkhornSamplesOTResult(potentials)

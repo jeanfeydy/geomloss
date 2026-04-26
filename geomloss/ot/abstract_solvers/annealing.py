@@ -45,13 +45,12 @@ if diameter is None:
 
 def annealing_parameters(
     *,
-    diameter: float,
-    p: int,
-    blur: float,
-    reach: Optional[float] = None,
+    maxmin_cost: float,
+    eps: float,
+    rho: Optional[float] = None,
     n_iter: Optional[int] = None,
     scaling: Optional[float] = None,
-    resolutions: Optional[List[float]] = None,
+    eps_scales: Optional[List[float]] = None,
 ) -> DescentParameters:
     r"""Turns high-level arguments into numerical values for the Sinkhorn loop.
 
@@ -65,21 +64,16 @@ def annealing_parameters(
     an integer number (n_iter) or a ratio between successive scales (scaling).
 
     Args:
-        diameter (float > 0 or None): Upper bound on the largest distance between
-            sample locations :math:`x_i` and :math:`y_j`.
+        maxmin_cost (float > 0): Upper bound on the largest difference between any
+            two entries of the cost matrix. For geometric problems, this can be
+            estimated by the diameter of the configuration raised to the power p,
+            where p is equal to 2 for the squared Euclidean cost and to 1 for the Euclidean cost.
 
-        p (integer or float): The exponent of the Euclidean distance
-            :math:`\|x_i-y_j\|` that defines the cost function
-            :math:`\text{C}(x_i,y_j) =\tfrac{1}{p} \|x_i-y_j\|^p`.
-            The relation between the blur scales (that are homogeneous to a distance)
-            and the temperatures eps (that are homogeneous to the cost function)
-            across iterations is that eps = blur**p.
-
-        blur (float > 0): Target value for the blur scale and the
+        eps (float > 0): Target value for the
             temperature (= entropic regularization parameter)
-            ":math:`\varepsilon = \text{blur}^p`".
+            ":math:`\varepsilon`".
 
-        reach (float > 0 or None): Strength of the marginal constraints.
+        rho (float > 0 or None): Strength of the marginal constraints.
             None stands for +infinity, i.e. balanced optimal transport.
 
         n_iter (int >= 1 or None): Number of iterations.
@@ -87,7 +81,8 @@ def annealing_parameters(
         scaling (float in (0,1) or None): Ratio between two successive
             values of the blur scale.
 
-        resolutions (list of S float or None): List of successive scales at which
+        eps_scales (list of S float or None): List of successive temperatures
+            (i.e. values of epsilon) associated to scales at which
             we represent the input distributions. These typically correspond
             to sampling scales, i.e. to average distances between two nearest samples.
             These scales should be decreasing (we always work in a coarse-to-fine
@@ -101,12 +96,6 @@ def annealing_parameters(
             the evolution of the main parameters along the iterations of the
             Sinkhorn loop.
             We return the attributes:
-            - diameter (float): The value of the diameter that we used as an estimate
-              in the descent. Typically, it is equal to max(diameter, blur).
-
-            - blur_list (list of n_iter float > 0): List of successive values for
-              the blur length of the Sinkhorn kernel, at which we process the samples.
-              The number of iterations in the loop is equal to the length of this list.
 
             - eps_list (list of n_iter float > 0): List of successive values for
               the Sinkhorn regularization parameter, the temperature :math:`\varepsilon`.
@@ -140,7 +129,7 @@ def annealing_parameters(
         )
 
     # Make sure that the diameter is >= blur:
-    diameter = max(diameter, blur)
+    maxmin_cost = max(maxmin_cost, eps)
 
     # Compute the appropriate number of iterations, if it has not been provided already:
     if n_iter is None:
@@ -154,7 +143,7 @@ def annealing_parameters(
         else:
             # Ensure that we have enough iterations to go from diameter to blur
             # with geometric steps of size scaling:
-            n_iter = (np.log(blur) - np.log(diameter)) / np.log(scaling)
+            n_iter = (np.log(eps) - np.log(maxmin_cost)) / np.log(scaling)
             n_iter = int(np.floor(n_iter)) + 2
 
             # With the formula above, assuming that e.g.
@@ -166,35 +155,31 @@ def annealing_parameters(
     if scaling == 1:
         # The user has specified a number of iterations and a "constant" scaling:
         # this is the regular Sinkhorn algorithm, without annealing.
-        blur_list = [blur] * n_iter
+        eps_list = [eps] * n_iter
 
     elif scaling is None:
         # The user has specified a number of iterations but no scaling:
         # we follow a geometric progession from diameter to the target
         # blur value.
         if n_iter == 1:
-            blur_list = [blur]
+            eps_list = [eps]
         else:
-            blur_list = np.geomspace(diameter, blur, n_iter)
+            eps_list = np.geomspace(maxmin_cost, eps, n_iter)
 
     else:
         # The user has specified a number of iterations *and* a scaling in (0,1):
         # we follow a geometric progression of factor scaling,
         # with n_iter terms and a "floor" minimum value at blur.
-        blur_list = np.arange(n_iter)
-        blur_list = np.log(diameter) + blur_list * np.log(scaling)
-        blur_list = np.maximum(blur_list, np.log(blur))
-        blur_list = np.exp(blur_list)
+        eps_list = np.arange(n_iter)
+        eps_list = np.log(maxmin_cost) + eps_list * np.log(scaling)
+        eps_list = np.maximum(eps_list, np.log(eps))
+        eps_list = np.exp(eps_list)
 
     # Turn our scales into temperature values:
-    eps_list = [b**p for b in blur_list]
+    eps_list = list(eps_list)
 
     # We use a constant value for the unbalanced parameter rho:
-    if reach is None:
-        rho = None
-    else:
-        rho = reach**p
-    rho_list = [rho] * len(blur_list)
+    rho_list = [rho] * len(eps_list)
 
     # We perform an iteration that is associated to a precision "blur"
     # at the coarsest available resolution such that blur >= resolution.
@@ -202,40 +187,38 @@ def annealing_parameters(
     # blur[next_iteration] < current scale.
     #
     # More precisely, let's assume that:
-    # resolutions = [1., .5, .1]
-    # blur_list = [.7, .6, .5, .3, .2, .1, .05]
+    # eps_scales = [1., .5, .1]
+    # eps_list = [.7, .6, .5, .3, .2, .1, .05]
     # then:
     # scale_list = [1, 1, 1, 2, 2, 2, 2]
     # This will induce a "jump" from scale 1 to scale 2 between the
     # 3rd (blur=.5) and the 4th (blur=.3) iterations.
     #
     # Note that in this example:
-    # - We don't use the first scale (resolution = 1.0), because our first iteration
+    # - We don't use the first scale (eps_scales = 1.0), because our first iteration
     #   is already performed at blur = 0.7.
-    # - We perform the 3rd iteration (blur = 0.5) at the 2nd scale (resolution = 0.5).
-    #   Our convention is that we only jump if the blur becomes strictly smaller
+    # - We perform the 3rd iteration (eps = 0.5) at the 2nd scale (eps_scales = 0.5).
+    #   Our convention is that we only jump if the eps becomes strictly smaller
     #   than the current resolution of our representation.
-    # - We perform the last iteration (blur = .05) at the last scale (resolution = 0.1)
+    # - We perform the last iteration (eps = .05) at the last scale (eps_scales = 0.1)
     #   because we don't have access to any finer representation of the distributions.
 
-    if resolutions is None or len(resolutions) < 2:
+    if eps_scales is None or len(eps_scales) < 2:
         # Single-scale mode
-        scale_list = [0] * len(blur_list)
+        scale_list = [0] * len(eps_list)
     else:
         scale_list = []
         scale = 0  # Index for the current scale
-        for blur in blur_list:
-            while scale + 1 < len(resolutions) and blur < resolutions[scale]:
+        for eps in eps_list:
+            while scale + 1 < len(eps_scales) and eps < eps_scales[scale]:
                 scale = scale + 1
             scale_list.append(scale)
 
         # By convention, we always return a result at the finest scale available:
-        scale_list[-1] = len(resolutions) - 1
+        scale_list[-1] = len(eps_scales) - 1
 
     return DescentParameters(
-        diameter=diameter,
         scale_list=scale_list,
         eps_list=eps_list,
-        blur_list=blur_list,
         rho_list=rho_list,
     )

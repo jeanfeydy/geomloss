@@ -32,16 +32,13 @@ class SinkhornPotentials(NamedTuple):
     g_bb: Optional[RealTensor] = None  # Symmetric potential g_bb(y_j)
 
 
-# The descent parameters contains the lists of blur scales, temperatures
+# The descent parameters contains the lists of temperatures
 # epsilon and strength of the marginal constraints rho
 # that we use in successive iterations of the Sinkhorn loop.
-# It also contains a rough estimation of the diameter of our configuration,
-# and a list of integer indices that describe at which "scale" of a multiscale
-# representation we should perform each iteration.
+# It also contains a list of integer indices that describe at which "scale"
+# of a multiscale representation we should perform each iteration.
 class DescentParameters(NamedTuple):
-    diameter: float
     scale_list: List[int]  # = [0, ..., 0] for single-scale mode
-    blur_list: List[float]
     eps_list: List[float]
     rho_list: List[float]
 
