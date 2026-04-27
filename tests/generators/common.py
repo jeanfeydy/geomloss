@@ -61,9 +61,12 @@ class ExpectedOTResult:
 class OTExperimentConfig:
     a: Any
     b: Any
-    C: Any
     max_iter: int
     reg: float
+    X_a: Any = None
+    X_b: Any = None
+    cost: str = "sqeuclidean"
+    C: Any = None
     means: Any = None
     covs: Any = None
     total_mass: Any = None

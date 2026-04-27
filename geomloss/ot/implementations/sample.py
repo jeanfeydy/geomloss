@@ -2,7 +2,7 @@
 from ... import backends as bk
 
 # Typing annotations:
-from ...typing import RealTensor, CostMatrices
+from ...typing import RealTensor, CostMatrices, CostMatrix
 
 # Abstract class for our results:
 from ..ot_result import OTResult
@@ -25,43 +25,140 @@ from ...arguments import (
 )
 
 
-def squared_distances(x, y, use_keops=False):
+def squared_distances(x, y):
+    N, D = x.shape
+    M, D_ = y.shape
+    assert D == D_, "x and y should have the same number of coordinates per sample."
 
-    if use_keops and keops_available:
-        if x.dim() == 2:
-            x_i = LazyTensor(x[:, None, :])  # (N,1,D)
-            y_j = LazyTensor(y[None, :, :])  # (1,M,D)
-        elif x.dim() == 3:  # Batch computation
-            x_i = LazyTensor(x[:, :, None, :])  # (B,N,1,D)
-            y_j = LazyTensor(y[:, None, :, :])  # (B,1,M,D)
-        else:
-            print("x.shape : ", x.shape)
-            raise ValueError("Incorrect number of dimensions")
+    if bk.keops_available:
+        x_i = bk.LazyTensor(bk.view(x, (N, 1, D)))  # (N,1,D)
+        y_j = bk.LazyTensor(bk.view(y, (1, M, D)))  # (1,M,D)
 
         return ((x_i - y_j) ** 2).sum(-1)
 
     else:
-        if x.dim() == 2:
-            D_xx = (x * x).sum(-1).unsqueeze(1)  # (N,1)
-            D_xy = torch.matmul(x, y.permute(1, 0))  # (N,D) @ (D,M) = (N,M)
-            D_yy = (y * y).sum(-1).unsqueeze(0)  # (1,M)
-        elif x.dim() == 3:  # Batch computation
-            D_xx = (x * x).sum(-1).unsqueeze(2)  # (B,N,1)
-            D_xy = torch.matmul(x, y.permute(0, 2, 1))  # (B,N,D) @ (B,D,M) = (B,N,M)
-            D_yy = (y * y).sum(-1).unsqueeze(1)  # (B,1,M)
-        else:
-            print("x.shape : ", x.shape)
-            raise ValueError("Incorrect number of dimensions")
+        D_xx = bk.view(bk.sum(x * x, axis=-1), (N, 1))  # (N,1)
+        D_xy = x @ bk.transpose(y, (1, 0))  # (N,D) @ (D,M) = (N,M)
+        D_yy = bk.view(bk.sum(y * y, axis=-1), (1, M))  # (1,M)
 
         return D_xx - 2 * D_xy + D_yy
 
 
-def distances(x, y, use_keops=False):
-    if use_keops:
-        return squared_distances(x, y, use_keops=use_keops).sqrt()
+def distances(x, y):
+    if bk.use_keops:
+        return squared_distances(x, y).sqrt()
+    else:
+        return bk.sqrt(bk.clamp_min(squared_distances(x, y), 1e-8))
+
+
+def cost_matrix(x, y, *, cost="sqeuclidean"):
+    N, D = x.shape
+    M, D_ = y.shape
+    assert D == D_, "x and y should have the same number of coordinates per sample."
+
+    if cost == "sqeuclidean":
+        C_ij = squared_distances(x, y)
 
     else:
-        return torch.sqrt(torch.clamp_min(squared_distances(x, y), 1e-8))
+        raise NotImplementedError()
+
+    assert C_ij.shape == (N, M), "Cost matrix should have shape (N,M)."
+    return C_ij
+
+
+def softmin_sample(
+    eps: float,
+    log_weights: RealTensor,
+    costs: CostMatrix,
+    potentials: RealTensor,
+) -> RealTensor:
+    """Softmin function implemented with KeOps.
+
+    The softmin function is at the heart of any (stable) implementation
+    of the Sinkhorn algorithm. It takes as input:
+    - a temperature eps(ilon),
+    - log_weights lb[j] = log(b(y[j])) of shape (M,),
+    - a cost matrix C_xy[i,j] = C(x[i],y[j]) of shape (N, M),
+    - a weighted dual potential G_y[j] = g_ab(y[j]) of shape (M,).
+
+    It returns a new dual potential supported on the points x[i]:
+    f_x[i] = - eps * log(sum_j(exp[ lb[j] + (G_y[j]  -  C_xy[i,j]) / eps ] ))
+
+    In the Sinkhorn loop, we typically use calls like:
+        ft_ba = softmin(eps, b_log, C_xy, g_ab)
+
+    Args:
+        eps (float >= 0): Temperature eps(ilon), the main regularization parameter
+            of the Sinkhorn algorithm.
+        log_weights ((M,) real-valued Tensor): Batch of B vectors of shape (M,) containing
+            the logarithm of the weights of the measure b.
+        costs ((N,M) LazyTensor): Cost matrix of shape (N,M).
+        potentials ((M,) real-valued Tensor): Vector of shape (M,).
+
+    Returns:
+        (N,) real-valued Tensor:
+    """
+    log_b_y = log_weights
+    C_xy = costs
+    g_y = potentials
+
+    assert eps >= 0, "We only support non-negative temperatures (eps >= 0)."
+    assert len(C_xy.shape) == 2, "C_xy should be a (N,M) Tensor."
+    N, M = C_xy.shape
+
+    assert g_y.shape == (M,), "g_y should be a (M,) Tensor."
+    assert log_b_y.shape == (M,), "log_b_y should be a (M,) Tensor."
+
+    C_is_lazy = hasattr(C_xy, "_shape")
+
+    if eps == float("inf"):
+        # TODO: handle the case where b is not a probability measure
+        # Currently, we're "missing" the -eps * log(b_y.sum()) term.
+        b_y = bk.exp(log_b_y)  # (M,)
+        sum_b = bk.sum(b_y, axis=1, keepdims=True)  # (1,)
+
+        # Compute f_i of shape (N,):
+        if C_is_lazy:
+            g_y_j = bk.LazyTensor(bk.view(g_y, (1, M, 1)))
+            b_y_j = bk.LazyTensor(bk.view(b_y, (1, M, 1)))
+            # f_i = ((C_xy - g_y_j) * b_y_j).sum(axis=1)  # (N,)
+        else:
+            g_y_j = bk.view(g_y, (1, M))
+            b_y_j = bk.view(b_y, (1, M))
+
+        f_i = bk.sum((C_xy - g_y_j) * b_y_j, axis=1)
+        f_i = bk.view(f_i, (N,))  # May be important with KeOps
+        return f_i / sum_b
+
+    elif eps == 0:
+        # TODO: handle the case where some of the b_y are zero
+        if C_is_lazy:
+            g_y_j = bk.LazyTensor(bk.view(g_y, (1, M, 1)))
+            # f_i = (C_xy - g_y_j).min(axis=1)  # (N,) TODO: gradient?
+        else:
+            g_y_j = bk.view(g_y, (1, M))
+
+        f_i = bk.amin(C_xy - g_y_j, axis=1)  # (N,)
+        f_i = bk.view(f_i, (N,))  # May be important with KeOps
+        return f_i
+
+    else:
+        if C_is_lazy:
+            s_j = bk.LazyTensor(bk.view(log_b_y + g_y / eps, (1, M, 1)))
+            # scores_xy = s_j - C_xy / eps  # (N, M)
+            # s_i = scores_xy.logsumexp(axis=1)
+        else:
+            s_j = bk.view(log_b_y + g_y / eps, (1, M))
+
+        scores_xy = s_j - C_xy / eps  # (N, M)
+        s_i = bk.logsumexp(scores_xy, axis=1)
+        s_i = bk.view(s_i, (N,))  # May be important with KeOps
+        return -eps * s_i
+
+
+# ========================================================================================
+#                                  Actual solvers
+# ========================================================================================
 
 
 # OT on empirical distributions
@@ -167,22 +264,24 @@ def solve_sample(
     )
 
     # TODO: implement the two-scales method
+    C_xy = cost_matrix(X_a, X_b, cost=cost)
+    C_yx = cost_matrix(X_b, X_a, cost=cost)
+
     if debias:
-        # TODO
-        pass
+        C_xx = cost_matrix(X_a, X_a, cost=cost)
+        C_yy = cost_matrix(X_b, X_b, cost=cost)
+
+    else:
+        C_xx = None
+        C_yy = None
 
     potentials = sinkhorn_loop(
         softmin=softmin_sample,
         log_a_list=[bk.stable_log(a)],
         log_b_list=[bk.stable_log(b)],
-        C_list=[
-            CostMatrices(
-                xy=C,
-                yx=bk.ascontiguousarray(bk.transpose(C, (0, 2, 1))),
-            )
-        ],
+        C_list=[CostMatrices(xy=C_xy, yx=C_yx, xx=C_xx, yy=C_yy)],
         descent=descent,
-        debias=False,
+        debias=debias,
         last_extrapolation=True,
     )
 

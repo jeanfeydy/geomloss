@@ -1,4 +1,4 @@
-from .diracs import st_diracs_matrix
+from .diracs import st_diracs_matrix, st_diracs_sample
 from .permutations import st_permutations_matrix
 from .random import st_random_matrix
 from .convex_gradients import st_convex_gradients_matrix

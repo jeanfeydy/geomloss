@@ -6,6 +6,8 @@ try:
 except:
     from . import numpy as bk_torch
 
+from . import keops as bk_keops
+from .keops import keops_available, numpy_LazyTensor, torch_LazyTensor
 
 # Low-level attributes:
 device = pick(numpy=bk_numpy.device, torch=bk_torch.device)
@@ -23,11 +25,13 @@ einsum = pick(numpy=bk_numpy.einsum, torch=bk_torch.einsum, main_arg=1)
 
 # Array manipulations and reductions:
 any = pick(numpy=bk_numpy.any, torch=bk_torch.any)
-sum = pick(numpy=bk_numpy.sum, torch=bk_torch.sum)
+sum = pick(numpy=bk_numpy.sum, torch=bk_torch.sum, keops=bk_keops.sum)
 mean = pick(numpy=bk_numpy.mean, torch=bk_torch.mean)
-amin = pick(numpy=bk_numpy.amin, torch=bk_torch.amin)
+amin = pick(numpy=bk_numpy.amin, torch=bk_torch.amin, keops=bk_keops.amin)
 amax = pick(numpy=bk_numpy.amax, torch=bk_torch.amax)
-logsumexp = pick(numpy=bk_numpy.logsumexp, torch=bk_torch.logsumexp)
+logsumexp = pick(
+    numpy=bk_numpy.logsumexp, torch=bk_torch.logsumexp, keops=bk_keops.logsumexp
+)
 
 allclose = pick(numpy=bk_numpy.allclose, torch=bk_torch.allclose)
 
@@ -58,6 +62,21 @@ def cast(x, *, shape, dtype, device, library):
         if source == "numpy":
             x = bk_torch.from_numpy(x)
         return bk_torch.to(x, shape=shape, dtype=dtype, device=device)
+
+
+def LazyTensor(x):
+    assert keops_available, "Please report this issue."
+    library = get_library(x)
+    if library == "numpy":
+        return numpy_LazyTensor(x)
+    elif library == "torch":
+        return torch_LazyTensor(x)
+    else:
+        raise ValueError(
+            "Expected a NumPy array or a PyTorch tensor, "
+            f"but found {x} "
+            f"of type {type(x)}."
+        )
 
 
 # Autograd magic:
