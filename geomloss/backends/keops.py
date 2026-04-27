@@ -14,16 +14,16 @@ except ImportError:
 def sum(K_ij, axis=None, keepdims=False):
     assert axis is not None
     assert not keepdims
-    return K_ij.sum(dim=axis, keepdim=keepdims)
+    return K_ij.sum(dim=axis)
 
 
 def logsumexp(K_ij, axis=None, keepdims=False):
     assert axis is not None
     assert not keepdims
-    return K_ij.logsumexp(dim=axis, keepdim=keepdims)
+    return K_ij.logsumexp(dim=axis)
 
 
 def amin(K_ij, axis=None, keepdims=False):
     assert axis is not None
     assert not keepdims
-    return K_ij.min(dim=axis, keepdim=keepdims)
+    return K_ij.min(dim=axis)

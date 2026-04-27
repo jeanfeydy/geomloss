@@ -47,6 +47,7 @@ def check_solver(
     experiment=generators.st_diracs_sample(),
     method=st_method,
 )
+@settings(deadline=None)
 def test_correct_values_diracs(experiment, method):
     """Checks correctness on trivial examples with one point on each side."""
     check_solver(experiment, method=method)

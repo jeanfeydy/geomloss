@@ -24,6 +24,10 @@ from ...arguments import (
     check_marginal_masses,
 )
 
+# ========================================================================================
+#                              Cost functions and softmin
+# ========================================================================================
+
 
 def squared_distances(x, y):
     N, D = x.shape
@@ -102,6 +106,8 @@ def softmin_sample(
     C_xy = costs
     g_y = potentials
 
+    eps = float(eps)  # To avoid stealthy dtype issues with NumPy/PyTorch scalars
+
     assert eps >= 0, "We only support non-negative temperatures (eps >= 0)."
     assert len(C_xy.shape) == 2, "C_xy should be a (N,M) Tensor."
     N, M = C_xy.shape
@@ -115,7 +121,7 @@ def softmin_sample(
         # TODO: handle the case where b is not a probability measure
         # Currently, we're "missing" the -eps * log(b_y.sum()) term.
         b_y = bk.exp(log_b_y)  # (M,)
-        sum_b = bk.sum(b_y, axis=1, keepdims=True)  # (1,)
+        sum_b = bk.sum(b_y, axis=0, keepdims=True)  # (1,)
 
         # Compute f_i of shape (N,):
         if C_is_lazy:
@@ -275,17 +281,33 @@ def solve_sample(
         C_xx = None
         C_yy = None
 
+    C_list = [CostMatrices(xy=C_xy, yx=C_yx, xx=C_xx, yy=C_yy)]
+
     potentials = sinkhorn_loop(
         softmin=softmin_sample,
         log_a_list=[bk.stable_log(a)],
         log_b_list=[bk.stable_log(b)],
-        C_list=[CostMatrices(xy=C_xy, yx=C_yx, xx=C_xx, yy=C_yy)],
+        C_list=C_list,
         descent=descent,
         debias=debias,
         last_extrapolation=True,
     )
 
-    return SinkhornSamplesOTResult(potentials)
+    return OTResultSample(
+        X_a=X_a,
+        X_b=X_b,
+        a=a,
+        b=b,
+        C=C_list[-1],  # The finest scale
+        cost=cost,
+        reg=reg,
+        reg_type=reg_type,
+        unbalanced=unbalanced,
+        unbalanced_type=unbalanced_type,
+        debias=debias,
+        potentials=potentials,
+        array_properties=array_properties,
+    )
 
 
 # To support heterogeneous batches (which are very common in shape analysis),
@@ -333,8 +355,55 @@ def solve_sample_batch(
     return SinkhornSamplesOTResult(potentials)
 
 
-class SinkhornSamplesOTResult(OTResult):
-    pass
+class OTResultSample(OTResult):
+    def __init__(
+        self,
+        *,
+        X_a,
+        X_b,
+        a,
+        b,
+        C,
+        cost,
+        reg,
+        reg_type,
+        unbalanced,
+        unbalanced_type,
+        debias,
+        potentials,
+        array_properties,
+    ):
+        super().__init__(
+            a=a,
+            b=b,
+            C=C,
+            potentials=potentials,
+            array_properties=array_properties,
+            reg=reg,
+            reg_type=reg_type,
+            unbalanced=unbalanced,
+            unbalanced_type=unbalanced_type,
+            debias=debias,
+        )
+
+        self._X_a = X_a
+        self._X_b = X_b
+        self._cost = cost
+
+        # Fill the dictionary of "expected shapes", that will be used to format the
+        # result as expected by the user:
+        ap = self._array_properties
+
+        if ap.B == 0:
+            # Under the hood, we always work with batch dimensions, even if the user did not provide one.
+            self._shapes = {
+                "a": (ap.N,),
+                "b": (ap.M,),
+                "C": (ap.N, ap.M),
+                "B": (),
+            }
+        else:
+            raise NotImplementedError()
 
 
 # Convention:
