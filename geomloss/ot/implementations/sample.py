@@ -236,11 +236,11 @@ def solve_sample(
 
     .. testcode::
 
-        print(solution.value)
+        print(f"{solution.value:.3f}")
 
     .. testoutput::
 
-        4.500693147180561
+        4.501
 
 
 

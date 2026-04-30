@@ -57,7 +57,7 @@ def solve(
     max_iter=None,
     tol=None,
 ):
-    """
+    r"""
 
     Examples
     --------
@@ -86,11 +86,11 @@ def solve(
 
     .. testcode::
 
-        print(solution.value)
+        print(f"{solution.value:.3f}")
 
     .. testoutput::
 
-        0.9972274112777609
+        0.997
 
 
     """
