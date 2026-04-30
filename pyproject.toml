@@ -82,4 +82,15 @@ packages = ["geomloss"]
 version = { attr = "geomloss.__version__" }
 
 [tool.pytest.ini_options]
-addopts = "--durations=0"
+addopts = [
+  "-ra",
+  "--showlocals",
+  "--strict-markers",
+  "--strict-config",
+  "--cov=geomloss",
+  "--doctest-modules",
+  "--cov-report=html",
+  "--durations=0",
+  "./tests",
+  "./geomloss",
+]

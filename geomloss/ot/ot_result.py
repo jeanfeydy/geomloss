@@ -18,6 +18,7 @@ class OTResult:
         b,
         potentials,
         array_properties,
+        batchsize,
         reg,
         reg_type,
         unbalanced,
@@ -38,6 +39,7 @@ class OTResult:
         self._C = C
         self._potentials = potentials
         self._array_properties = array_properties
+        self._batchsize = batchsize
 
         self._reg = reg
         self._reg_type = reg_type
@@ -173,6 +175,7 @@ class OTResult:
             eps=self._reg,
             rho=self._unbalanced,
             debias=self._debias,
+            batchsize=self._batchsize,
         )
         return self.cast(values, "B")
 

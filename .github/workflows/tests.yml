@@ -43,11 +43,11 @@ jobs:
       # Tests are run first without pykeops
       - name: Test (minimal dependencies)
         run: |
-          pytest -x --cov-report xml:coverage.xml --durations=0
+          PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 pytest -x --cov-report xml:coverage.xml --durations=0
 
       # Then, with all optional dependencies
       - name: Test (with all optional dependencies)
         run: |
           pip install -e .[full] --group dev
-          pytest -x --cov-append --cov-report xml:coverage_opt.xml --durations=0
+          PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 pytest -x --cov-append --cov-report xml:coverage_opt.xml --durations=0
 

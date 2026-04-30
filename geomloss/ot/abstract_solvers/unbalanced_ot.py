@@ -22,6 +22,7 @@ def sinkhorn_cost(
     *,
     a: RealTensor,
     b: RealTensor,
+    batchsize: int,
     potentials: SinkhornPotentials,
     eps: float,
     rho: Optional[float],
@@ -75,6 +76,18 @@ def sinkhorn_cost(
         assert f_aa.shape == a.shape
     if g_bb is not None:
         assert g_bb.shape == b.shape
+
+    # The code below is written for batch mode.
+    # If the batchsize is 0, we add a dummy dimension in front of all the inputs.
+    if batchsize == 0:
+        a = a[None, ...]
+        b = b[None, ...]
+        f_ba = f_ba[None, ...]
+        g_ab = g_ab[None, ...]
+        if f_aa is not None:
+            f_aa = f_aa[None, ...]
+        if g_bb is not None:
+            g_bb = g_bb[None, ...]
 
     # Make sure that eps and rho are None or > 0:
     assert eps > 0
@@ -158,7 +171,14 @@ def sinkhorn_cost(
 
     a_costs = bk.dot_products(a, F_a)  # (B,)
     b_costs = bk.dot_products(b, G_b)  # (B,)
-    return a_costs + b_costs
+
+    total_costs = a_costs + b_costs
+
+    assert total_costs.shape == (max(batchsize, 1),)
+    if batchsize == 0:
+        total_costs = total_costs[0]
+
+    return total_costs
 
 
 """

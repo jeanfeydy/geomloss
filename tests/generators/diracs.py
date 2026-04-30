@@ -136,7 +136,7 @@ def st_diracs_sample(draw):
             result=ExpectedOTResult(
                 value=value,
                 # value_linear=value,
-                # plan=plan,
+                plan=plan,
                 potential_a=potential_a,
                 potential_b=potential_b,
                 # marginal_a=a,

@@ -4,6 +4,9 @@ from ... import backends as bk
 # Typing annotations:
 from ...typing import RealTensor, CostMatrices
 
+# Input converter:
+from ...input_validation import convert_inputs
+
 # Abstract class for our results:
 from ..ot_result import OTResult
 
@@ -32,6 +35,7 @@ from ...arguments import (
 # ----------------------------------------------------------------------------------------
 
 
+@convert_inputs("C", "a", "b")
 def solve(
     C,  # (N, M)
     *,
@@ -53,6 +57,43 @@ def solve(
     max_iter=None,
     tol=None,
 ):
+    """
+
+    Examples
+    --------
+
+    .. testcode::
+
+        from geomloss import ot
+
+        # Solve a balanced, 2x3 OT problem with entropic regularization:
+        solution = ot.solve(
+            C=[
+                [0., 1., 4.],
+                [2., 1., 0.]
+            ],
+            a=[2, 2],
+            b=[1, 1, 2],
+            reg=0.001,
+            max_iter=100,
+        )
+        print(solution.plan)
+
+    .. testoutput::
+
+        [[1. 1. 0.]
+         [0. 0. 2.]]
+
+    .. testcode::
+
+        print(solution.value)
+
+    .. testoutput::
+
+        0.9972274112777609
+
+
+    """
     if len(C.shape) != 2:
         raise ValueError(
             "The 'cost' matrix should be an array with 2 dimensions. "
@@ -82,6 +123,7 @@ def solve(
     return result
 
 
+@convert_inputs("C", "a", "b")
 def solve_batch(
     C,  # (B, N, M)  (B is the batch dimension)
     *,
@@ -111,6 +153,7 @@ def solve_batch(
         unbalanced_type=unbalanced_type,
         method=method,
         tol=tol,
+        max_iter=max_iter,
     )
 
     # Check the input data ===============================================================
@@ -213,6 +256,7 @@ class OTResultMatrix(OTResult):
             C=C,
             potentials=potentials,
             array_properties=array_properties,
+            batchsize=array_properties.B,
             reg=reg,
             reg_type=reg_type,
             unbalanced=unbalanced,
@@ -236,6 +280,8 @@ class OTResultMatrix(OTResult):
         """Removes the batch dimension, assuming that it is a dummy one."""
         ap = self._array_properties
         assert ap.B == 1
+        assert self._batchsize == 1
+        self._batchsize = 0
 
         self._shapes = {
             "a": (ap.N,),

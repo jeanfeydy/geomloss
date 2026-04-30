@@ -16,7 +16,7 @@ CostFunction = Any
 # and y[i] <-> y[j].
 class CostMatrices(NamedTuple):
     xy: CostMatrix  # C(x[i], y[j])
-    yx: CostMatrix  # C(y[i], x[j])
+    yx: CostMatrix = None  # C(y[i], x[j])
     xx: Optional[CostMatrix] = None  # C(x[i], x[j])
     yy: Optional[CostMatrix] = None  # C(y[i], y[j])
 

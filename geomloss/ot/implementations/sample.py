@@ -4,6 +4,9 @@ from ... import backends as bk
 # Typing annotations:
 from ...typing import RealTensor, CostMatrices, CostMatrix
 
+# Input converter:
+from ...input_validation import convert_inputs
+
 # Abstract class for our results:
 from ..ot_result import OTResult
 
@@ -29,23 +32,35 @@ from ...arguments import (
 # ========================================================================================
 
 
-def squared_distances(x, y):
+def squared_distances(x, y, *, matrix_type):
     N, D = x.shape
     M, D_ = y.shape
     assert D == D_, "x and y should have the same number of coordinates per sample."
 
-    if bk.keops_available:
+    if matrix_type == "auto":
+        if bk.keops_available:
+            matrix_type = "lazy"
+        else:
+            matrix_type = "dense"
+
+    if matrix_type == "lazy":
         x_i = bk.LazyTensor(bk.view(x, (N, 1, D)))  # (N,1,D)
         y_j = bk.LazyTensor(bk.view(y, (1, M, D)))  # (1,M,D)
 
         return ((x_i - y_j) ** 2).sum(-1)
 
-    else:
+    elif matrix_type == "dense":
         D_xx = bk.view(bk.sum(x * x, axis=-1), (N, 1))  # (N,1)
         D_xy = x @ bk.transpose(y, (1, 0))  # (N,D) @ (D,M) = (N,M)
         D_yy = bk.view(bk.sum(y * y, axis=-1), (1, M))  # (1,M)
 
         return D_xx - 2 * D_xy + D_yy
+
+    else:
+        raise ValueError(
+            f"Unknown matrix_type={matrix_type}. "
+            f"Expected 'auto', 'lazy' or 'dense'."
+        )
 
 
 def distances(x, y):
@@ -55,13 +70,13 @@ def distances(x, y):
         return bk.sqrt(bk.clamp_min(squared_distances(x, y), 1e-8))
 
 
-def cost_matrix(x, y, *, cost="sqeuclidean"):
+def cost_matrix(x, y, cost="sqeuclidean", matrix_type="auto"):
     N, D = x.shape
     M, D_ = y.shape
     assert D == D_, "x and y should have the same number of coordinates per sample."
 
     if cost == "sqeuclidean":
-        C_ij = squared_distances(x, y)
+        C_ij = squared_distances(x, y, matrix_type=matrix_type)
 
     else:
         raise NotImplementedError()
@@ -115,7 +130,7 @@ def softmin_sample(
     assert g_y.shape == (M,), "g_y should be a (M,) Tensor."
     assert log_b_y.shape == (M,), "log_b_y should be a (M,) Tensor."
 
-    C_is_lazy = hasattr(C_xy, "_shape")
+    C_is_lazy = bk.get_library(C_xy) == "keops"
 
     if eps == float("inf"):
         # TODO: handle the case where b is not a probability measure
@@ -168,6 +183,7 @@ def softmin_sample(
 
 
 # OT on empirical distributions
+@convert_inputs("X_a", "X_b", "a", "b")
 def solve_sample(
     X_a,  # (N, D)
     X_b,  # (M, D)
@@ -196,6 +212,39 @@ def solve_sample(
     reach=None,  # Specifies "rho" = p * reach^p
     # + same other params as above
 ):
+    """
+
+    Examples
+    --------
+
+    .. testcode::
+
+        from geomloss import ot
+
+        solution = ot.solve_sample(
+            X_a=[[0, 0], [0, 2]],
+            X_b=[[2, 1], [2, 2]],
+            reg=0.001,
+            max_iter=100,
+        )
+        print(solution.plan)
+
+    .. testoutput::
+
+        [[0.5 0. ]
+         [0.  0.5]]
+
+    .. testcode::
+
+        print(solution.value)
+
+    .. testoutput::
+
+        4.500693147180561
+
+
+
+    """
     if cost == "sqeuclidean":
         p = 2
     else:
@@ -223,6 +272,7 @@ def solve_sample(
         unbalanced_type=unbalanced_type,
         method=method,
         tol=tol,
+        max_iter=max_iter,
     )
 
     # Check the input data ===============================================================
@@ -363,7 +413,7 @@ class OTResultSample(OTResult):
         X_b,
         a,
         b,
-        C,
+        C: CostMatrices,
         cost,
         reg,
         reg_type,
@@ -376,9 +426,10 @@ class OTResultSample(OTResult):
         super().__init__(
             a=a,
             b=b,
-            C=C,
+            # C=C,  # see below with cost
             potentials=potentials,
             array_properties=array_properties,
+            batchsize=0,
             reg=reg,
             reg_type=reg_type,
             unbalanced=unbalanced,
@@ -389,6 +440,13 @@ class OTResultSample(OTResult):
         self._X_a = X_a
         self._X_b = X_b
         self._cost = cost
+
+        if bk.get_library(C.xy) == "keops":
+            self._C_lazy = C
+            self._C_dense = None
+        else:
+            self._C_lazy = None
+            self._C_dense = C
 
         # Fill the dictionary of "expected shapes", that will be used to format the
         # result as expected by the user:
@@ -404,6 +462,51 @@ class OTResultSample(OTResult):
             }
         else:
             raise NotImplementedError()
+
+    @property
+    def plan(self):
+        """Transport plan, encoded as a dense array."""
+        # N.B.: We may catch out-of-memory errors and suggest
+        # the use of lazy_plan or sparse_plan when appropriate.
+
+        # Compute and store the dense cost matrix if we only have a lazy one:
+        if self._C_dense is None:
+            self._C_dense = CostMatrices(
+                xy=cost_matrix(
+                    self._X_a, self._X_b, cost=self._cost, matrix_type="dense"
+                )
+            )
+
+        C = self._C_dense.xy
+        f = self._potentials.f_ba
+        g = self._potentials.g_ab
+        a = self._a
+        b = self._b
+
+        ap = self._array_properties
+        assert C.shape == (ap.N, ap.M)
+        assert f.shape == (ap.N,)
+        assert g.shape == (ap.M,)
+        assert a.shape == (ap.N,)
+        assert b.shape == (ap.M,)
+
+        eps = self._reg
+        if self._reg_type != "KL":
+            raise NotImplementedError(
+                "Currently, we only support 'KL' "
+                "as regularization for the OT problem."
+            )
+        assert eps > 0
+
+        # Compute the transport plan:
+        P_ij = bk.exp((f[:, None] + g[None, :] - C) / eps) * a[:, None] * b[None, :]
+        return self.cast(P_ij, "C")
+
+    @property
+    def lazy_plan(self):
+        """Transport plan, encoded as a symbolic KeOps LazyTensor."""
+        if self._C_lazy is None:
+            return None
 
 
 # Convention:

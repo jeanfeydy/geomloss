@@ -19,6 +19,7 @@ def check_regularization(
     unbalanced_type,
     method,
     tol,
+    max_iter,
 ):
     if reg < 0:
         raise ValueError(f"Parameter 'reg' should be >= 0. Received {reg}.")
@@ -42,6 +43,9 @@ def check_regularization(
 
     if method != "auto":
         raise NotImplementedError("Currently, we only support a single method.")
+
+    if max_iter is None:
+        raise ValueError("The 'max_iter' parameter should be a positive integer.")
 
     if tol is not None:
         raise NotImplementedError(
