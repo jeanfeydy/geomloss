@@ -1,4 +1,5 @@
 from .. import backends as bk
+from ..cache import add_cached_methods_to_sphinx, cache_methods_and_properties
 from .abstract_solvers.unbalanced_ot import sinkhorn_cost
 import math
 
@@ -154,6 +155,7 @@ class LinearOperator:
         )
 
 
+@add_cached_methods_to_sphinx
 class OTResult:
     """Abstract class for optimal transport results.
 
@@ -216,6 +218,47 @@ class OTResult:
         # methods (e.g. "plan" and "lazy_plan" but not "sparse_plan", etc.).
         # log is a dictionary containing potential information about the solver
 
+        # ----------------------------------------------------------------------------
+        # Start of the Python magic (hack?) to load the features-computing methods,
+        # memoize the properties (with cache clearing when users update the points,
+        # edges or triangles), and add the methods to the class with a docstring that
+        # is fully compatible with Sphinx autodoc.
+        # ----------------------------------------------------------------------------
+
+        # Cached methods: for reference on the Python syntax,
+        # see "don't lru_cache methods! (intermediate) anthony explains #382",
+        # https://www.youtube.com/watch?v=sVjtp6tGo0g
+        cache_methods_and_properties(
+            cls=self.__class__,  # OTResult,
+            instance=self,
+            cache_size=1,
+        )
+
+    _cached_methods = ()
+    _cached_properties = (
+        "potential_a",
+        "potential_b",
+        "potential_aa",
+        "potential_bb",
+        "density",
+        "sparse_density",
+        "lazy_density",
+        "density_operator",
+        "plan",
+        "sparse_plan",
+        "lazy_plan",
+        "plan_operator",
+        "value",
+        "value_linear",
+        "marginal_a",
+        "marginal_b",
+        "a_to_b",
+        "b_to_a",
+        "citation",
+    )
+
+    from ..cache import cache_clear
+
     def cast(self, x, shape):
         return bk.cast(
             x,
@@ -226,8 +269,7 @@ class OTResult:
         )
 
     # Dual potentials ====================================================================
-    @property
-    def potential_a(self):
+    def _potential_a(self):
         """First dual potential, associated to the source measure `a`.
 
         This real-valued Tensor has the same shape and numerical dtype as the
@@ -237,8 +279,7 @@ class OTResult:
         """
         return self.cast(self._potentials.f_ba, "a")
 
-    @property
-    def potential_b(self):
+    def _potential_b(self):
         """Second dual potential, associated to the target measure `b`.
 
         This real-valued Tensor has the same shape and numerical dtype as the
@@ -248,8 +289,7 @@ class OTResult:
         """
         return self.cast(self._potentials.g_ab, "b")
 
-    @property
-    def potential_aa(self):
+    def _potential_aa(self):
         """Dual potential associated to the self-interaction of the source measure `a`.
 
         This potential is only defined when using a debiased Sinkhorn solver.
@@ -266,8 +306,7 @@ class OTResult:
 
         return self.cast(self._potentials.f_aa, "a")
 
-    @property
-    def potential_bb(self):
+    def _potential_bb(self):
         """Dual potential associated to the self-interaction of the target measure `b`.
 
         This potential is only defined when using a debiased Sinkhorn solver.
@@ -285,45 +324,45 @@ class OTResult:
         return self.cast(self._potentials.g_bb, "b")
 
     # Transport plan =====================================================================
-    @property
-    def plan(self):
+    def _density(self):
+        """Density of the transport plan with respect to the reference measure, encoded as a dense array."""
+        return None
+
+    def _sparse_density(self):
+        """Density of the transport plan with respect to the reference measure, encoded as a sparse array."""
+        return None
+
+    def _lazy_density(self):
+        """Density of the transport plan with respect to the reference measure, encoded as a symbolic KeOps LazyTensor."""
+        return None
+
+    def _density_operator(self):
+        """Density of the transport plan with respect to the reference measure, encoded as a linear operator."""
+        return None
+
+    def _plan(self):
         """Transport plan, encoded as a dense array."""
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
         return None
 
-    @property
-    def sparse_plan(self):
+    def _sparse_plan(self):
         """Transport plan, encoded as a sparse array."""
         return None
 
-    @property
-    def lazy_plan(self):
+    def _lazy_plan(self):
         """Transport plan, encoded as a symbolic KeOps LazyTensor."""
         return None
 
-    @property
-    def density_operator(self):
-        """Density operator, i.e. exp((f_i + g_j - C(x_i, y_j)) / eps) for the Sinkhorn algorithm.
-
-        Behaves like a (B, N, M) tensor in batch mode and like a (N, M) tensor otherwise.
-        """
-        return None
-
-    @property
-    def plan_operator(self):
-        """Transport plan, encoded as a linear operator that can be applied to vectors.
-
-        Behaves like a ((B, N), (B, M)) tensor in batch mode and like a (N, M) tensor otherwise.
-        """
+    def _plan_operator(self):
+        """Transport plan, encoded as a linear operator."""
 
         a = self.cast(self._a, "a")
         b = self.cast(self._b, "b")
         return self.density_operator.rescale(input_scaling=b, output_scaling=a)
 
     # Loss values ========================================================================
-    @property
-    def value(self):
+    def _value(self):
         """Full transport cost, including possible regularization terms."""
         if self._reg_type != "KL":
             raise NotImplementedError(
@@ -350,14 +389,12 @@ class OTResult:
         )
         return self.cast(values, "B")
 
-    @property
-    def value_linear(self):
+    def _value_linear(self):
         """The "bare bones" transport cost, i.e. the product between the transport plan and the cost."""
         return None
 
     # Marginal constraints ===============================================================
-    @property
-    def marginal_a(self):
+    def _marginal_a(self):
         """First marginal of the transport plan, with the same shape as the source weights `a`."""
         a = self.cast(self._a, "a")
         b = self.cast(self._b, "b")
@@ -367,8 +404,7 @@ class OTResult:
         marginal = a * density
         return self.cast(marginal, "a")
 
-    @property
-    def marginal_b(self):
+    def _marginal_b(self):
         """Second marginal of the transport plan, with the same shape as the target weights `b`."""
         a = self.cast(self._a, "a")
         b = self.cast(self._b, "b")
@@ -382,13 +418,11 @@ class OTResult:
     # Return the displacement vectors as an array
     # that has the same shape as "xa"/"xb" (for samples)
     # or "a"/"b" * D (for images)?
-    @property
-    def a_to_b(self):
+    def _a_to_b(self):
         """Displacement vectors from the first to the second measure."""
         return None
 
-    @property
-    def b_to_a(self):
+    def _b_to_a(self):
         """Displacement vectors from the second to the first measure."""
         return None
 
@@ -404,8 +438,7 @@ class OTResult:
     #     raise NotImplementedError()
 
     # Miscellaneous ======================================================================
-    @property
-    def citation(self):
+    def _citation(self):
         r"""Appropriate citation(s) for this result, in plain text and BibTex formats."""
 
         # The string below refers to the GeomLoss library:

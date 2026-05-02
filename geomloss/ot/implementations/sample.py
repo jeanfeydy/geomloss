@@ -464,8 +464,7 @@ class OTResultSample(OTResult):
         else:
             raise NotImplementedError()
 
-    @property
-    def density(self):
+    def _density(self):
         """Density of the transport plan with respect to the reference measure, encoded as a dense (N, M) array."""
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
@@ -503,8 +502,7 @@ class OTResultSample(OTResult):
         assert P_ij.shape == (ap.N, ap.M)
         return self.cast(P_ij, "C")
 
-    @property
-    def lazy_density(self):
+    def _lazy_density(self):
         """Density of the transport plan, encoded as a symbolic KeOps LazyTensor."""
         if self._C_lazy is None:
             return None
@@ -533,8 +531,7 @@ class OTResultSample(OTResult):
             assert P_ij.shape == (ap.N, ap.M)
             return P_ij
 
-    @property
-    def density_operator(self):
+    def _density_operator(self):
         """Density of the transport plan, encoded as a LinearOperator."""
         if self.lazy_density is not None:
             return LinearOperator.from_lazy_tensor(
@@ -549,8 +546,7 @@ class OTResultSample(OTResult):
                 output_shape=self._shapes["a"],
             )
 
-    @property
-    def plan(self):
+    def _plan(self):
         """Transport plan, encoded as a dense array."""
         density = self.density
         a = self._a
@@ -565,8 +561,7 @@ class OTResultSample(OTResult):
         P_ij = density * a[:, None] * b[None, :]
         return self.cast(P_ij, "C")
 
-    @property
-    def lazy_plan(self):
+    def _lazy_plan(self):
         """Transport plan, encoded as a symbolic KeOps LazyTensor."""
         if self._C_lazy is None:
             return None

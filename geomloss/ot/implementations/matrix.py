@@ -290,7 +290,6 @@ class OTResultMatrix(OTResult):
             "B": (),
         }
 
-    @property
     def _density(self):
         # Load the relevant quantities:
         f = self._potentials.f_ba  # (B, N)
@@ -308,37 +307,40 @@ class OTResultMatrix(OTResult):
         assert eps > 0
 
         # Compute the main term in the expression of the optimal plan:
-        return bk.exp((f[:, :, None] + g[:, None, :] - C) / eps)  # (B,N,M)
+        D_ij = bk.exp((f[:, :, None] + g[:, None, :] - C) / eps)  # (B,N,M)
+        return self.cast(D_ij, "C")  # Cast as a (N,M) or (B,N,M) Tensor
 
-    @property
-    def density_operator(self):
-        density = self.cast(self._density, "C")  # Cast as a (N,M) or (B,N,M) Tensor
-
+    def _density_operator(self):
         return LinearOperator.from_dense(
-            density,
+            self.density,
             input_shape=self._shapes["b"],
             output_shape=self._shapes["a"],
         )
 
-    @property
-    def plan(self):
+    def _plan(self):
         # Load the relevant quantities:
         a = self._a  # (B, N)
         b = self._b  # (B, M)
-        plan = self._density  # (B, N, M)
+        dens = self.density  # (N, M) or (B, N, M)
 
         # Make sure that everyone has the expected shape:
         ap = self._array_properties
         B, N, M = ap.B, ap.N, ap.M
 
+        if self._batchsize == 0:
+            assert dens.shape == (N, M)
+            assert B == 1
+            # Add a dummy batch dimension
+            dens = bk.view(dens, (B, N, M))
+
         assert a.shape == (B, N)
         assert b.shape == (B, M)
-        assert plan.shape == (B, N, M)
+        assert dens.shape == (B, N, M)
 
         # Actual computation:
         if self._reg_type == "KL":
             # Multiply by the reference product measure:
-            plan = a[:, :, None] * b[:, None, :] * plan  # (B,N,1) * (B,1,M) * (B,N,M)
+            plan = a[:, :, None] * b[:, None, :] * dens  # (B,N,1) * (B,1,M) * (B,N,M)
         else:
             raise NotImplementedError(
                 "Currently, we only support the computation "
