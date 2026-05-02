@@ -1,24 +1,24 @@
 # Our generic backend, to use instead of NumPy/PyTorch/...
-from ... import backends as bk
+from ... import _backends as bk
 
 # Typing annotations:
-from ...typing import RealTensor, CostMatrices
+from ..._typing import RealTensor, CostMatrices
 
 # Input converter:
-from ...input_validation import convert_inputs
+from ..._input_validation import convert_inputs
 
 # Abstract class for our results:
-from ..ot_result import OTResult, LinearOperator
+from .._ot_result import OTResult, LinearOperator
 
 # Abstract solvers and annealing strategy:
-from ..abstract_solvers import (
+from .._abstract_solvers import (
     sinkhorn_loop,
     # sinkhorn_barycenter_loop,
     annealing_parameters,
 )
 
 # Utility functions:
-from ...arguments import (
+from ..._arguments import (
     ArrayProperties,
     check_library_dtype_device,
     check_regularization,

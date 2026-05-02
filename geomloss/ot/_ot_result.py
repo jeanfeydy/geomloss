@@ -1,6 +1,6 @@
-from .. import backends as bk
-from ..cache import add_cached_methods_to_sphinx, cache_methods_and_properties
-from .abstract_solvers.unbalanced_ot import sinkhorn_cost
+from .. import _backends as bk
+from .._cache import add_cached_methods_to_sphinx, cache_methods_and_properties
+from ._abstract_solvers.unbalanced_ot import sinkhorn_cost
 import math
 
 
@@ -257,7 +257,7 @@ class OTResult:
         "citation",
     )
 
-    from ..cache import cache_clear
+    from .._cache import cache_clear
 
     def cast(self, x, shape):
         return bk.cast(

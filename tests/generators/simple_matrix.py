@@ -3,7 +3,7 @@ from .common import OTExperimentConfig, ExpectedOTResult, cast
 from .common import st_N, st_M, st_batchsize, st_library_dtype_device
 from hypothesis import strategies as st
 from hypothesis.extra.numpy import arrays as st_arrays
-from geomloss import backends as bk
+from geomloss import _backends as bk
 
 
 @st.composite

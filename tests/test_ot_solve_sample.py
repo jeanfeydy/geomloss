@@ -5,7 +5,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from geomloss import ot
-from geomloss import backends as bk
+from geomloss import _backends as bk
 from .generators.common import st_method, cast, OTExperimentConfig
 from . import generators
 from .check_ot_result import (

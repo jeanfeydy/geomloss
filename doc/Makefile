@@ -56,6 +56,7 @@ clean:
 	rm -rf $(BUILDDIR)/*
 	rm -rf _auto_examples/
 	rm -rf _auto_tutorials/
+	rm -rf api/stubs/
 
 html-noplot: export SPHX_GLR_THEME = $(theme)
 html-noplot:

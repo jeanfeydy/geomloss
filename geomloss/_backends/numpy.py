@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import special
 
-from ..typing import RealTensor
+from .._typing import RealTensor
 
 
 def device(a: RealTensor):

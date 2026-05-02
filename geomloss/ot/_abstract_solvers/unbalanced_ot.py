@@ -6,8 +6,8 @@ Thibault Séjourné, Jean Feydy, François-Xavier Vialard, Alain Trouvé, Gabrie
 https://arxiv.org/pdf/1910.12958.pdf
 """
 
-from ... import backends as bk
-from ...typing import Optional, RealTensor, SinkhornPotentials
+from ... import _backends as bk
+from ..._typing import Optional, RealTensor, SinkhornPotentials
 
 
 def dampening(*, eps: float, rho: Optional[float]):

@@ -60,10 +60,10 @@ class SamplesLoss(Module):
               - ``"energy"``: Energy Distance MMD, computed using the kernel
                 :math:`k(x,y) = -\|x-y\|_2`.
               - ``"gaussian"``: Gaussian MMD, computed using the kernel
-                :math:`k(x,y) = \exp \\big( -\|x-y\|_2^2 \,/\, 2\sigma^2)`
+                :math:`k(x,y) = \exp ( -\|x-y\|_2^2 \,/\, 2\sigma^2)`
                 of standard deviation :math:`\sigma` = **blur**.
               - ``"laplacian"``: Laplacian MMD, computed using the kernel
-                :math:`k(x,y) = \exp \\big( -\|x-y\|_2 \,/\, \sigma)`
+                :math:`k(x,y) = \exp ( -\|x-y\|_2 \,/\, \sigma)`
                 of standard deviation :math:`\sigma` = **blur**.
 
         p (int, default=2): If **loss** is ``"sinkhorn"`` or ``"hausdorff"``,
@@ -71,7 +71,7 @@ class SamplesLoss(Module):
             The supported values are:
 
               - **p** = 1: :math:`~~C(x,y) ~=~ \|x-y\|_2`.
-              - **p** = 2: :math:`~~C(x,y) ~=~ \\tfrac{1}{2}\|x-y\|_2^2`.
+              - **p** = 2: :math:`~~C(x,y) ~=~ \tfrac{1}{2}\|x-y\|_2^2`.
 
         blur (float, default=.05): The finest level of detail that
             should be handled by the loss function - in
@@ -81,7 +81,7 @@ class SamplesLoss(Module):
               it is the standard deviation :math:`\sigma` of the convolution kernel.
             - If **loss** is ``"sinkhorn"`` or ``"hausdorff"``,
               it is the typical scale :math:`\sigma` associated
-              to the temperature :math:`\\varepsilon = \sigma^p`.
+              to the temperature :math:`\varepsilon = \sigma^p`.
               The default value of .05 is sensible for input
               measures that lie in the unit square/cube.
 
@@ -90,18 +90,18 @@ class SamplesLoss(Module):
 
         reach (float, default=None= :math:`+\infty` ): If **loss** is ``"sinkhorn"``
             or ``"hausdorff"``,
-            specifies the typical scale :math:`\\tau` associated
-            to the constraint strength :math:`\\rho = \\tau^p`.
+            specifies the typical scale :math:`\tau` associated
+            to the constraint strength :math:`\rho = \tau^p`.
 
         diameter (float, default=None): A rough indication of the maximum
-            distance between points, which is used to tune the :math:`\\varepsilon`-scaling
+            distance between points, which is used to tune the :math:`\varepsilon`-scaling
             descent and provide a default heuristic for clustering **multiscale** schemes.
             If **None**, a conservative estimate will be computed on-the-fly.
 
         scaling (float, default=.5): If **loss** is ``"sinkhorn"``,
             specifies the ratio between successive values
-            of :math:`\sigma=\\varepsilon^{1/p}` in the
-            :math:`\\varepsilon`-scaling descent.
+            of :math:`\sigma=\varepsilon^{1/p}` in the
+            :math:`\varepsilon`-scaling descent.
             This parameter allows you to specify the trade-off between
             speed (**scaling** < .4) and accuracy (**scaling** > .9).
 
@@ -110,14 +110,14 @@ class SamplesLoss(Module):
             a Gaussian/Laplacian kernel as a multiple of its standard deviation.
             If **truncate** is not **None**, kernel truncation
             steps will assume that
-            :math:`\\exp(-x/\sigma)` or
-            :math:`\\exp(-x^2/2\sigma^2)` are zero when
-            :math:`\|x\| \,>\, \\text{truncate}\cdot \sigma`.
+            :math:`\exp(-x/\sigma)` or
+            :math:`\exp(-x^2/2\sigma^2)` are zero when
+            :math:`\|x\| \,>\, \text{truncate}\cdot \sigma`.
 
 
         cost (function or string, default=None): if **loss** is ``"sinkhorn"``
             or ``"hausdorff"``, specifies the cost function that should
-            be used instead of :math:`\\tfrac{1}{p}\|x-y\|^p`:
+            be used instead of :math:`\tfrac{1}{p}\|x-y\|^p`:
 
             - If **backend** is ``"tensorized"``, **cost** should be a
               python function that takes as input a
@@ -146,11 +146,11 @@ class SamplesLoss(Module):
             instead of differentiable scalar value.
             These dual vectors :math:`(F(x_i))` and :math:`(G(y_j))`
             are encoded as Torch tensors, with the same shape
-            as the input weights :math:`(\\alpha_i)` and :math:`(\\beta_j)`.
+            as the input weights :math:`(\alpha_i)` and :math:`(\beta_j)`.
 
         verbose (bool, default=False): If **backend** is ``"multiscale"``,
             specifies whether information on the clustering and
-            :math:`\\varepsilon`-scaling descent should be displayed
+            :math:`\varepsilon`-scaling descent should be displayed
             in the standard output.
 
         backend (string, default = ``"auto"``): The implementation that

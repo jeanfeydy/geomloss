@@ -157,6 +157,13 @@ todo_include_todos = False
 # a list of builtin themes.
 html_theme = "sphinx_rtd_theme"
 
+
+if True:
+    # See https://stackoverflow.com/questions/2701998/automatically-document-all-modules-recursively-with-sphinx-autodoc/62613202#62613202
+    # for the templating magic...
+    templates_path = ["_templates"]
+    autosummary_generate = True
+
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
 # documentation.

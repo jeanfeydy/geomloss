@@ -1,5 +1,5 @@
 import pytest_check as check
-from geomloss import backends as bk
+from geomloss import _backends as bk
 
 
 def check_approx_equal(a, b, atol=0.0, rtol=0.0, name=""):
