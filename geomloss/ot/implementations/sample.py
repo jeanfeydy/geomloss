@@ -8,7 +8,7 @@ from ...typing import RealTensor, CostMatrices, CostMatrix
 from ...input_validation import convert_inputs
 
 # Abstract class for our results:
-from ..ot_result import OTResult
+from ..ot_result import OTResult, LinearOperator
 
 # Abstract solvers and annealing strategy:
 from ..abstract_solvers import (
@@ -393,6 +393,7 @@ def solve_sample_batch(
     blur=None,
     reach=None,
 ):
+    raise NotImplementedError("This function is not implemented yet.")
     args, output_shapes = cast_input(
         xa=(xa, "B,N,D"),
         xb=(xb, "B,M,D"),
@@ -464,8 +465,8 @@ class OTResultSample(OTResult):
             raise NotImplementedError()
 
     @property
-    def plan(self):
-        """Transport plan, encoded as a dense array."""
+    def density(self):
+        """Density of the transport plan with respect to the reference measure, encoded as a dense (N, M) array."""
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
 
@@ -477,18 +478,14 @@ class OTResultSample(OTResult):
                 )
             )
 
+        ap = self._array_properties
+
         C = self._C_dense.xy
         f = self._potentials.f_ba
         g = self._potentials.g_ab
-        a = self._a
-        b = self._b
-
-        ap = self._array_properties
         assert C.shape == (ap.N, ap.M)
         assert f.shape == (ap.N,)
         assert g.shape == (ap.M,)
-        assert a.shape == (ap.N,)
-        assert b.shape == (ap.M,)
 
         eps = self._reg
         if self._reg_type != "KL":
@@ -498,8 +495,74 @@ class OTResultSample(OTResult):
             )
         assert eps > 0
 
+        f_i = bk.view(f, (ap.N, 1))
+        g_j = bk.view(g, (1, ap.M))
+        C_ij = bk.view(C, (ap.N, ap.M))
+
+        P_ij = bk.exp((f_i + g_j - C_ij) / eps)
+        assert P_ij.shape == (ap.N, ap.M)
+        return self.cast(P_ij, "C")
+
+    @property
+    def lazy_density(self):
+        """Density of the transport plan, encoded as a symbolic KeOps LazyTensor."""
+        if self._C_lazy is None:
+            return None
+        else:
+            ap = self._array_properties
+
+            C_ij = self._C_lazy.xy
+            f = self._potentials.f_ba
+            g = self._potentials.g_ab
+            assert C_ij.shape == (ap.N, ap.M)
+            assert f.shape == (ap.N,)
+            assert g.shape == (ap.M,)
+
+            eps = self._reg
+            if self._reg_type != "KL":
+                raise NotImplementedError(
+                    "Currently, we only support 'KL' "
+                    "as regularization for the OT problem."
+                )
+            assert eps > 0
+
+            f_i = bk.LazyTensor(bk.view(f, (ap.N, 1, 1)))
+            g_j = bk.LazyTensor(bk.view(g, (1, ap.M, 1)))
+
+            P_ij = ((f_i + g_j - C_ij) / eps).exp()
+            assert P_ij.shape == (ap.N, ap.M)
+            return P_ij
+
+    @property
+    def density_operator(self):
+        """Density of the transport plan, encoded as a LinearOperator."""
+        if self.lazy_density is not None:
+            return LinearOperator.from_lazy_tensor(
+                self.lazy_density,
+                input_shape=self._shapes["b"],
+                output_shape=self._shapes["a"],
+            )
+        else:
+            return LinearOperator.from_dense(
+                self.density,
+                input_shape=self._shapes["b"],
+                output_shape=self._shapes["a"],
+            )
+
+    @property
+    def plan(self):
+        """Transport plan, encoded as a dense array."""
+        density = self.density
+        a = self._a
+        b = self._b
+
+        ap = self._array_properties
+        assert density.shape == (ap.N, ap.M)
+        assert a.shape == (ap.N,)
+        assert b.shape == (ap.M,)
+
         # Compute the transport plan:
-        P_ij = bk.exp((f[:, None] + g[None, :] - C) / eps) * a[:, None] * b[None, :]
+        P_ij = density * a[:, None] * b[None, :]
         return self.cast(P_ij, "C")
 
     @property
@@ -507,6 +570,20 @@ class OTResultSample(OTResult):
         """Transport plan, encoded as a symbolic KeOps LazyTensor."""
         if self._C_lazy is None:
             return None
+
+        density_ij = self.lazy_density
+        a = self._a
+        b = self._b
+        ap = self._array_properties
+        assert density_ij.shape == (ap.N, ap.M)
+        assert a.shape == (ap.N,)
+        assert b.shape == (ap.M,)
+
+        a_i = bk.LazyTensor(bk.view(a, (ap.N, 1, 1)))
+        b_j = bk.LazyTensor(bk.view(b, (1, ap.M, 1)))
+        P_ij = density_ij * a_i * b_j
+        assert P_ij.shape == (ap.N, ap.M)
+        return P_ij
 
 
 # Convention:

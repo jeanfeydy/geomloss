@@ -1,5 +1,157 @@
 from .. import backends as bk
 from .abstract_solvers.unbalanced_ot import sinkhorn_cost
+import math
+
+
+class LinearOperator:
+    """Linear operator that can be applied to vectors, without being explicitly instantiated as a matrix."""
+
+    def __init__(self, *, matmat, rmatmat, input_shape, output_shape):
+        self._matmat = matmat
+        self._rmatmat = rmatmat
+        self._input_shape = input_shape
+        self._output_shape = output_shape
+
+    def __matmul__(self, x):
+        if (
+            len(x.shape) < len(self._input_shape)
+            or x.shape[: len(self._input_shape)] != self._input_shape
+        ):
+            raise ValueError(
+                f"Expects an input of shape {self._input_shape} with, maybe, additional trailing dimensions, but found an array of shape {x.shape}."
+            )
+
+        trailing_shape = x.shape[len(self._input_shape) :]
+
+        # For the sake of simplicity, make sure that x has shape (input_shape, V) for some V,
+        # with a single trailing dimension.
+        x_reshaped = bk.view(x, self._input_shape + (-1,))
+        out = self._matmat(x_reshaped)  # (output_shape, V)
+        return bk.view(out, self._output_shape + trailing_shape)
+
+    @property
+    def shape(self):
+        """For compatibility with e.g. SciPy's LinearOperator class."""
+        return (math.prod(self._output_shape), math.prod(self._input_shape))
+
+    def transpose(self):
+        return LinearOperator(
+            matmat=self._rmatmat,
+            rmatmat=self._matmat,
+            input_shape=self._output_shape,
+            output_shape=self._input_shape,
+        )
+
+    @property
+    def T(self):
+        return self.transpose()
+
+    @classmethod
+    def from_dense(cls, dense_matrix, *, input_shape, output_shape):
+        """Returns a LinearOperator that behaves like the given dense matrix."""
+        if len(dense_matrix.shape) == 2:
+            N, M = dense_matrix.shape
+            assert input_shape == (M,)
+            assert output_shape == (N,)
+
+            def matmat(s):
+                M_, V_ = s.shape
+                assert M_ == M
+                return dense_matrix @ s  # (N,M) @ (M,V) -> (N,V)
+
+            def rmatmat(s):
+                N_, V_ = s.shape
+                assert N_ == N
+                return bk.transpose(dense_matrix, (1, 0)) @ s  # (M,N) @ (N,V) -> (M,V)
+
+        elif len(dense_matrix.shape) == 3:
+            B, N, M = dense_matrix.shape
+            assert input_shape == (B, M)
+            assert output_shape == (B, N)
+
+            def matmat(s):
+                B_, M_, V_ = s.shape
+                assert B_ == B and M_ == M
+                return dense_matrix @ s  # (B,N,M) @ (B,M,V) -> (B,N,V)
+
+            def rmatmat(s):
+                B_, N_, V_ = s.shape
+                assert B_ == B and N_ == N
+                # (B,M,N) @ (B,N,V) -> (B,M,V)
+                return bk.transpose(dense_matrix, (0, 2, 1)) @ s
+
+        else:
+            raise ValueError(
+                f"Expected a dense matrix of shape (N, M) or (B, N, M), but found an array of shape {dense_matrix.shape}."
+            )
+
+        return cls(
+            matmat=matmat,
+            rmatmat=rmatmat,
+            input_shape=input_shape,
+            output_shape=output_shape,
+        )
+
+    @classmethod
+    def from_lazy_tensor(cls, lazy_tensor, *, input_shape, output_shape):
+        """Returns a LinearOperator that behaves like the given KeOps LazyTensor."""
+        if len(lazy_tensor.shape) == 2:
+            N, M = lazy_tensor.shape
+            assert input_shape == (M,)
+            assert output_shape == (N,)
+
+            def matmat(s):
+                M_, V_ = s.shape
+                assert M_ == M
+                return lazy_tensor @ s  # (N,M) @ (M,V) -> (N,V)
+
+            def rmatmat(s):
+                N_, V_ = s.shape
+                assert N_ == N
+                return lazy_tensor.T @ s  # (M,N) @ (N,V) -> (M,V)
+
+        else:
+            raise ValueError(
+                f"Expected a LazyTensor of shape (N, M), but found an array of shape {lazy_tensor.shape}."
+            )
+
+        return cls(
+            matmat=matmat,
+            rmatmat=rmatmat,
+            input_shape=input_shape,
+            output_shape=output_shape,
+        )
+
+    def rescale(self, *, input_scaling, output_scaling):
+        """Returns a new LinearOperator that behaves like the original one, but with rescaled inputs and outputs."""
+        b = input_scaling
+        a = output_scaling
+
+        assert a.shape == self._output_shape
+        assert b.shape == self._input_shape
+
+        def matmat(s):
+            # __matmul__ reshapes the input to have shape (input_shape, V) for some V, with a single trailing dimension.
+            V = s.shape[-1]
+            assert s.shape == b.shape + (V,)
+            a_broadcasted = bk.view(a, a.shape + (1,))
+            b_broadcasted = bk.view(b, b.shape + (1,))
+            return a_broadcasted * (self @ (b_broadcasted * s))
+
+        def rmatmat(s):
+            # __matmul__ reshapes the input to have shape (input_shape, V) for some V.
+            V = s.shape[-1]
+            assert s.shape == b.shape + (V,)
+            a_broadcasted = bk.view(a, a.shape + (1,))
+            b_broadcasted = bk.view(b, b.shape + (1,))
+            return b_broadcasted * (self.T @ (a_broadcasted * s))
+
+        return LinearOperator(
+            matmat=matmat,
+            rmatmat=rmatmat,
+            input_shape=self._input_shape,
+            output_shape=self._output_shape,
+        )
 
 
 class OTResult:
@@ -150,6 +302,25 @@ class OTResult:
         """Transport plan, encoded as a symbolic KeOps LazyTensor."""
         return None
 
+    @property
+    def density_operator(self):
+        """Density operator, i.e. exp((f_i + g_j - C(x_i, y_j)) / eps) for the Sinkhorn algorithm.
+
+        Behaves like a (B, N, M) tensor in batch mode and like a (N, M) tensor otherwise.
+        """
+        return None
+
+    @property
+    def plan_operator(self):
+        """Transport plan, encoded as a linear operator that can be applied to vectors.
+
+        Behaves like a ((B, N), (B, M)) tensor in batch mode and like a (N, M) tensor otherwise.
+        """
+
+        a = self.cast(self._a, "a")
+        b = self.cast(self._b, "b")
+        return self.density_operator.rescale(input_scaling=b, output_scaling=a)
+
     # Loss values ========================================================================
     @property
     def value(self):
@@ -188,12 +359,24 @@ class OTResult:
     @property
     def marginal_a(self):
         """First marginal of the transport plan, with the same shape as the source weights `a`."""
-        return None
+        a = self.cast(self._a, "a")
+        b = self.cast(self._b, "b")
+
+        density = self.density_operator @ b
+        assert density.shape == a.shape
+        marginal = a * density
+        return self.cast(marginal, "a")
 
     @property
     def marginal_b(self):
         """Second marginal of the transport plan, with the same shape as the target weights `b`."""
-        return None
+        a = self.cast(self._a, "a")
+        b = self.cast(self._b, "b")
+
+        density = self.density_operator.T @ a
+        assert density.shape == b.shape
+        marginal = b * density
+        return self.cast(marginal, "b")
 
     # Barycentric mappings ===============================================================
     # Return the displacement vectors as an array

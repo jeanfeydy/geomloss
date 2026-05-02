@@ -8,7 +8,7 @@ from ...typing import RealTensor, CostMatrices
 from ...input_validation import convert_inputs
 
 # Abstract class for our results:
-from ..ot_result import OTResult
+from ..ot_result import OTResult, LinearOperator
 
 # Abstract solvers and annealing strategy:
 from ..abstract_solvers import (
@@ -291,8 +291,7 @@ class OTResultMatrix(OTResult):
         }
 
     @property
-    def _exp_fg_C(self):
-        """Computes the pseudo transport plan exp((f[i] + g[j] - C[i,j]) / eps)."""
+    def _density(self):
         # Load the relevant quantities:
         f = self._potentials.f_ba  # (B, N)
         g = self._potentials.g_ab  # (B, M)
@@ -312,11 +311,21 @@ class OTResultMatrix(OTResult):
         return bk.exp((f[:, :, None] + g[:, None, :] - C) / eps)  # (B,N,M)
 
     @property
+    def density_operator(self):
+        density = self.cast(self._density, "C")  # Cast as a (N,M) or (B,N,M) Tensor
+
+        return LinearOperator.from_dense(
+            density,
+            input_shape=self._shapes["b"],
+            output_shape=self._shapes["a"],
+        )
+
+    @property
     def plan(self):
         # Load the relevant quantities:
         a = self._a  # (B, N)
         b = self._b  # (B, M)
-        plan = self._exp_fg_C  # (B, N, M)
+        plan = self._density  # (B, N, M)
 
         # Make sure that everyone has the expected shape:
         ap = self._array_properties
@@ -337,24 +346,6 @@ class OTResultMatrix(OTResult):
             )
 
         return self.cast(plan, "C")  # Cast as a (N,M) or (B,N,M) Tensor
-
-    @property
-    def marginal_a(self):
-        """First marginal of the transport plan, with the same shape as the source weights `a`."""
-        # Compute a[i] * sum_j ( b[j] * exp( (f[i] + g[j] - C[i,j]) / eps) )
-        marginal = self._a * bk.sum(
-            self._b[:, None, :] * self._exp_fg_C, axis=2
-        )  # (B, N)
-        return self.cast(marginal, "a")
-
-    @property
-    def marginal_b(self):
-        """Second marginal of the transport plan, with the same shape as the target weights `b`."""
-        # Compute b[j] * sum_i ( a[i] * exp( (f[i] + g[j] - C[i,j]) / eps) )
-        marginal = self._b * bk.sum(
-            self._a[:, :, None] * self._exp_fg_C, axis=1
-        )  # (B, M)
-        return self.cast(marginal, "b")
 
 
 # ----------------------------------------------------------------------------------------
