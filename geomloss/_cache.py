@@ -56,12 +56,15 @@ def add_cached_methods_to_sphinx(cls):
     in the `__init__` method, the Sphinx documentation will look as though
     it was a regular method.
     """
-    for method_name in cls._cached_methods + cls._cached_properties:
+    for method_name in cls._cached_methods:
         # As far as Sphinx is concerned,
         # self.method_name = self._method_name
         # Then, at the end of the __init__, we overwrite self.method_name
         # with a memoized version of self._method_name.
         setattr(cls, method_name, getattr(cls, "_" + method_name))
+
+    for method_name in cls._cached_properties:
+        setattr(cls, method_name, property(getattr(cls, "_" + method_name)))
     return cls
 
 

@@ -1,9 +1,11 @@
-from typing import Union, Tuple, List, Optional, Any, NamedTuple, Callable
+from typing import Union, Tuple, List, Optional, Any, NamedTuple, Callable, Literal
 from numpy.typing import ArrayLike
 
 RealTensor = ArrayLike
 CostMatrix = Union[RealTensor, Any]
 CostFunction = Any
+UnbalancedType = Literal["KL"]
+SupportedMethods = Literal["auto"]
 
 
 # A CostMatrices object encodes the full information about cost

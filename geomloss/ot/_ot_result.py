@@ -241,15 +241,12 @@ class OTResult:
         "potential_aa",
         "potential_bb",
         "density",
-        "sparse_density",
         "lazy_density",
         "density_operator",
         "plan",
-        "sparse_plan",
         "lazy_plan",
         "plan_operator",
         "value",
-        "value_linear",
         "marginal_a",
         "marginal_b",
         "a_to_b",
@@ -328,10 +325,6 @@ class OTResult:
         """Density of the transport plan with respect to the reference measure, encoded as a dense array."""
         return None
 
-    def _sparse_density(self):
-        """Density of the transport plan with respect to the reference measure, encoded as a sparse array."""
-        return None
-
     def _lazy_density(self):
         """Density of the transport plan with respect to the reference measure, encoded as a symbolic KeOps LazyTensor."""
         return None
@@ -344,10 +337,6 @@ class OTResult:
         """Transport plan, encoded as a dense array."""
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
-        return None
-
-    def _sparse_plan(self):
-        """Transport plan, encoded as a sparse array."""
         return None
 
     def _lazy_plan(self):
@@ -388,10 +377,6 @@ class OTResult:
             batchsize=self._batchsize,
         )
         return self.cast(values, "B")
-
-    def _value_linear(self):
-        """The "bare bones" transport cost, i.e. the product between the transport plan and the cost."""
-        return None
 
     # Marginal constraints ===============================================================
     def _marginal_a(self):
@@ -439,7 +424,10 @@ class OTResult:
 
     # Miscellaneous ======================================================================
     def _citation(self):
-        r"""Appropriate citation(s) for this result, in plain text and BibTex formats."""
+        r"""Appropriate citation(s) for this result, in plain text and BibTex formats.
+
+        Since GeomLoss packages contributions from various authors, we provide a method that returns the appropriate citation(s) for the result at hand.
+        """
 
         # The string below refers to the GeomLoss library:
         # successor methods may concatenate the relevant references

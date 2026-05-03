@@ -10,6 +10,9 @@ from ..._input_validation import convert_inputs
 # Abstract class for our results:
 from .._ot_result import OTResult, LinearOperator
 
+# Support for caching results without messing up the documentation:
+from ..._cache import add_cached_methods_to_sphinx
+
 # Abstract solvers and annealing strategy:
 from .._abstract_solvers import (
     sinkhorn_loop,
@@ -194,7 +197,6 @@ def solve_sample(
     debias=False,
     # Regularization:
     reg=None,  # -> None by default
-    reg_type="KL",
     # Unbalanced OT:
     unbalanced=None,  # None = +infty -> balanced by default;
     # We will also support scalar numbers, pairs of scalar numbers,
@@ -267,7 +269,6 @@ def solve_sample(
     # Basic checks on the solver parameters ==============================================
     check_regularization(
         reg=reg,
-        reg_type=reg_type,
         unbalanced=unbalanced,
         unbalanced_type=unbalanced_type,
         method=method,
@@ -351,7 +352,7 @@ def solve_sample(
         C=C_list[-1],  # The finest scale
         cost=cost,
         reg=reg,
-        reg_type=reg_type,
+        reg_type="KL",
         unbalanced=unbalanced,
         unbalanced_type=unbalanced_type,
         debias=debias,
@@ -376,7 +377,6 @@ def solve_sample_batch(
     debias=False,
     # Regularization:
     reg=0,  # -> None by default
-    reg_type="KL",
     # Unbalanced OT:
     unbalanced=None,  # None = +infty -> balanced by default;
     # We will also support scalar numbers, pairs of scalar numbers,
@@ -406,7 +406,10 @@ def solve_sample_batch(
     return SinkhornSamplesOTResult(potentials)
 
 
+@add_cached_methods_to_sphinx
 class OTResultSample(OTResult):
+    """Blablabla."""
+
     def __init__(
         self,
         *,

@@ -14,7 +14,6 @@ class ArrayProperties(NamedTuple):
 def check_regularization(
     *,
     reg,
-    reg_type,
     unbalanced,
     unbalanced_type,
     method,
@@ -25,9 +24,6 @@ def check_regularization(
         raise ValueError(f"Parameter 'reg' should be >= 0. Received {reg}.")
     elif reg == 0:
         raise NotImplementedError("Currently, we require that reg > 0.")
-
-    if reg_type != "KL":
-        raise NotImplementedError("Currently, we only support a Sinkhorn solver.")
 
     if unbalanced is not None and unbalanced <= 0:
         raise ValueError(

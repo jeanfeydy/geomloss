@@ -54,7 +54,25 @@ extensions = [
     "sphinxcontrib.httpdomain",
     "sphinx_gallery.gen_gallery",
     "sphinx.ext.napoleon",
+    "sphinx_math_dollar",
+    "sphinx_autodoc_typehints",
+    "sphinx_copybutton",
 ]
+
+# napoleon_use_param = True
+napoleon_preprocess_types = True
+napoleon_attr_annotations = True
+
+always_document_param_types = False
+
+# This simplifies things like Optional[Union[int, str]]
+# and can help with nested TypeAliasType resolutions.
+simplify_optional_unions = True
+
+# If you want to avoid the "TypeAliasType" suffix specifically:
+typehints_fully_qualified = False
+typehints_defaults = "comma"
+
 
 from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
@@ -78,6 +96,7 @@ sphinx_gallery_conf = {
 
 # Generate the API documentation when building
 autosummary_generate = True
+autosummary_ignore_module_all = False
 numpydoc_show_class_members = False
 autodoc_member_order = "alphabetical"
 
