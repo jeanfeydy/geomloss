@@ -1,0 +1,66 @@
+# Workflow to build documentation
+# On pull request: build documentation but do not publish it if docs or examples are modified
+# On push to main: build documentation but do not publish it (test it)
+# On release/manual trigger: build and publish documentation
+name: Documentation
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+  release:
+
+jobs:
+
+  build_documentation:
+    name: Build Documentation
+    if: |
+      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'release' ||
+      contains(github.event.head_commit.message, '[doc]') || 
+      contains(github.event.pull_request.title, '[doc]')
+    runs-on: ubuntu-latest
+
+    permissions:
+      deployments: write
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Configure Git Credentials
+      run: |
+        git config user.name github-actions[bot]
+        git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+        cache: "pip"
+
+    - name: Install package (with dependencies for docs)
+      run: |
+        pip install --upgrade pip
+        pip install .[full] --group dev
+
+    # https://github.com/pyvista/setup-headless-display-action
+    - name: Setup headless display
+      uses: pyvista/setup-headless-display-action@v3
+
+    - name: build documentation (pull request or push)
+      run: |
+        cd doc/
+        make clean
+        PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 make html
+        cd ..
+
+    - name: upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        path:
+          doc/_build/html/

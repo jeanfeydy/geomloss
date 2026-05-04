@@ -1,0 +1,53 @@
+# Install GeomLoss from source, run the tests and upload the coverage to Codecov
+# this workflow is triggered on pull request  and push to main branch
+name: Tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  install_and_run_tests:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }} on ${{ matrix.os }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install package (with dependencies for tests)
+        run: |
+          pip install --upgrade pip
+          pip install -e . --group dev
+
+      # https://github.com/pyvista/setup-headless-display-action
+      # This step is needed to run pyvista displays in tests.
+      - name: Setup headless display
+        uses: pyvista/setup-headless-display-action@v3
+
+      # Tests are run first without pykeops
+      - name: Test (minimal dependencies)
+        run: |
+          PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 pytest -x --cov-report xml:coverage.xml --durations=0
+
+      # Then, with all optional dependencies
+      - name: Test (with all optional dependencies)
+        run: |
+          pip install -e .[full] --group dev
+          PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 pytest -x --cov-append --cov-report xml:coverage_opt.xml --durations=0
+

@@ -4,7 +4,7 @@ Getting started
 Install with pip (recommended)
 ---------------------------------
 
-To install GeomLoss and all its (optional) dependencies, please:
+To install GeomLoss and all of its (optional) dependencies, please:
 
   1. Install `PyTorch <https://pytorch.org/>`_.
   2. Install the `KeOps library <http://www.kernel-operations.io/keops/python/installation.html>`_.

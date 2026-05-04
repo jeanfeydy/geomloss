@@ -56,6 +56,7 @@ clean:
 	rm -rf $(BUILDDIR)/*
 	rm -rf _auto_examples/
 	rm -rf _auto_tutorials/
+	rm -rf api/stubs/
 
 html-noplot: export SPHX_GLR_THEME = $(theme)
 html-noplot:
@@ -71,7 +72,7 @@ html_abort_on_example_error:
 
 html: export SPHX_GLR_THEME = $(theme)
 html:
-	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
+	PYKEOPS_VERBOSE=0 KEOPS_VERBOSE=0 $(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 

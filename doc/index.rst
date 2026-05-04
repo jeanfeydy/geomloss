@@ -109,6 +109,12 @@ Details and examples are provided below:
 * :doc:`Examples <_auto_examples/index>`
 
 
+This website was rendered on a Dell workstation with 
+an Intel Xeon W-2255 CPU (3.70GHz), 
+64 Gb RAM
+and a NVIDIA GeForce RTX 3090 GPU (24 Gb VRAM).
+
+
 Author and Contributors
 -------------------------
 

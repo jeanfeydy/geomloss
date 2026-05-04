@@ -14,6 +14,4 @@ The internal workings of GeomLoss are fully described in
   theory in computational anatomy
   and discusses open problems in the field.
 
-The most relevant parts of this work
-will soon be uploaded on this website.
 

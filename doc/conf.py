@@ -54,30 +54,49 @@ extensions = [
     "sphinxcontrib.httpdomain",
     "sphinx_gallery.gen_gallery",
     "sphinx.ext.napoleon",
+    "sphinx_math_dollar",
+    "sphinx_autodoc_typehints",
+    "sphinx_copybutton",
 ]
+
+# napoleon_use_param = True
+napoleon_preprocess_types = True
+napoleon_attr_annotations = True
+
+always_document_param_types = False
+
+# This simplifies things like Optional[Union[int, str]]
+# and can help with nested TypeAliasType resolutions.
+simplify_optional_unions = True
+
+# If you want to avoid the "TypeAliasType" suffix specifically:
+typehints_fully_qualified = False
+typehints_defaults = "comma"
+
 
 from sphinx_gallery.sorting import ExplicitOrder, FileNameSortKey
 
 sphinx_gallery_conf = {
     # path to your examples scripts
-    "examples_dirs": ["../geomloss/examples"],
+    "examples_dirs": ["../examples"],
     "subsection_order": ExplicitOrder(
         [
-            "../geomloss/examples/comparisons",
-            "../geomloss/examples/sinkhorn_multiscale",
-            "../geomloss/examples/optimal_transport",
-            "../geomloss/examples/performances",
-            "../geomloss/examples/brain_tractograms",
+            "../examples/comparisons",
+            "../examples/sinkhorn_multiscale",
+            "../examples/optimal_transport",
+            "../examples/performances",
+            "../examples/brain_tractograms",
         ]
     ),
     # path where to save gallery generated examples
     "gallery_dirs": ["./_auto_examples"],
     "within_subsection_order": FileNameSortKey,
-    "ignore_pattern": ".*__init__\.py",
+    "ignore_pattern": r".*__init__\.py",
 }
 
 # Generate the API documentation when building
 autosummary_generate = True
+autosummary_ignore_module_all = False
 numpydoc_show_class_members = False
 autodoc_member_order = "alphabetical"
 
@@ -156,6 +175,13 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = "sphinx_rtd_theme"
+
+
+if True:
+    # See https://stackoverflow.com/questions/2701998/automatically-document-all-modules-recursively-with-sphinx-autodoc/62613202#62613202
+    # for the templating magic...
+    templates_path = ["_templates"]
+    autosummary_generate = True
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
