@@ -214,7 +214,41 @@ def solve_sample(
     reach=None,  # Specifies "rho" = p * reach^p
     # + same other params as above
 ):
-    """
+    r"""Solves an optimal transport problem between point clouds.
+
+    .. warning::
+        The interface of this solver is still in development and may change in future releases.
+        We welcome any feedback and suggestions for improvement.
+
+    Using the notations of the documentation of :func:`~geomloss.ot.solve`, this function focuses on the case
+    where the values of the cost matrix $C_{ij} = C(x_i, y_j)$ are not provided as input, but are instead computed on the fly from the coordinates of the samples $x_i$ (stored in the array **X_a**) and $y_j$ (stored in the array **X_b**).
+    This is the most common setting in geometric applications, where the cost is typically a power of the Euclidean distance between the points.
+
+
+    Parameters
+    ----------
+    X_a: (N,D) array-like
+        Coordinates of the $N$ samples $x_1, \dots, x_N$ of the source measure $\alpha$.
+    X_b: (M,D) array-like
+        Coordinates of the $M$ samples $y_1, \dots, y_M$ of the target measure $\beta$.
+    cost: str or callable, default: "sqeuclidean"
+        Cost function, either specified as a string (e.g. ``"sqeuclidean"``) or
+        as a Python callable that takes as input two arrays of coordinates and returns the cost matrix.
+
+        Currently, we only support ``"sqeuclidean"`` as a string shortcut for the squared Euclidean distance.
+    debias: bool, default: False
+        Whether to compute the debiased Sinkhorn divergence, which returns an unbiased estimate of the unregularized OT cost
+        without shrinking artifacts (the so-called "entropic bias"). This is desirable when the value of the optimal
+        transport problem is used as a loss function.
+    blur: float > 0, default: None
+        Redundant parameter that specifies the regularization strength as $\texttt{reg} = \varepsilon = 2 * \texttt{blur}^2$,
+        when the cost is the squared Euclidean distance. This is a more intuitive parameter for geometric applications, since it corresponds to the "blurring radius" $\sigma$ of the kernel $k(x,y) = e^{-\|x-y\|^2 / 2 \sigma^2} = e^{-\|x-y\|^2 / \varepsilon}$.
+        This parameter should not be used together with `reg`, which is a more general regularization parameter that can be used with any cost and any regularization type.
+    reach: float > 0, default: None
+        Redundant parameter that specifies the unbalanced OT penalty strength as $\texttt{unbalanced} = \rho = 2 * \texttt{reach}^2$, when the cost is the squared Euclidean distance.
+
+
+    **Other parameters** are identical to those of :func:`~geomloss.ot.solve` and control the regularization strength, the unbalanced OT penalty type and strength, the optimization method and parameters, etc. See the documentation of :func:`~geomloss.ot.solve` for more details.
 
     Examples
     --------
@@ -408,7 +442,14 @@ def solve_sample_batch(
 
 @add_cached_methods_to_sphinx
 class OTResultSample(OTResult):
-    """Blablabla."""
+    """Stores the result of an optimal transport problem computed using point positions.
+
+    Users may access the optimal transport plan, the dual potentials and other related
+    quantities as attributes of this class. Under the hood, these attributes are computed
+    lazily and cached for efficiency. In the documentation below,
+    $N$ and $M$ denote the number of samples in the
+    source and target measures, respectively.
+    """
 
     def __init__(
         self,
@@ -468,7 +509,21 @@ class OTResultSample(OTResult):
             raise NotImplementedError()
 
     def _density(self):
-        """Density of the transport plan with respect to the reference measure, encoded as a dense (N, M) array."""
+        r"""Density $P_{ij}$ of the transport plan with respect to the reference product measure $\alpha \otimes \beta$.
+
+        Using the notations of the documentation of :func:`~geomloss.ot.solve`, we have:
+
+        .. math::
+
+            P_{ij} = \exp\left( \frac{f_i + g_j - C(x_i, y_j)}{\varepsilon} \right)~,
+
+        where $f$ and $g$ are the dual potentials of the optimal transport problem, $C$ is the cost function and $\varepsilon$ is the regularization strength.
+
+        Returns
+        -------
+        (N,M) array-like >= 0
+            If this solution was computed with :func:`~geomloss.ot.solve_sample`, the density is returned as a :mod:`(N,M)` array.
+        """
         # N.B.: We may catch out-of-memory errors and suggest
         # the use of lazy_plan or sparse_plan when appropriate.
 
@@ -506,7 +561,7 @@ class OTResultSample(OTResult):
         return self.cast(P_ij, "C")
 
     def _lazy_density(self):
-        """Density of the transport plan, encoded as a symbolic KeOps LazyTensor."""
+        """Density of the transport plan, encoded as a symbolic KeOps :class:`LazyTensor`."""
         if self._C_lazy is None:
             return None
         else:
@@ -535,7 +590,7 @@ class OTResultSample(OTResult):
             return P_ij
 
     def _density_operator(self):
-        """Density of the transport plan, encoded as a LinearOperator."""
+        """Density of the transport plan, encoded as a :mod:`LinearOperator`."""
         if self.lazy_density is not None:
             return LinearOperator.from_lazy_tensor(
                 self.lazy_density,
@@ -565,7 +620,7 @@ class OTResultSample(OTResult):
         return self.cast(P_ij, "C")
 
     def _lazy_plan(self):
-        """Transport plan, encoded as a symbolic KeOps LazyTensor."""
+        """Transport plan, encoded as a symbolic KeOps :class:`LazyTensor`."""
         if self._C_lazy is None:
             return None
 

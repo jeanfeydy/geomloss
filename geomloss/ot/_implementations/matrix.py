@@ -109,7 +109,14 @@ def softmin_dense(
 
 @add_cached_methods_to_sphinx
 class OTResultMatrix(OTResult):
-    """Truc..."""
+    """Stores the result of an optimal transport problem computed using an explicit cost matrix.
+
+    Users may access the optimal transport plan, the dual potentials and other related
+    quantities as attributes of this class. Under the hood, these attributes are computed
+    lazily and cached for efficiency. In the documentation below,
+    $B$ denotes the batch size while $N$ and $M$ denote the number of samples in the
+    source and target measures, respectively.
+    """
 
     def __init__(
         self,
@@ -180,6 +187,22 @@ class OTResultMatrix(OTResult):
         }
 
     def _density(self):
+        r"""Density $P_{ij}$ of the transport plan with respect to the reference product measure $\alpha \otimes \beta$.
+
+        Using the notations of the documentation of :func:`~geomloss.ot.solve`, we have:
+
+        .. math::
+
+            P_{ij} = \exp\left( \frac{f_i + g_j - C_{ij}}{\varepsilon} \right)~,
+
+        where $f$ and $g$ are the dual potentials of the optimal transport problem, $C$ is the cost matrix and $\varepsilon$ is the regularization strength.
+
+        Returns
+        -------
+        (N,M) or (B,N,M) array-like >= 0
+            If this solution was computed with :func:`~geomloss.ot.solve`, the density is returned as a :mod:`(N,M)` array.
+            If this solution was computed with :func:`~geomloss.ot.solve_batch`, the density is returned as a :mod:`(B,N,M)` array, where B is the batch size.
+        """
         # Load the relevant quantities:
         f = self._potentials.f_ba  # (B, N)
         g = self._potentials.g_ab  # (B, M)
@@ -200,6 +223,18 @@ class OTResultMatrix(OTResult):
         return self.cast(D_ij, "C")  # Cast as a (N,M) or (B,N,M) Tensor
 
     def _density_operator(self):
+        r"""Linear operator associated to :attr:`density`.
+
+        Returns
+        -------
+        LinearOperator
+            If this solution was computed with :func:`~geomloss.ot.solve`, the returned operator can be applied to
+            arrays of shape :mod:`(M,...)` to produce arrays of shape :mod:`(N,...)`.
+
+            If this solution was computed with :func:`~geomloss.ot.solve_batch`, the returned operator can be applied to
+            arrays of shape :mod:`(B,M,...)` to produce arrays of shape :mod:`(B,N,...)`.
+
+        """
         return LinearOperator.from_dense(
             self.density,
             input_shape=self._shapes["b"],
@@ -207,7 +242,22 @@ class OTResultMatrix(OTResult):
         )
 
     def _plan(self):
-        """Blablabla..."""
+        r"""Optimal transport plan $\pi_{ij}$.
+
+        Using the notations of the documentation of :func:`~geomloss.ot.solve`, we have:
+
+        .. math::
+
+            \pi_{ij} = \alpha_i \beta_j \cdot \exp\left( \frac{f_i + g_j - C_{ij}}{\varepsilon} \right)~,
+
+        where $f$ and $g$ are the dual potentials of the optimal transport problem, $C$ is the cost matrix and $\varepsilon$ is the regularization strength.
+
+        Returns
+        -------
+        (N,M) or (B,N,M) array-like >= 0
+            If this solution was computed with :func:`~geomloss.ot.solve`, the plan is returned as a :mod:`(N,M)` array.
+            If this solution was computed with :func:`~geomloss.ot.solve_batch`, the plan is returned as a :mod:`(B,N,M)` array, where B is the batch size.
+        """
 
         # Load the relevant quantities:
         a = self._a  # (B, N)
@@ -239,6 +289,54 @@ class OTResultMatrix(OTResult):
             )
 
         return self.cast(plan, "C")  # Cast as a (N,M) or (B,N,M) Tensor
+
+    def _plan_operator(self):
+        r"""Linear operator associated to :attr:`plan`.
+
+        Example
+        -------
+
+        .. testcode::
+
+            import numpy as np
+            from geomloss import ot
+
+            # Solve a balanced, 2x3 OT problem with entropic regularization:
+            solution = ot.solve(
+                C=[[0., 1., 4.],
+                   [2., 1., 0.]],
+                a=[2, 2],
+                b=[1, 1, 2],
+                reg=0.001,
+                max_iter=100,
+            )
+            print(solution.plan)
+
+        .. testoutput::
+
+            [[1. 1. 0.]
+             [0. 0. 2.]]
+
+        .. testcode::
+
+            print(solution.plan_operator @ np.array([-2., 1., 1.]))
+
+        .. testoutput::
+
+            [-1.  2.]
+
+
+        Returns
+        -------
+        LinearOperator
+            If this solution was computed with :func:`~geomloss.ot.solve`, the returned operator can be applied to
+            arrays of shape :mod:`(M,...)` to produce arrays of shape :mod:`(N,...)`.
+
+            If this solution was computed with :func:`~geomloss.ot.solve_batch`, the returned operator can be applied to
+            arrays of shape :mod:`(B,M,...)` to produce arrays of shape :mod:`(B,N,...)`.
+
+        """
+        return super()._plan_operator()
 
 
 # ----------------------------------------------------------------------------------------

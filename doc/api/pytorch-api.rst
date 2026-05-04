@@ -42,6 +42,12 @@ It is most similar to :class:`SamplesLoss` and returns an :class:`ot.OTResultSam
     ot.solve_sample
     ot.OTResultSample
 
+Note that both :class:`ot.OTResultMatrix` and :class:`ot.OTResultSample` provide efficient access to transfer operators via the :class:`ot.LinearOperator` class:
+
+.. autosummary:: 
+
+    ot.LinearOperator
+
 
 .. note::
     
@@ -62,5 +68,10 @@ It is most similar to :class:`SamplesLoss` and returns an :class:`ot.OTResultSam
 .. autofunction:: geomloss.ot.solve_sample
 
 .. autoclass:: geomloss.ot.OTResultSample
+   :members:
+   :undoc-members:
+
+
+.. autoclass:: geomloss.ot.LinearOperator
    :members:
    :undoc-members:

@@ -50,7 +50,7 @@ class SamplesLoss(Module):
         the resulting routine will expect measures whose total masses are equal with each other.
 
     Parameters:
-        loss (string, default = ``"sinkhorn"``): The loss function to compute.
+        loss (string, default = "sinkhorn"): The loss function to compute.
             The supported values are:
 
               - ``"sinkhorn"``: (Un-biased) Sinkhorn divergence, which interpolates
@@ -88,10 +88,12 @@ class SamplesLoss(Module):
             Note that the *Energy Distance* is scale-equivariant, and won't
             be affected by this parameter.
 
-        reach (float, default=None= :math:`+\infty` ): If **loss** is ``"sinkhorn"``
+        reach (float, default=None): If **loss** is ``"sinkhorn"``
             or ``"hausdorff"``,
             specifies the typical scale :math:`\tau` associated
             to the constraint strength :math:`\rho = \tau^p`.
+            If **reach** is not :mod:`None`, the resulting routine will be an *unbalanced* OT loss, which can handle measures with different total masses.
+            If **reach** is :mod:`None`, $\rho = +\infty$ and the resulting routine will be a *balanced* OT loss, which expects measures with the same total mass.
 
         diameter (float, default=None): A rough indication of the maximum
             distance between points, which is used to tune the :math:`\varepsilon`-scaling
@@ -105,14 +107,15 @@ class SamplesLoss(Module):
             This parameter allows you to specify the trade-off between
             speed (**scaling** < .4) and accuracy (**scaling** > .9).
 
-        truncate (float, default=None= :math:`+\infty`): If **backend**
+        truncate (float, default=None): If **backend**
             is ``"multiscale"``, specifies the effective support of
             a Gaussian/Laplacian kernel as a multiple of its standard deviation.
-            If **truncate** is not **None**, kernel truncation
+            If **truncate** is not :mod:`None`, kernel truncation
             steps will assume that
             :math:`\exp(-x/\sigma)` or
             :math:`\exp(-x^2/2\sigma^2)` are zero when
             :math:`\|x\| \,>\, \text{truncate}\cdot \sigma`.
+            If **truncate** is :mod:`None`, no truncation will be applied, and the resulting routines will be exact.
 
 
         cost (function or string, default=None): if **loss** is ``"sinkhorn"``
@@ -153,7 +156,7 @@ class SamplesLoss(Module):
             :math:`\varepsilon`-scaling descent should be displayed
             in the standard output.
 
-        backend (string, default = ``"auto"``): The implementation that
+        backend (string, default = "auto"): The implementation that
             will be used in the background; this choice has a major impact
             on performance. The supported values are:
 

@@ -5,7 +5,10 @@ import math
 
 
 class LinearOperator:
-    """Linear operator that can be applied to vectors, without being explicitly instantiated as a matrix."""
+    """Linear operator that can be applied to arrays, without being explicitly instantiated as a matrix.
+
+    .. automethod:: __matmul__
+    """
 
     def __init__(self, *, matmat, rmatmat, input_shape, output_shape):
         self._matmat = matmat
@@ -14,6 +17,7 @@ class LinearOperator:
         self._output_shape = output_shape
 
     def __matmul__(self, x):
+        """Applies the linear operator to an array x."""
         if (
             len(x.shape) < len(self._input_shape)
             or x.shape[: len(self._input_shape)] != self._input_shape
@@ -36,6 +40,7 @@ class LinearOperator:
         return (math.prod(self._output_shape), math.prod(self._input_shape))
 
     def transpose(self):
+        """Returns the transposed linear operator."""
         return LinearOperator(
             matmat=self._rmatmat,
             rmatmat=self._matmat,
@@ -45,11 +50,12 @@ class LinearOperator:
 
     @property
     def T(self):
+        """Alias for :meth:`transpose` ."""
         return self.transpose()
 
     @classmethod
     def from_dense(cls, dense_matrix, *, input_shape, output_shape):
-        """Returns a LinearOperator that behaves like the given dense matrix."""
+        """Returns a :class:`LinearOperator` that behaves like the given dense matrix."""
         if len(dense_matrix.shape) == 2:
             N, M = dense_matrix.shape
             assert input_shape == (M,)
@@ -95,7 +101,7 @@ class LinearOperator:
 
     @classmethod
     def from_lazy_tensor(cls, lazy_tensor, *, input_shape, output_shape):
-        """Returns a LinearOperator that behaves like the given KeOps LazyTensor."""
+        """Returns a :class:`LinearOperator` that behaves like the given KeOps :class:`LazyTensor`."""
         if len(lazy_tensor.shape) == 2:
             N, M = lazy_tensor.shape
             assert input_shape == (M,)
@@ -124,7 +130,7 @@ class LinearOperator:
         )
 
     def rescale(self, *, input_scaling, output_scaling):
-        """Returns a new LinearOperator that behaves like the original one, but with rescaled inputs and outputs."""
+        """Returns a new :class:`LinearOperator` that behaves like the original one, but with rescaled inputs and outputs."""
         b = input_scaling
         a = output_scaling
 
@@ -267,7 +273,7 @@ class OTResult:
 
     # Dual potentials ====================================================================
     def _potential_a(self):
-        """First dual potential, associated to the source measure `a`.
+        r"""First dual potential $f$, associated to the source measure $\alpha$.
 
         This real-valued Tensor has the same shape and numerical dtype as the
         Tensor of source weights `a` that was provided as input to the OT solver.
@@ -277,7 +283,7 @@ class OTResult:
         return self.cast(self._potentials.f_ba, "a")
 
     def _potential_b(self):
-        """Second dual potential, associated to the target measure `b`.
+        r"""Second dual potential $g$, associated to the target measure $\beta$.
 
         This real-valued Tensor has the same shape and numerical dtype as the
         Tensor of target weights `b` that was provided as input to the OT solver.
@@ -287,7 +293,7 @@ class OTResult:
         return self.cast(self._potentials.g_ab, "b")
 
     def _potential_aa(self):
-        """Dual potential associated to the self-interaction of the source measure `a`.
+        r"""Dual potential associated to the self-interaction of the source measure $\alpha$.
 
         This potential is only defined when using a debiased Sinkhorn solver.
         This real-valued Tensor has the same shape and numerical dtype as the
@@ -304,7 +310,7 @@ class OTResult:
         return self.cast(self._potentials.f_aa, "a")
 
     def _potential_bb(self):
-        """Dual potential associated to the self-interaction of the target measure `b`.
+        r"""Dual potential associated to the self-interaction of the target measure $\beta$.
 
         This potential is only defined when using a debiased Sinkhorn solver.
         This real-valued Tensor has the same shape and numerical dtype as the
@@ -340,7 +346,7 @@ class OTResult:
         return None
 
     def _lazy_plan(self):
-        """Transport plan, encoded as a symbolic KeOps LazyTensor."""
+        """Transport plan, encoded as a symbolic KeOps :mod:`LazyTensor`."""
         return None
 
     def _plan_operator(self):
@@ -380,7 +386,7 @@ class OTResult:
 
     # Marginal constraints ===============================================================
     def _marginal_a(self):
-        """First marginal of the transport plan, with the same shape as the source weights `a`."""
+        r"""First marginal $\pi 1_M$ of the transport plan, with the same shape as the source weights `a`."""
         a = self.cast(self._a, "a")
         b = self.cast(self._b, "b")
 
@@ -390,7 +396,7 @@ class OTResult:
         return self.cast(marginal, "a")
 
     def _marginal_b(self):
-        """Second marginal of the transport plan, with the same shape as the target weights `b`."""
+        r"""Second marginal $\pi^\intercal 1_N$ of the transport plan, with the same shape as the target weights `b`."""
         a = self.cast(self._a, "a")
         b = self.cast(self._b, "b")
 
