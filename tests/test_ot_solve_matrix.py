@@ -25,6 +25,7 @@ from .check_ot_result import (
     ex=generators.st_simple_matrix(),
     method=st_method,
 )
+@settings(deadline=None)
 @pytest.mark.filterwarnings("ignore:overflow encountered in")
 def test_symmetry(ex, method):
     """Checks that OT(a,b) = OT(b,a)."""

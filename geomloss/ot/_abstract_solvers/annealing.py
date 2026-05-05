@@ -129,6 +129,7 @@ def annealing_parameters(
         )
 
     # Make sure that the diameter is >= blur:
+    maxmin_cost = float(maxmin_cost)
     maxmin_cost = max(maxmin_cost, eps)
 
     # Compute the appropriate number of iterations, if it has not been provided already:
