@@ -75,9 +75,6 @@ dev = [
 [project.urls]
 Homepage = "https://www.kernel-operations.io/geomloss/"
 
-[tool.setuptools]
-packages = ["geomloss"]
-
 [tool.setuptools.dynamic]
 version = { attr = "geomloss.__version__" }
 
@@ -92,5 +89,5 @@ addopts = [
   "--cov-report=html",
   "--durations=0",
   "./tests",
-  "./geomloss",
+  "./src",
 ]
