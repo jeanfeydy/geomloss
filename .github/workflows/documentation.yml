@@ -32,13 +32,13 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: Configure Git Credentials
       run: |
         git config user.name github-actions[bot]
         git config user.email 41898282+github-actions[bot]@users.noreply.github.com
 
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: "3.13"
         cache: "pip"
@@ -50,7 +50,7 @@ jobs:
 
     # https://github.com/pyvista/setup-headless-display-action
     - name: Setup headless display
-      uses: pyvista/setup-headless-display-action@v3
+      uses: pyvista/setup-headless-display-action@v4
 
     - name: build documentation (pull request or push)
       run: |
@@ -60,7 +60,7 @@ jobs:
         cd ..
 
     - name: upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         path:
           doc/_build/html/
