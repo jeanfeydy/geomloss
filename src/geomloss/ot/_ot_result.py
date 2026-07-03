@@ -148,7 +148,7 @@ class LinearOperator:
         def rmatmat(s):
             # __matmul__ reshapes the input to have shape (input_shape, V) for some V.
             V = s.shape[-1]
-            assert s.shape == b.shape + (V,)
+            assert s.shape == a.shape + (V,)
             a_broadcasted = bk.view(a, a.shape + (1,))
             b_broadcasted = bk.view(b, b.shape + (1,))
             return b_broadcasted * (self.T @ (a_broadcasted * s))
