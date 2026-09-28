@@ -8,7 +8,7 @@ from ..._typing import RealTensor, CostMatrices, UnbalancedType, SupportedMethod
 from ..._input_validation import convert_inputs
 
 # Abstract class for our results:
-from .._ot_result import OTResult, LinearOperator
+from .._ot_result import OTResult, LinearOperator, linear_transport_cost
 
 # Support for caching results without messing up the documentation:
 from ..._cache import add_cached_methods_to_sphinx
@@ -167,6 +167,7 @@ class OTResultMatrix(OTResult):
         "lazy_plan",
         "plan_operator",
         "value",
+        "value_linear",
         "marginal_a",
         "marginal_b",
         "citation",
@@ -289,6 +290,81 @@ class OTResultMatrix(OTResult):
             )
 
         return self.cast(plan, "C")  # Cast as a (N,M) or (B,N,M) Tensor
+
+    def _value_linear(self):
+        r"""Linear part of the transport cost, i.e. the value of :attr:`plan` for the cost matrix $C$.
+
+        Using the notations of the documentation of :func:`~geomloss.ot.solve`, we have:
+
+        .. math::
+
+            \langle \pi, C \rangle = \sum_{i=1}^N \sum_{j=1}^M \pi_{ij} C_{ij}~.
+
+        Unlike :attr:`value`, this quantity does not include the entropic
+        regularization term: comparing the two gives access to the "sharp"
+        (unregularized) transport cost, as well as to the relative magnitude
+        of the regularization and linear terms.
+
+        Example
+        -------
+
+        .. testcode::
+
+            import numpy as np
+            from geomloss import ot
+
+            # Solve a balanced, 2x3 OT problem with entropic regularization:
+            solution = ot.solve(
+                C=[[0., 1., 4.],
+                   [2., 1., 0.]],
+                a=[2, 2],
+                b=[1, 1, 2],
+                reg=0.001,
+                max_iter=100,
+            )
+            print(f"{solution.value_linear:.3f}")
+
+        .. testoutput::
+
+            1.000
+
+        Returns
+        -------
+        () or (B,) array-like
+            If this solution was computed with :func:`~geomloss.ot.solve`, the linear
+            value is returned as a scalar.
+            If this solution was computed with :func:`~geomloss.ot.solve_batch`, the
+            linear value is returned as a :mod:`(B,)` array, where B is the batch size.
+
+        N.B.: This quantity is computed lazily, and only when it is requested.
+        As for :attr:`plan`, it is built from the dual potentials that the solver returns,
+        so that its gradient does not back-propagate through the Sinkhorn iterations - see
+        the documentation of :meth:`~geomloss.ot.OTResult.value_linear` for details.
+        """
+        # Load the relevant quantities:
+        a = self._a  # (B, N)
+        b = self._b  # (B, M)
+        C = self._C  # (B, N, M)
+        dens = self.density  # (N, M) or (B, N, M)
+
+        # Make sure that everyone has the expected shape:
+        ap = self._array_properties
+        B, N, M = ap.B, ap.N, ap.M
+
+        if self._batchsize == 0:
+            assert dens.shape == (N, M)
+            assert B == 1
+            # Add a dummy batch dimension
+            dens = bk.view(dens, (B, N, M))
+
+        assert a.shape == (B, N)
+        assert b.shape == (B, M)
+        assert C.shape == (B, N, M)
+        assert dens.shape == (B, N, M)
+
+        # Actual computation: sum_ij a_i * b_j * dens_ij * C_ij
+        values = linear_transport_cost(density=dens, C=C, a=a, b=b)  # (B,)
+        return self.cast(values, "B")  # Cast as a () or (B,) Tensor
 
     def _plan_operator(self):
         r"""Linear operator associated to :attr:`plan`.

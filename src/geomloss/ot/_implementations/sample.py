@@ -8,7 +8,7 @@ from ..._typing import RealTensor, CostMatrices, CostMatrix
 from ..._input_validation import convert_inputs
 
 # Abstract class for our results:
-from .._ot_result import OTResult, LinearOperator
+from .._ot_result import OTResult, LinearOperator, linear_transport_cost
 
 # Support for caching results without messing up the documentation:
 from ..._cache import add_cached_methods_to_sphinx
@@ -637,6 +637,128 @@ class OTResultSample(OTResult):
         P_ij = density_ij * a_i * b_j
         assert P_ij.shape == (ap.N, ap.M)
         return P_ij
+
+    def _self_density(self, *, C, f, lazy):
+        r"""Density $P_{ij} = \exp((f_i + f_j - C_{ij})/\varepsilon)$ of a self-interaction transport plan.
+
+        This is the density of the transport plan associated to the "a <-> a"
+        (or "b <-> b") optimal transport problem, that is used by debiased
+        Sinkhorn solvers. The associated transport plan reads
+        :math:`\pi_{ij} = \alpha_i \alpha_j \cdot P_{ij}`.
+
+        Args:
+            C ((N,N) array-like): Cost matrix between the points of the measure
+                and itself, i.e. :math:`C_{ij} = C(x_i, x_j)`.
+            f ((N,) array-like): Dual potential supported by the points of the measure.
+            lazy (bool): Should we return a symbolic KeOps :class:`LazyTensor`
+                instead of a dense array?
+        """
+        eps = self._reg
+        if self._reg_type != "KL":
+            raise NotImplementedError(
+                "Currently, we only support 'KL' "
+                "as regularization for the OT problem."
+            )
+        assert eps > 0
+
+        n = f.shape[0]
+
+        if lazy:
+            f_i = bk.LazyTensor(bk.view(f, (n, 1, 1)))  # (N,1,1)
+            f_j = bk.LazyTensor(bk.view(f, (1, n, 1)))  # (1,N,1)
+            P_ij = ((f_i + f_j - C) / eps).exp()
+        else:
+            f_i = bk.view(f, (n, 1))  # (N,1)
+            f_j = bk.view(f, (1, n))  # (1,N)
+            P_ij = bk.exp((f_i + f_j - C) / eps)  # (N,N)
+            assert P_ij.shape == (n, n)
+
+        return P_ij
+
+    def _value_linear(self):
+        r"""Linear part of the transport cost, i.e. the value of :attr:`plan` for the cost function $C$.
+
+        Using the notations of the documentation of :func:`~geomloss.ot.solve`, we have:
+
+        .. math::
+
+            \langle \pi, C \rangle = \sum_{i=1}^N \sum_{j=1}^M \pi_{ij} C(x_i, y_j)~.
+
+        Unlike :attr:`value`, this quantity does not include the entropic
+        regularization term. When the solver was run with ``debias = True``,
+        :attr:`value` is the Sinkhorn divergence
+
+        .. math::
+
+            S_{\varepsilon, \rho}(\alpha, \beta) =
+            \text{OT}_{\varepsilon, \rho}(\alpha, \beta)
+            - \tfrac{1}{2} \text{OT}_{\varepsilon, \rho}(\alpha, \alpha)
+            - \tfrac{1}{2} \text{OT}_{\varepsilon, \rho}(\beta, \beta)
+            + \tfrac{\varepsilon}{2} \left| \text{mass}(\alpha) - \text{mass}(\beta) \right|^2~,
+
+        and :attr:`value_linear` is then defined by removing the entropic term of each of
+        the three optimal transport problems involved above:
+
+        .. math::
+
+            \langle \pi_{\alpha \beta}, C_{xy} \rangle
+            - \tfrac{1}{2} \langle \pi_{\alpha \alpha}, C_{xx} \rangle
+            - \tfrac{1}{2} \langle \pi_{\beta \beta}, C_{yy} \rangle~,
+
+        which matches the convention used by POT for its own
+        :attr:`~geomloss.ot.OTResult.value_linear`.
+
+        Returns
+        -------
+        () array-like
+            If this solution was computed with :func:`~geomloss.ot.solve_sample`,
+            the linear value is returned as a scalar.
+
+        N.B.: This quantity is computed lazily, and only when it is requested.
+        If the cost matrices were computed with KeOps, the sum is evaluated
+        symbolically by the KeOps engine, so that the (N, M) transport plan is
+        never materialized in memory. As for :attr:`plan`, it is built from the dual
+        potentials that the solver returns, so that its gradient does not back-propagate
+        through the Sinkhorn iterations - see the documentation of
+        :meth:`~geomloss.ot.OTResult.value_linear` for details.
+        """
+        # Load the relevant quantities:
+        a = self._a  # (N,)
+        b = self._b  # (M,)
+        lazy = self._C_lazy is not None
+        C = self._C_lazy if lazy else self._C_dense
+        density_ab = self.lazy_density if lazy else self.density
+
+        ap = self._array_properties
+        assert C.xy.shape == (ap.N, ap.M)
+
+        # Linear cost of the "a <-> b" transport plan:
+        value = linear_transport_cost(density=density_ab, C=C.xy, a=a, b=b)
+
+        if not self._debias:
+            return self.cast(value, "B")
+
+        # Debiased case: we must remove the entropic term of the
+        # "a <-> a" and "b <-> b" optimal transport problems as well.
+        f_aa = self._potentials.f_aa
+        g_bb = self._potentials.g_bb
+        assert f_aa is not None and g_bb is not None
+        assert C.xx is not None and C.yy is not None
+        assert f_aa.shape == (ap.N,)
+        assert g_bb.shape == (ap.M,)
+        assert C.xx.shape == (ap.N, ap.N)
+        assert C.yy.shape == (ap.M, ap.M)
+
+        density_aa = self._self_density(C=C.xx, f=f_aa, lazy=lazy)
+        density_bb = self._self_density(C=C.yy, f=g_bb, lazy=lazy)
+
+        value = value - 0.5 * linear_transport_cost(
+            density=density_aa, C=C.xx, a=a, b=a
+        )
+        value = value - 0.5 * linear_transport_cost(
+            density=density_bb, C=C.yy, a=b, b=b
+        )
+        return self.cast(value, "B")
 
 
 # Convention:

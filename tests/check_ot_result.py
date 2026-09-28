@@ -91,7 +91,7 @@ def check_ot_result_symmetric(a_to_b, b_to_a, *, transpose, atol=1e-4, rtol=0.0)
     # Values:
     check_approx_equal(a_to_b.value, b_to_a.value, atol=atol, rtol=rtol, name="value")
 
-    if False and a_to_b.value_linear is not None:
+    if a_to_b.value_linear is not None:
         check_approx_equal(
             a_to_b.value_linear,
             b_to_a.value_linear,
@@ -154,11 +154,12 @@ def check_ot_result_cost_linearity(
         name="value",
     )
 
-    if False and normal.value_linear is not None:
+    if normal.value_linear is not None:
         check_approx_equal(
             scaling * normal.value_linear + offset,
             scaled.value_linear,
             atol=atol,
+            rtol=rtol,
             name="value_linear",
         )
 

@@ -161,6 +161,71 @@ class LinearOperator:
         )
 
 
+def linear_transport_cost(*, density, C, a, b):
+    r"""Returns the linear cost :math:`\langle \pi, C \rangle` of a transport plan.
+
+    Given the density $P_{ij}$ of a transport plan with respect to the reference
+    product measure $\alpha \otimes \beta$, i.e. the array such that
+
+    .. math::
+
+        \pi_{ij} = \alpha_i \beta_j \cdot P_{ij}~,
+
+    this routine returns the sum
+
+    .. math::
+
+        \langle \pi, C \rangle = \sum_{i=1}^N \sum_{j=1}^M \pi_{ij} C_{ij}~,
+
+    i.e. the value of the cost functional that is minimized by unregularized
+    optimal transport, evaluated on the plan $\pi$. It is the "linear" part of
+    the entropic OT objective, i.e. the objective without the regularization
+    and marginal penalization terms.
+
+    N.B.: This routine does *not* materialize the dense transport plan $\pi$.
+    When ``density`` and ``C`` are symbolic KeOps :class:`LazyTensor` objects,
+    the sum is evaluated on the fly by the KeOps engine, so that the (N, M)
+    matrix $\pi$ is never stored in memory.
+
+    Args:
+        density ((N,M) or (B,N,M) array-like): Density of the transport plan
+            with respect to the reference product measure.
+        C ((N,M) or (B,N,M) array-like): Cost matrix, with the same layout as
+            ``density``.
+        a ((N,) or (B,N) array-like): Weights of the source measure.
+        b ((M,) or (B,M) array-like): Weights of the target measure.
+
+    Returns:
+        () or (B,) array-like: The linear cost of the transport plan.
+    """
+
+    if bk.get_library(density) == "keops":
+        # Symbolic KeOps computation: we convert the weights to LazyTensors
+        # and let the KeOps engine evaluate the sum "on the fly".
+        # The (N, M) transport plan is never materialized.
+        a_i = bk.LazyTensor(bk.view(a, (a.shape[0], 1, 1)))  # (N,1,1)
+        b_j = bk.LazyTensor(bk.view(b, (1, b.shape[0], 1)))  # (1,M,1)
+        pi_times_C_ij = a_i * b_j * density * C  # (N,M)
+        return bk.sum(bk.sum(pi_times_C_ij, axis=1), axis=0)
+
+    # Dense computation, with support for the "batch" layout:
+    if len(density.shape) == 2:
+        # Single problem: a is (N,), b is (M,), density and C are (N,M).
+        pi_times_C_ij = (a[:, None] * b[None, :]) * density * C  # (N,M)
+        return bk.sum(bk.sum(pi_times_C_ij, axis=1), axis=0)
+
+    elif len(density.shape) == 3:
+        # Batch mode: a is (B,N), b is (B,M), density and C are (B,N,M).
+        pi_times_C_ij = (a[:, :, None] * b[:, None, :]) * density * C  # (B,N,M)
+        return bk.sum(bk.sum(pi_times_C_ij, axis=2), axis=1)  # (B,)
+
+    else:
+        raise ValueError(
+            "Expected a density array of shape (N,M) or (B,N,M), "
+            f"but found an array of shape {density.shape}."
+        )
+
+
 @add_cached_methods_to_sphinx
 class OTResult:
     """Abstract class for optimal transport results.
@@ -253,6 +318,7 @@ class OTResult:
         "lazy_plan",
         "plan_operator",
         "value",
+        "value_linear",
         "marginal_a",
         "marginal_b",
         "a_to_b",
@@ -383,6 +449,39 @@ class OTResult:
             batchsize=self._batchsize,
         )
         return self.cast(values, "B")
+
+    def _value_linear(self):
+        r"""Linear part of the transport cost, without any regularization term.
+
+        This is the value of the transport plan :attr:`plan` for the cost matrix or cost
+        function of the problem at hand, i.e. the quantity
+
+        .. math::
+
+            \langle \pi, C \rangle = \sum_{i=1}^N \sum_{j=1}^M \pi_{ij} C_{ij}~.
+
+        Unlike :attr:`value`, it does not include the entropic regularization term, nor
+        the penalization of the marginal constraints in unbalanced OT: comparing the two
+        gives access to the "sharp" (unregularized) transport cost, as well as to the
+        relative magnitude of the regularization and linear terms.
+
+        It is implemented by the concrete result classes; see
+        :attr:`~geomloss.ot.OTResultMatrix.value_linear` and
+        :attr:`~geomloss.ot.OTResultSample.value_linear` for the details that are
+        specific to the matrix and to the point-cloud solvers.
+
+        N.B.: As for :attr:`plan`, this quantity is built from the dual potentials that
+        the solver returns: differentiating it does not back-propagate through the
+        Sinkhorn iterations. Its gradient is therefore that of the formula above, which
+        is not the envelope-theorem derivative of the linear transport cost - the latter
+        is the transport plan itself, since :math:`\partial \text{OT} / \partial C_{ij} =
+        \pi_{ij}` at convergence. This quantity is meant to be used as a diagnostic of
+        the solver's output, not as a differentiable loss.
+        """
+        raise NotImplementedError(
+            "The linear part of the transport cost is not implemented "
+            f"for the class {type(self).__name__}."
+        )
 
     # Marginal constraints ===============================================================
     def _marginal_a(self):

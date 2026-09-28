@@ -21,12 +21,16 @@ from .check_ot_result import (
 
 # Running solvers with very low reg and max_iter may produce +-inf and then NaN in the
 # final computation of the OT cost: we disable this known warning by hand.
+# The "invalid value" warning comes from value_linear, which multiplies the density of the
+# transport plan by the cost matrix: in this overflow regime, a zero entry of C meets an
+# infinite density and yields a NaN, exactly as the dual cost above yields a NaN.
 @given(
     ex=generators.st_simple_matrix(),
     method=st_method,
 )
 @settings(deadline=None)
 @pytest.mark.filterwarnings("ignore:overflow encountered in")
+@pytest.mark.filterwarnings("ignore:invalid value encountered in")
 def test_symmetry(ex, method):
     """Checks that OT(a,b) = OT(b,a)."""
 
@@ -68,6 +72,7 @@ def test_symmetry(ex, method):
     method=st_method,
 )
 @pytest.mark.filterwarnings("ignore:overflow encountered in")
+@pytest.mark.filterwarnings("ignore:invalid value encountered in")
 def test_cost_linearity(ex, scaling, offset, method):
     """Checks that OT_{scaling * C + offset}(a,b) = scaling * OT(a,b) + offset if scaling > 0."""
 

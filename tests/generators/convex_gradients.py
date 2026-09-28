@@ -121,7 +121,10 @@ def st_convex_gradients_matrix(draw):
             rtol=1e-2,
             result=ExpectedOTResult(
                 value=value,
-                # value_linear=value,
+                # The transport plan is the diagonal matrix of the weights, so that
+                # the linear cost of the plan is the weighted sum of the squared
+                # displacements, i.e. exactly the expected OT value:
+                value_linear=value,
                 plan=plan,
                 marginal_a=a,
                 marginal_b=b,
