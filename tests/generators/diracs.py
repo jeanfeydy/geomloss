@@ -59,7 +59,20 @@ def st_diracs_matrix(draw):
             atol=1e-2,
             result=ExpectedOTResult(
                 value=value,
-                # value_linear=value,
+                # N.B.: We do not check value_linear on the "diracs" examples, even
+                # though its expected value is known in closed form (= the cost matrix,
+                # since the transport plan is the 1-by-1 matrix [[1]]).
+                # The reason is that this example is degenerate with respect to
+                # value_linear: with a single point on each side, we have
+                #   value_linear = exp((f + g - C) / eps) * C,
+                # so that the relative error of the transport plan - which is bounded
+                # by one ULP of the dual potentials divided by eps, i.e. ~1e-3 in
+                # single precision for eps = 1e-2 - is amplified by the magnitude of
+                # the cost matrix (up to 1e2 here). The resulting error on value_linear
+                # (up to ~1e-1) is much larger than the absolute tolerance that we use
+                # on the plan itself, without this being a defect of value_linear.
+                # value_linear is covered instead by the other generators, whose
+                # transport plans are well-conditioned, and by tests/test_value_linear.py.
                 plan=plan,
                 potential_a=potential_a,
                 potential_b=potential_b,
@@ -135,7 +148,12 @@ def st_diracs_sample(draw):
             atol=1e-2,
             result=ExpectedOTResult(
                 value=value,
-                # value_linear=value,
+                # N.B.: See the comment in st_diracs_matrix() above: this degenerate
+                # example is not a useful test of value_linear, whose relative error
+                # is that of the transport plan amplified by the magnitude of the cost
+                # matrix. Here, the cost matrix is computed from the point coordinates
+                # as |x|^2 - 2 <x, y> + |y|^2, whose cancellation errors are further
+                # amplified by the division by a small value of eps.
                 plan=plan,
                 potential_a=potential_a,
                 potential_b=potential_b,

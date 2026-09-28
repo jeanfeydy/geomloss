@@ -618,12 +618,23 @@ def st_gaussians_matrix(draw):
         marginal_a = np.sum(plan, axis=2)
         marginal_b = np.sum(plan, axis=1)
 
+    # The "linear" cost of the transport plan, i.e. the transport cost without
+    # the entropic regularization term. It is computed from the closed-form
+    # transport plan of Janati et al. (2020), and from the cost matrix C:
+    if plan is None:
+        # The true transport plan is singular, so that we cannot compute it:
+        value_linear = None
+    else:
+        value_linear = np.sum(plan * C, axis=(1, 2))  # (B,)
+
     # Convert to match the expected signatures and return the result ---------------------
     if batchsize == 0:  # No batch mode:
         # (B,) -> (), (B,N) -> (N,), (B,M) -> (M,), (B,N,M) -> (N,M)
         source_weights, target_weights = source_weights[0], target_weights[0]
         marginal_a, marginal_b = marginal_a[0], marginal_b[0]
         C, value = C[0], value[0]
+        if value_linear is not None:
+            value_linear = value_linear[0]
         if plan is not None:
             plan = plan[0]
 
@@ -642,7 +653,7 @@ def st_gaussians_matrix(draw):
             rtol=1e-2,
             result=ExpectedOTResult(
                 value=value,
-                # value_linear=value,
+                value_linear=value_linear,
                 plan=plan,
                 marginal_a=marginal_a,
                 marginal_b=marginal_b,

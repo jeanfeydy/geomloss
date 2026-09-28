@@ -75,7 +75,9 @@ def st_permutations_matrix(draw):
             rtol=5e-2,
             result=ExpectedOTResult(
                 value=value,
-                # value_linear=value,
+                # The transport plan is the permutation matrix associated to sigma,
+                # so that the linear cost of the plan is the sum of the selected costs:
+                value_linear=value,
                 plan=plan,
                 marginal_a=a,
                 marginal_b=b,
