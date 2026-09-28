@@ -154,23 +154,74 @@ def test_value_linear_sample_debiased():
     plain = ot.solve_sample(X, X, a=a, b=a, reg=0.1, max_iter=1000)
     check.is_true(bk.allclose(plain.value_linear, np.sum(plain.plan * C_xy), atol=1e-8))
 
-    # ... and, more precisely, on the general definition of value_linear
-    # for debiased solvers:
-    #   <pi_ab, C_xy> - 0.5 * <pi_aa, C_xx> - 0.5 * <pi_bb, C_yy>
-    f_aa = solution._potentials.f_aa
-    g_bb = solution._potentials.g_bb
-    eps = 0.1
-    dens_aa = np.exp((f_aa[:, None] + f_aa[None, :] - C_xy) / eps)
-    dens_bb = np.exp((g_bb[:, None] + g_bb[None, :] - C_xy) / eps)
-    pi_aa = a[:, None] * a[None, :] * dens_aa
-    pi_bb = a[:, None] * a[None, :] * dens_bb
-    expected = (
-        np.sum(solution.plan * C_xy)
-        - 0.5 * np.sum(pi_aa * C_xy)
-        - 0.5 * np.sum(pi_bb * C_xy)
+    # N.B.: The general formula <pi_ab, C_xy> - 0.5 <pi_aa, C_xx> - 0.5 <pi_bb, C_yy>
+    # is checked in test_value_linear_sample_debiased_nontrivial() below, on a problem
+    # where the three transport plans are distinct and the expected value is not zero.
+
+
+def test_value_linear_sample_debiased_nontrivial():
+    """Checks the debiased value_linear on distinct measures with distinct weights.
+
+    Unlike the symmetric test above, the three optimal transport problems involved here
+    are genuinely different, and the expected value is not zero. It is built from three
+    *independent* solves, performed with the matrix solver on explicitly constructed cost
+    matrices: one for the cross problem (a <-> b) and one for each self-interaction
+    problem (a <-> a and b <-> b). The definition
+
+        <pi_ab, C_xy> - 0.5 <pi_aa, C_xx> - 0.5 <pi_bb, C_yy>
+
+    is then written out explicitly with plain sums of `plan * C`. No object's
+    `value_linear` is read while building the expectation, and the formula is not
+    factored out into a shared helper, so that dropping a term, flipping a sign or
+    forgetting a factor 1/2 all make this test fail: each of those mistakes changes the
+    expected value by at least 7e-2, while the implementation agrees with it to ~1e-5.
+    """
+
+    X_a = np.array([[0.0, 0.0], [1.0, 0.2], [0.1, 1.4], [1.6, 1.1]])
+    X_b = np.array([[0.3, 0.9], [1.4, 0.4], [0.8, 1.7]])
+    a = np.array([0.4, 0.3, 0.2, 0.1])  # sums up to 1
+    b = np.array([0.5, 0.3, 0.2])  # sums up to 1, and differs from a
+    reg = 0.5
+    max_iter = 5000
+
+    C_xy = sqdists(X_a, X_b)
+    C_xx = sqdists(X_a, X_a)
+    C_yy = sqdists(X_b, X_b)
+
+    # The three transport plans, each obtained from its own balanced OT problem:
+    pi_ab = ot.solve(C_xy, a=a, b=b, reg=reg, max_iter=max_iter).plan
+    pi_aa = ot.solve(C_xx, a=a, b=a, reg=reg, max_iter=max_iter).plan
+    pi_bb = ot.solve(C_yy, a=b, b=b, reg=reg, max_iter=max_iter).plan
+
+    cross = np.sum(pi_ab * C_xy)
+    self_a = 0.5 * np.sum(pi_aa * C_xx)
+    self_b = 0.5 * np.sum(pi_bb * C_yy)
+    expected = cross - self_a - self_b
+
+    # The two self-interaction terms must be large enough for this test to be able to
+    # detect a missing term or a wrong sign:
+    check.is_true(
+        self_a > 1e-2, f"The self-interaction term for a is too small: {self_a}."
     )
     check.is_true(
-        bk.allclose(solution.value_linear, expected, atol=1e-8),
+        self_b > 1e-2, f"The self-interaction term for b is too small: {self_b}."
+    )
+    check.is_true(
+        abs(expected) > 1e-2, f"The expected value is too close to zero: {expected}."
+    )
+
+    solution = ot.solve_sample(
+        X_a, X_b, a=a, b=b, reg=reg, debias=True, max_iter=max_iter
+    )
+
+    # The cross plan of the debiased solver must be the one that we solved for above,
+    # so that the expectation really is the one that the implementation should produce:
+    check.is_true(
+        bk.allclose(solution.plan, pi_ab, atol=1e-3),
+        "The debiased solver did not return the expected cross transport plan.",
+    )
+    check.is_true(
+        bk.allclose(solution.value_linear, expected, atol=1e-3),
         f"Expected value_linear = {expected}, but found {solution.value_linear}.",
     )
 

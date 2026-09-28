@@ -638,18 +638,6 @@ class OTResultSample(OTResult):
         assert P_ij.shape == (ap.N, ap.M)
         return P_ij
 
-    def _cost_matrices(self):
-        """Returns the cost matrices of this problem, in the most economical representation available.
-
-        If the cost matrices were computed with KeOps, we return the symbolic
-        :class:`CostMatrices` object that stores :class:`LazyTensor` objects:
-        this avoids materializing the (N, M) cost matrix in memory.
-        """
-        if self._C_lazy is not None:
-            return self._C_lazy
-        else:
-            return self._C_dense
-
     def _self_density(self, *, C, f, lazy):
         r"""Density $P_{ij} = \exp((f_i + f_j - C_{ij})/\varepsilon)$ of a self-interaction transport plan.
 
@@ -698,10 +686,27 @@ class OTResultSample(OTResult):
 
         Unlike :attr:`value`, this quantity does not include the entropic
         regularization term. When the solver was run with ``debias = True``,
-        :attr:`value` is the Sinkhorn divergence and this quantity is defined
-        by removing the entropic term of each of the three optimal transport
-        problems that it involves - see the documentation of
-        :meth:`~geomloss.ot.OTResult.value_linear` for details.
+        :attr:`value` is the Sinkhorn divergence
+
+        .. math::
+
+            S_{\varepsilon, \rho}(\alpha, \beta) =
+            \text{OT}_{\varepsilon, \rho}(\alpha, \beta)
+            - \tfrac{1}{2} \text{OT}_{\varepsilon, \rho}(\alpha, \alpha)
+            - \tfrac{1}{2} \text{OT}_{\varepsilon, \rho}(\beta, \beta)
+            + \tfrac{\varepsilon}{2} \left| \text{mass}(\alpha) - \text{mass}(\beta) \right|^2~,
+
+        and :attr:`value_linear` is then defined by removing the entropic term of each of
+        the three optimal transport problems involved above:
+
+        .. math::
+
+            \langle \pi_{\alpha \beta}, C_{xy} \rangle
+            - \tfrac{1}{2} \langle \pi_{\alpha \alpha}, C_{xx} \rangle
+            - \tfrac{1}{2} \langle \pi_{\beta \beta}, C_{yy} \rangle~,
+
+        which matches the convention used by POT for its own
+        :attr:`~geomloss.ot.OTResult.value_linear`.
 
         Returns
         -------
@@ -712,14 +717,16 @@ class OTResultSample(OTResult):
         N.B.: This quantity is computed lazily, and only when it is requested.
         If the cost matrices were computed with KeOps, the sum is evaluated
         symbolically by the KeOps engine, so that the (N, M) transport plan is
-        never materialized in memory.
+        never materialized in memory. As for :attr:`plan`, it is built from the dual
+        potentials that the solver returns, so that its gradient does not back-propagate
+        through the Sinkhorn iterations - see the documentation of
+        :meth:`~geomloss.ot.OTResult.value_linear` for details.
         """
         # Load the relevant quantities:
         a = self._a  # (N,)
         b = self._b  # (M,)
-        C = self._cost_matrices()
-
         lazy = self._C_lazy is not None
+        C = self._C_lazy if lazy else self._C_dense
         density_ab = self.lazy_density if lazy else self.density
 
         ap = self._array_properties

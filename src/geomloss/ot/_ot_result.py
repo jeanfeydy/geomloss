@@ -453,50 +453,30 @@ class OTResult:
     def _value_linear(self):
         r"""Linear part of the transport cost, without any regularization term.
 
-        Using the notations of the documentation of :func:`~geomloss.ot.solve`,
-        this is the quantity
+        This is the value of the transport plan :attr:`plan` for the cost matrix or cost
+        function of the problem at hand, i.e. the quantity
 
         .. math::
 
-            \langle \pi, C \rangle = \sum_{i=1}^N \sum_{j=1}^M \pi_{ij} C_{ij}~,
+            \langle \pi, C \rangle = \sum_{i=1}^N \sum_{j=1}^M \pi_{ij} C_{ij}~.
 
-        where $\pi$ denotes the transport plan returned by the solver and $C$ the
-        cost matrix of the problem at hand. Unlike :attr:`value`, it does not
-        include the entropic regularization term, nor the penalization of the
-        marginal constraints in unbalanced OT: comparing the two quantities gives
-        access to the "sharp" (unregularized) transport cost, as well as to the
+        Unlike :attr:`value`, it does not include the entropic regularization term, nor
+        the penalization of the marginal constraints in unbalanced OT: comparing the two
+        gives access to the "sharp" (unregularized) transport cost, as well as to the
         relative magnitude of the regularization and linear terms.
 
-        When the result comes from a debiased solver, :attr:`value` is the
-        Sinkhorn divergence
+        It is implemented by the concrete result classes; see
+        :attr:`~geomloss.ot.OTResultMatrix.value_linear` and
+        :attr:`~geomloss.ot.OTResultSample.value_linear` for the details that are
+        specific to the matrix and to the point-cloud solvers.
 
-        .. math::
-
-            S_{\varepsilon, \rho}(\alpha, \beta) =
-            \text{OT}_{\varepsilon, \rho}(\alpha, \beta)
-            - \tfrac{1}{2} \text{OT}_{\varepsilon, \rho}(\alpha, \alpha)
-            - \tfrac{1}{2} \text{OT}_{\varepsilon, \rho}(\beta, \beta)
-            + \tfrac{\varepsilon}{2} \left| \text{mass}(\alpha) - \text{mass}(\beta) \right|^2~,
-
-        and :attr:`value_linear` is defined by removing the entropic term of each
-        of the three optimal transport problems involved above:
-
-        .. math::
-
-            \langle \pi_{\alpha \beta}, C_{xy} \rangle
-            - \tfrac{1}{2} \langle \pi_{\alpha \alpha}, C_{xx} \rangle
-            - \tfrac{1}{2} \langle \pi_{\beta \beta}, C_{yy} \rangle~.
-
-        Returns
-        -------
-        () or (B,) array-like
-            If this solution was computed with :func:`~geomloss.ot.solve` or
-            :func:`~geomloss.ot.solve_sample`, the value is returned as a scalar.
-            If this solution was computed with a batched solver, the value is
-            returned as a :mod:`(B,)` array, where B is the batch size.
-
-        N.B.: This quantity is computed lazily, and only when it is requested:
-        solvers do not spend any time on it unless users ask for it.
+        N.B.: As for :attr:`plan`, this quantity is built from the dual potentials that
+        the solver returns: differentiating it does not back-propagate through the
+        Sinkhorn iterations. Its gradient is therefore that of the formula above, which
+        is not the envelope-theorem derivative of the linear transport cost - the latter
+        is the transport plan itself, since :math:`\partial \text{OT} / \partial C_{ij} =
+        \pi_{ij}` at convergence. This quantity is meant to be used as a diagnostic of
+        the solver's output, not as a differentiable loss.
         """
         raise NotImplementedError(
             "The linear part of the transport cost is not implemented "

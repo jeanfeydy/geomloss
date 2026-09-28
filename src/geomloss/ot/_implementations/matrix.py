@@ -337,6 +337,9 @@ class OTResultMatrix(OTResult):
             linear value is returned as a :mod:`(B,)` array, where B is the batch size.
 
         N.B.: This quantity is computed lazily, and only when it is requested.
+        As for :attr:`plan`, it is built from the dual potentials that the solver returns,
+        so that its gradient does not back-propagate through the Sinkhorn iterations - see
+        the documentation of :meth:`~geomloss.ot.OTResult.value_linear` for details.
         """
         # Load the relevant quantities:
         a = self._a  # (B, N)
