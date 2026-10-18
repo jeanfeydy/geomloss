@@ -425,9 +425,18 @@ def sinkhorn_loop(
     if last_extrapolation:
         # The cross-updates *must* be done in parallel!
         # Do *not* split this coupled update.
+        #
+        # Autograd only sees this update. For balanced biased transport,
+        # value is <a, f_ba> + <b, g_ab>. Both softmins read the cost, so
+        # each term contributes one plan. Detach C.yx. The plan still
+        # flows through C.xy, and forward values stay put.
+        # Leave unbalanced, debiased, and KeOps graphs unchanged.
+        yx = C.yx
+        if rho is None and not debias and bk.get_library(yx) != "keops":
+            yx = bk.detach(yx)
         f_ba, g_ab = (
             dampen(softmin(eps, bk.detach(log_b), C.xy, bk.detach(g_ab))),
-            dampen(softmin(eps, bk.detach(log_a), C.yx, bk.detach(f_ba))),
+            dampen(softmin(eps, bk.detach(log_a), yx, bk.detach(f_ba))),
         )
 
         if debias:
