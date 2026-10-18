@@ -54,7 +54,7 @@ def squared_distances(x, y, use_keops=False):
 
 
 def distances(x, y, use_keops=False):
-    if use_keops:
+    if use_keops and keops_available:
         return squared_distances(x, y, use_keops=use_keops).sqrt()
 
     else:
